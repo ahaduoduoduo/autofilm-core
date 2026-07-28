@@ -1,0 +1,268 @@
+.task-metrics {
+  display: grid;
+  gap: 11px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 15px;
+}
+
+.mini-metric {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  padding: 12px 14px;
+}
+
+.mini-metric-icon {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  height: 31px;
+  justify-content: center;
+  width: 31px;
+}
+
+.mini-metric-icon.accent {
+  background: var(--purple-soft);
+  color: var(--purple-text);
+}
+
+.mini-metric-icon.success {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.mini-metric-icon.danger {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.mini-metric > span:nth-child(2) {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.mini-metric strong {
+  font-size: 20px;
+  margin-left: auto;
+}
+
+.task-table-row {
+  gap: 14px;
+  grid-template-columns: 1.5fr 1fr 0.5fr 1fr;
+}
+
+.progress-cell {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.progress-track {
+  background: var(--bg-subtle);
+  border-radius: 5px;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progress-track > span {
+  background: var(--purple);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.progress-track .progress-failed {
+  background: var(--red);
+}
+
+.progress-cell small {
+  color: var(--text-faint);
+  font-size: 9px;
+  min-width: 38px;
+}
+
+.time-cell {
+  align-items: center;
+  color: var(--text-faint);
+  display: flex;
+  font-size: 9px;
+  gap: 5px;
+}
+
+.playground {
+  display: flex;
+  flex-direction: column;
+  height: min(680px, calc(100vh - 190px));
+  min-height: 500px;
+  overflow: hidden;
+}
+
+.playground-head {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 9px;
+  padding: 12px 15px;
+}
+
+.agent-avatar,
+.chat-welcome-icon {
+  align-items: center;
+  background: var(--purple-soft);
+  border-radius: 10px;
+  color: var(--purple-text);
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.playground-head > div:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.playground-head strong {
+  font-size: 11px;
+}
+
+.playground-head span {
+  align-items: center;
+  color: var(--text-faint);
+  display: flex;
+  font-size: 8px;
+  gap: 5px;
+}
+
+.playground-head i {
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+  height: 5px;
+  width: 5px;
+}
+
+.chat-window {
+  flex: 1;
+  overflow: auto;
+}
+
+.chat-welcome {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+  padding: 25px;
+  text-align: center;
+}
+
+.chat-welcome-icon {
+  height: 52px;
+  margin-bottom: 15px;
+  width: 52px;
+}
+
+.chat-welcome h2 {
+  font-size: 17px;
+}
+
+.chat-welcome p {
+  color: var(--text-soft);
+  font-size: 11px;
+  margin: 6px 0 18px;
+}
+
+.suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.suggestion-row button {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 9px;
+  padding: 7px 10px;
+}
+
+.chat-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+}
+
+.chat-item {
+  align-items: flex-start;
+  display: flex;
+  gap: 9px;
+  max-width: 80%;
+}
+
+.chat-item > div {
+  background: var(--bg-subtle);
+  border-radius: 4px 12px 12px;
+  font-size: 11px;
+  line-height: 1.7;
+  padding: 9px 11px;
+  white-space: pre-wrap;
+}
+
+.chat-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-user > div {
+  background: var(--purple);
+  border-radius: 12px 4px 12px 12px;
+  color: white;
+}
+
+.chat-avatar {
+  align-items: center;
+  background: var(--purple-soft);
+  border-radius: 8px;
+  color: var(--purple-text);
+  display: flex;
+  flex: 0 0 auto;
+  height: 29px;
+  justify-content: center;
+  width: 29px;
+}
+
+.chat-user .chat-avatar {
+  background: var(--bg-subtle);
+  color: var(--text-soft);
+}
+
+.typing {
+  display: flex;
+  gap: 4px;
+  min-width: 48px;
+}
+
+.chat-composer {
+  align-items: flex-end;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
+
+.chat-composer .textarea {
+  max-height: 120px;
+  min-height: 42px;
+}
+
+.chat-composer .button {
+  height: 42px;
+  width: 42px;
+}

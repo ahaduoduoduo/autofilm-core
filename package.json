@@ -1,0 +1,24 @@
+{
+  "name": "autofilm-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @autofilm/contracts && npm run build -w @autofilm/web && npm run build -w @autofilm/server",
+    "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @autofilm/server\" \"npm run dev -w @autofilm/web\"",
+    "test": "npm run build -w @autofilm/contracts && npm run test -w @autofilm/server && npm run test -w @autofilm/web",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "lint": "npm run lint -ws --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,103 @@
+services:
+  autofilm-core:
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "${AUTOFILM_PORT:-3100}:3100"
+    environment:
+      AUTOFILM_HOST: 0.0.0.0
+      AUTOFILM_PORT: 3100
+      AUTOFILM_DATA_DIR: /data
+      AUTOFILM_PUBLIC_URL: "${AUTOFILM_PUBLIC_URL:?set AUTOFILM_PUBLIC_URL}"
+      AUTOFILM_MEDIA_BASE_URL: http://autofilm-core:3100
+      AUTOFILM_MASTER_KEY: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
+    volumes:
+      - ./data/core:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - autofilm
+
+  openlist:
+    build:
+      context: ../autofilm-openlist
+      dockerfile: Dockerfile.autofilm
+    restart: unless-stopped
+    ports:
+      - "${OPENLIST_PORT:-15244}:5244"
+    environment:
+      AUTOFILM_SERVICE_TOKEN: "${OPENLIST_JELLYFIN_TOKEN:?set OPENLIST_JELLYFIN_TOKEN}"
+      AUTOFILM_JELLYFIN_EVENT_URL: http://jellyfin:8096/AutoFilm/Events
+      AUTOFILM_JELLYFIN_EVENT_TOKEN: "${OPENLIST_JELLYFIN_EVENT_TOKEN:?set OPENLIST_JELLYFIN_EVENT_TOKEN}"
+    volumes:
+      - ./data/openlist:/opt/openlist/data
+    networks:
+      - autofilm
+
+  jellyfin:
+    build:
+      context: ../autofilm-jellyfin
+      dockerfile: Dockerfile.autofilm
+      additional_contexts:
+        autofilm_web: ../autofilm-jellyfin-web
+    restart: unless-stopped
+    depends_on:
+      - openlist
+    ports:
+      - "${JELLYFIN_PORT:-18096}:8096"
+    environment:
+      AUTOFILM_OPENLIST_URL: http://openlist:5244
+      AUTOFILM_OPENLIST_PUBLIC_URL: "${OPENLIST_PUBLIC_URL:?set OPENLIST_PUBLIC_URL}"
+      AUTOFILM_OPENLIST_TOKEN: "${OPENLIST_JELLYFIN_TOKEN:?set OPENLIST_JELLYFIN_TOKEN}"
+      AUTOFILM_JELLYFIN_INBOUND_TOKEN: "${OPENLIST_JELLYFIN_EVENT_TOKEN:?set OPENLIST_JELLYFIN_EVENT_TOKEN}"
+    volumes:
+      - ./data/jellyfin/config:/config
+      - ./data/jellyfin/cache:/cache
+    networks:
+      - autofilm
+
+  weclaw:
+    profiles:
+      - wechat
+    build:
+      context: ../autofilm-weclaw
+    restart: unless-stopped
+    depends_on:
+      autofilm-core:
+        condition: service_healthy
+    volumes:
+      - ./weclaw/config:/app/config
+      - ./weclaw/data:/app/data
+    networks:
+      - autofilm
+
+  jackett:
+    profiles:
+      - search
+    image: lscr.io/linuxserver/jackett:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/jackett:/config
+    networks:
+      - autofilm
+
+  flaresolverr:
+    profiles:
+      - search
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    networks:
+      - autofilm
+
+networks:
+  autofilm:
+    name: autofilm

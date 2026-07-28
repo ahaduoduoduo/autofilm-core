@@ -1,0 +1,67 @@
+services:
+  autofilm-core:
+    build:
+      context: .
+    image: ghcr.io/ahaduoduoduo/autofilm-core:latest
+    restart: unless-stopped
+    ports:
+      - "${AUTOFILM_PORT:-3100}:3100"
+    environment:
+      AUTOFILM_HOST: 0.0.0.0
+      AUTOFILM_PORT: 3100
+      AUTOFILM_DATA_DIR: /data
+      AUTOFILM_PUBLIC_URL: "${AUTOFILM_PUBLIC_URL:-http://localhost:3100}"
+      AUTOFILM_MEDIA_BASE_URL: "${AUTOFILM_MEDIA_BASE_URL:-http://autofilm-core:3100}"
+      AUTOFILM_MASTER_KEY: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
+      AUTOFILM_ADMIN_USERNAME: "${AUTOFILM_ADMIN_USERNAME:-}"
+      AUTOFILM_ADMIN_PASSWORD: "${AUTOFILM_ADMIN_PASSWORD:-}"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - autofilm
+
+  weclaw:
+    profiles:
+      - wechat
+    image: ghcr.io/ahaduoduoduo/weclaw:latest
+    restart: unless-stopped
+    depends_on:
+      autofilm-core:
+        condition: service_healthy
+    volumes:
+      - ./weclaw/config:/app/config
+      - ./weclaw/data:/app/data
+    networks:
+      - autofilm
+
+  jackett:
+    profiles:
+      - search
+    image: lscr.io/linuxserver/jackett:latest
+    restart: unless-stopped
+    volumes:
+      - ./jackett:/config
+    networks:
+      - autofilm
+
+  flaresolverr:
+    profiles:
+      - search
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    networks:
+      - autofilm
+
+networks:
+  autofilm:
+    name: autofilm

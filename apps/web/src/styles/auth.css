@@ -1,0 +1,203 @@
+.auth-page {
+  background: #0d0c13;
+  color: #f6f3fb;
+  display: grid;
+  grid-template-columns: 1.08fr 0.92fr;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+.auth-orb {
+  border-radius: 50%;
+  filter: blur(4px);
+  pointer-events: none;
+  position: absolute;
+}
+
+.auth-orb-one {
+  background: rgb(117 79 232 / 17%);
+  height: 520px;
+  left: -160px;
+  top: -200px;
+  width: 520px;
+}
+
+.auth-orb-two {
+  background: rgb(73 190 209 / 8%);
+  bottom: -220px;
+  height: 500px;
+  left: 34%;
+  width: 500px;
+}
+
+.auth-intro {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 52px clamp(40px, 7vw, 105px);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-copy {
+  margin: 80px 0;
+  max-width: 620px;
+}
+
+.auth-copy h1 {
+  font-size: clamp(38px, 4.5vw, 64px);
+  font-weight: 720;
+  letter-spacing: -0.055em;
+  line-height: 1.06;
+}
+
+.auth-copy p {
+  color: #aaa4b5;
+  font-size: 14px;
+  line-height: 1.8;
+  margin-top: 24px;
+  max-width: 530px;
+}
+
+.auth-stat-row {
+  display: flex;
+  gap: clamp(30px, 6vw, 80px);
+}
+
+.auth-stat-row > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-stat-row strong {
+  font-size: 24px;
+  font-weight: 620;
+}
+
+.auth-stat-row span {
+  color: #777180;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.auth-panel {
+  align-items: center;
+  background: #f6f5f8;
+  color: #19171e;
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-card {
+  max-width: 410px;
+  width: 100%;
+}
+
+.auth-icon {
+  align-items: center;
+  background: #ece7ff;
+  border-radius: 12px;
+  color: #6746da;
+  display: flex;
+  height: 45px;
+  justify-content: center;
+  margin-bottom: 22px;
+  width: 45px;
+}
+
+.auth-card h2 {
+  font-size: 27px;
+  letter-spacing: -0.04em;
+}
+
+.auth-card > p {
+  color: #77727e;
+  font-size: 12px;
+  margin: 7px 0 27px;
+}
+
+.auth-card .field-label {
+  color: #5f5a66;
+}
+
+.auth-card .field-hint {
+  color: #918b97;
+}
+
+.auth-card .input {
+  background: #fff;
+  border-color: #dedbe3;
+  color: #19171e;
+  min-height: 45px;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field .input {
+  padding-right: 43px;
+}
+
+.password-field button {
+  background: transparent;
+  color: #8d8793;
+  cursor: pointer;
+  padding: 7px;
+  position: absolute;
+  right: 5px;
+  top: 5px;
+}
+
+.auth-submit {
+  margin-top: 23px;
+  min-height: 45px;
+  width: 100%;
+}
+
+.auth-footnote {
+  color: #98929d;
+  font-size: 9px;
+  margin-top: 15px;
+  text-align: center;
+}
+
+.member-access-page {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 25%, var(--purple-soft), transparent 32%),
+    var(--bg);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 22px;
+}
+
+.member-access-card {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  max-width: 440px;
+  padding: 36px;
+  text-align: center;
+}
+
+.member-access-card > svg {
+  color: var(--purple);
+  margin: 25px 0 12px;
+}
+
+.member-access-card h1 {
+  font-size: 21px;
+}
+
+.member-access-card p {
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 7px 0 20px;
+}

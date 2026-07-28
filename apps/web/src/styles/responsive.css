@@ -1,0 +1,222 @@
+@media (max-width: 1120px) {
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pending-list {
+    display: none;
+  }
+
+  .auth-page {
+    grid-template-columns: 0.85fr 1.15fr;
+  }
+
+  .auth-stat-row {
+    gap: 35px;
+  }
+}
+
+@media (max-width: 860px) {
+  .sidebar {
+    box-shadow: var(--shadow-md);
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar-open {
+    transform: translateX(0);
+  }
+
+  .mobile-close {
+    background: transparent;
+    color: var(--text-soft);
+    cursor: pointer;
+    display: block;
+    margin-left: auto;
+  }
+
+  .sidebar-scrim {
+    background: rgb(0 0 0 / 48%);
+    cursor: pointer;
+    display: block;
+    inset: 0;
+    position: fixed;
+    z-index: 25;
+  }
+
+  .main-column {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .topbar {
+    justify-content: flex-end;
+    padding: 0 18px;
+  }
+
+  .mobile-menu {
+    display: inline-flex;
+    margin-right: auto;
+  }
+
+  .main-content {
+    padding: 25px 20px 50px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    min-height: unset;
+  }
+
+  .service-hints {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .table-card {
+    overflow-x: auto;
+  }
+
+  .auth-page {
+    display: block;
+  }
+
+  .auth-intro {
+    min-height: 420px;
+    padding: 35px 38px;
+  }
+
+  .auth-copy {
+    margin: 55px 0;
+  }
+
+  .auth-copy h1 {
+    font-size: 42px;
+  }
+
+  .auth-panel {
+    min-height: 600px;
+  }
+}
+
+@media (max-width: 600px) {
+  .main-content {
+    padding: 22px 14px 45px;
+  }
+
+  .topbar-context {
+    display: none;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 17px;
+  }
+
+  .page-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .page-actions .button {
+    flex: 1;
+  }
+
+  .metric-grid,
+  .card-grid,
+  .task-metrics,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card {
+    min-height: 135px;
+  }
+
+  .section-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .section-title .button {
+    width: 100%;
+  }
+
+  .boundary-card,
+  .pending-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .boundary-card > .badge {
+    margin-left: 53px;
+  }
+
+  .service-hints {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: 92vh;
+  }
+
+  .toast-stack {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .toast {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .playground {
+    height: calc(100vh - 220px);
+  }
+
+  .chat-item {
+    max-width: 94%;
+  }
+
+  .auth-intro {
+    min-height: 480px;
+    padding: 28px 23px;
+  }
+
+  .auth-copy {
+    margin: 55px 0 35px;
+  }
+
+  .auth-copy h1 {
+    font-size: 36px;
+  }
+
+  .auth-copy p {
+    font-size: 12px;
+  }
+
+  .auth-stat-row {
+    gap: 30px;
+  }
+
+  .auth-panel {
+    min-height: 580px;
+    padding: 45px 23px;
+  }
+}
