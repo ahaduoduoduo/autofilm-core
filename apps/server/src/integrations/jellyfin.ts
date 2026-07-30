@@ -286,18 +286,27 @@ export class JellyfinClient {
     isHearingImpaired?: boolean;
   }): Promise<void> {
     const config = this.requireConfig();
+    const normalizedFormat = input.format.replace(/^\./, "").toLowerCase();
     await requestOk(
-      `${config.baseUrl}/Videos/${encodeURIComponent(input.itemId)}/Subtitles`,
+      withQuery(
+        config.baseUrl,
+        `/AutoFilm/Videos/${encodeURIComponent(input.itemId)}/Subtitles`,
+        {
+          format: normalizedFormat,
+          language: input.language,
+          isForced: String(input.isForced ?? false),
+          isHearingImpaired: String(input.isHearingImpaired ?? false),
+        },
+      ),
       {
         method: "POST",
-        headers: this.headers(config.credential),
-        body: JSON.stringify({
-          language: input.language,
-          format: input.format.replace(/^\./, "").toLowerCase(),
-          isForced: input.isForced ?? false,
-          isHearingImpaired: input.isHearingImpaired ?? false,
-          data: input.data.toString("base64"),
-        }),
+        headers: {
+          ...this.headers(config.credential),
+          "content-type": "application/octet-stream",
+          "content-length": String(input.data.byteLength),
+        },
+        body: input.data,
+        signal: AbortSignal.timeout(10 * 60_000),
       },
     );
   }

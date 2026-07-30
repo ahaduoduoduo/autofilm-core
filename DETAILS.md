@@ -84,7 +84,8 @@ Updated: 2026-07-30
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
   内存任务状态、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
-  `RemoteRefresh`、字幕读取、上传和删除。
+  `RemoteRefresh`、字幕读取和删除；所有字幕格式均以保留原始长度的二进制请求
+  上传到 AutoFilm 流式端点，不生成 Base64 副本。
 - `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
   并提供季、分集日期和受限大小的封面读取。

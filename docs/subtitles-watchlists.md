@@ -73,12 +73,15 @@ AI 请求失败或返回无法解析的数据时保留原字幕。SUP/PGS 和其
 现有外挂字幕流。每条外挂字幕使用基于条目和文件摘要的 `subtitle_ref`，Agent 不接收
 Jellyfin 字幕流数字序号，也不填写 OpenList 视频路径。
 
-`place_subtitles` 逐项调用 Jellyfin 标准字幕上传接口：
+`place_subtitles` 逐项调用 AutoFilm Jellyfin 的鉴权二进制流式字幕上传接口：
 
 - 本地媒体由 Jellyfin 保存到媒体目录或内部元数据目录，并使用原生命名规则。
 - `openlist:///` 媒体由 Jellyfin AutoFilm 字幕服务上传 OpenList，并立即保存新的
   外挂字幕流。
-- SUP/PGS 使用同一接口并保留二进制数据。
+- ASS、SSA、SRT、VTT、SUP/PGS 等所有格式使用同一流式接口；请求不进行 Base64
+  编码，也不受 ASP.NET Core 默认 30 MB JSON 请求限制。
+- Jellyfin 原生 JSON 字幕上传接口仅为 Jellyfin Web、第三方客户端和插件保留，
+  AutoFilm Core 不再调用。
 - 新字幕上传成功后才按可选 `replace_subtitle_ref` 删除旧字幕。
 - 删除前重新读取 Jellyfin 条目并核对摘要；字幕流发生变化时拒绝按旧位置猜测。
 - 单项失败不会停止其他映射；失败时返回逐项结果并保留 workspace。
