@@ -119,9 +119,12 @@ export class OpenListClient {
     );
   }
 
-  async authHealth(): Promise<{
+  async authState(): Promise<{
     authenticated: boolean;
-    checked_at: string;
+    state: "authenticated" | "risk_controlled" | "error";
+    requires_reauthentication: boolean;
+    status_code?: number;
+    detected_at?: string;
     message?: string;
   }> {
     const config = this.requireConfig();
@@ -130,7 +133,7 @@ export class OpenListClient {
       throw new Error("OpenList authStorageId is not configured");
     }
     const query = new URLSearchParams({ storage_id: String(storageId) });
-    return this.get(`/api/autofilm/auth-health?${query}`);
+    return this.get(`/api/autofilm/auth-state?${query}`);
   }
 
   async startAuth(storageId: number): Promise<OpenListAuthSession> {

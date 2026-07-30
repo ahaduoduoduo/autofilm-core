@@ -38,6 +38,8 @@ services:
     build:
       context: ../autofilm-openlist
       dockerfile: Dockerfile.autofilm
+      additional_contexts:
+        autofilm_frontend: ../autofilm-openlist-frontend
     restart: unless-stopped
     ports:
       - "${OPENLIST_PORT:-15244}:5244"

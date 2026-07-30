@@ -86,8 +86,9 @@ Updated: 2026-07-30
 - `tasks/progress-worker.ts`：每 2 秒读取 OpenList 内存任务状态，处理 115
   短时失败、远端任务删除和备用磁力；任务完成后按目标目录合并 Jellyfin
   刷新请求并保存重试状态。
-- `tasks/openlist-auth-worker.ts`：低频检查 115 登录凭据；失效时向每个已配置渠道中的
-  owner/admin 身份发送通知，同一次失效不重复发送。
+- `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
+  115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
+  同一次标记不重复发送。
 - `tasks/watchlist-worker.ts`：按间隔读取 TMDB 并调用只读 Agent 检查追更条件。
 - `channels/outbound.ts`：向 Native Adapter 发送主动消息。
 - `channels/agent-messages.ts`：把 Agent 最终文本中的 Core 临时媒体 URL 提取为

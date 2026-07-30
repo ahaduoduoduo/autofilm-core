@@ -41,6 +41,8 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   `剧名/Sxx`，多季合集进入剧集根目录，Agent 不能自行指定最终目录。
 - OpenList 115 扫码登录管理；二维码可从管理界面获取，管理员也可让 Agent
   通过聊天发送临时二维码。
+- OpenList 真实请求返回 HTTP 405 时向所有已绑定管理员渠道发送一次通知；Core
+  只读取 OpenList 本地标记，不主动访问 115。
 - WeClaw 与独立 Telegram Adapter，共用 Native Message Service
   `2026-07-01` 协议和双向令牌认证；同一 Compose 内的 WeClaw 登录账号由
   Core 自动识别，不要求管理员填写 Bot ID、容器地址或令牌。

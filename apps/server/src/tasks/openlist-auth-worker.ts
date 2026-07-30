@@ -11,11 +11,11 @@ export class OpenListAuthWorker {
   private state: AuthState = "unknown";
 
   constructor(
-    private readonly openList: Pick<OpenListClient, "authHealth">,
+    private readonly openList: Pick<OpenListClient, "authState">,
     private readonly configs: Pick<ConfigStore, "listChannels">,
     private readonly users: Pick<UserStore, "listMembers">,
     private readonly outbox: Pick<OutboxStore, "enqueue">,
-    private readonly intervalMs = 10 * 60_000,
+    private readonly intervalMs = 60_000,
   ) {}
 
   start(): void {
@@ -34,18 +34,24 @@ export class OpenListAuthWorker {
     if (this.running) return;
     this.running = true;
     try {
-      const health = await this.openList.authHealth();
-      if (health.authenticated) {
+      const state = await this.openList.authState();
+      if (state.authenticated) {
         this.state = "authenticated";
         return;
       }
+      if (
+        state.state !== "risk_controlled" ||
+        state.status_code !== 405
+      ) {
+        return;
+      }
       if (this.state !== "required") {
-        this.notifyAdministrators(health.message);
+        this.notifyAdministrators(state.message);
       }
       this.state = "required";
     } catch (error) {
       console.error(
-        `OpenList authentication health request failed: ${error instanceof Error ? error.message : String(error)}`,
+        `OpenList authentication state request failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
       this.running = false;
@@ -89,7 +95,7 @@ export class OpenListAuthWorker {
           providerInstanceId: identity.providerInstanceId,
           targetId: identity.externalUserId,
           text:
-            "OpenList 的 115 登录凭据已经失效，需要重新扫码。请在 AutoFilm 管理页面的服务设置中打开 OpenList 扫码登录。" +
+            "OpenList 的 115 存储触发 HTTP 405 风控，需要重新扫码。请打开 OpenList 的 115 存储配置页面生成二维码。" +
             suffix,
         });
       }

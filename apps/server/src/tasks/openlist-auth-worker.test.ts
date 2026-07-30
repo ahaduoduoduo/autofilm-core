@@ -67,11 +67,13 @@ describe("OpenList authentication worker", () => {
     const enqueue = vi.fn();
     const worker = new OpenListAuthWorker(
       {
-        async authHealth() {
+        async authState() {
           return {
             authenticated: false,
-            checked_at: new Date().toISOString(),
-            message: "cookie expired",
+            state: "risk_controlled" as const,
+            requires_reauthentication: true,
+            status_code: 405,
+            message: "HTTP 405",
           };
         },
       },
@@ -87,5 +89,28 @@ describe("OpenList authentication worker", () => {
     expect(
       enqueue.mock.calls.map(([message]) => message.providerInstanceId),
     ).toEqual(["wechat-main", "telegram-main"]);
+  });
+
+  it("does not notify for a local state read or an unrelated storage error", async () => {
+    const enqueue = vi.fn();
+    const worker = new OpenListAuthWorker(
+      {
+        async authState() {
+          return {
+            authenticated: false,
+            state: "error" as const,
+            requires_reauthentication: false,
+            message: "storage is initializing",
+          };
+        },
+      },
+      { listChannels: () => channels },
+      { listMembers: () => members },
+      { enqueue },
+    );
+
+    await worker.tick();
+
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });

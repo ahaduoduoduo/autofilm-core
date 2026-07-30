@@ -35,8 +35,10 @@ Core 使用 OpenList 管理端 AutoFilm 扫码 API：
 扫码成功后 OpenList 使用该 Storage 原有 `QRCodeSource`，校验新 Cookie，
 更新驱动字段并保存 Storage。Core 不接收 Cookie。
 
-OpenList 还提供低频凭据健康检查。Core 不解释 115 错误文本，而是读取明确的
-`authenticated` 状态；失效时向所有已配置且已有管理员身份的聊天渠道发送通知。
+OpenList 不执行低频 115 凭据检查。真实文件操作返回 HTTP 405 时，115 驱动记录
+明确的 `risk_controlled` 状态；Core 只读取这个本地状态，并向所有已配置且已有
+管理员身份的聊天渠道发送一次通知。扫码成功或后续真实请求恢复成功时，OpenList
+清除标记。
 
 管理界面中的 Storage ID 只用于选择需要重新认证的 OpenList Storage，
 不会写入 Jellyfin 条目，也不会成为媒体路径的一部分。
