@@ -77,9 +77,39 @@ docker compose -f compose.full.yaml \
 绑定域名后修改 `AUTOFILM_PUBLIC_URL` 和 `OPENLIST_PUBLIC_URL`。
 Jellyfin 返回给播放客户端的是后者，所以必须是 Infuse 能访问的地址。
 
+### 现有数据目录
+
+完整编排不会假定固定的群晖目录。以下变量用于接管现有 OpenList/Jellyfin 数据：
+
+- `OPENLIST_DATA_DIR`：OpenList 持久化目录，挂载到 `/opt/openlist/data`。
+- `JELLYFIN_CONFIG_DIR`：Jellyfin 配置和数据库目录，挂载到 `/config`。
+- `JELLYFIN_CACHE_DIR`：Jellyfin 缓存目录，挂载到 `/cache`。
+- `JELLYFIN_MEDIA_DIR`：旧本地媒体根目录，挂载到 `/movie`。
+- `JELLYFIN_LEGACY_SUBTITLE_DIR`：旧软链接树，按只读方式挂载到
+  `/legacy-subtitles`，只用于字幕首次读取时的延迟迁移。
+
+`JELLYFIN_MEDIA_DIR` 保留本地媒体库和未迁移记录的读取能力。
+`JELLYFIN_LEGACY_SUBTITLE_DIR` 不参与视频播放，也不是独立整理出的字幕目录；
+它就是旧视频软链接与外挂字幕原来共同所在的目录。
+
+### 接管已有部署
+
+在本机 `.env` 中填写现有数据目录、宿主机端口和公开地址。`.env` 不进入版本库，
+避免公开个人域名、目录和服务凭据。已有 Jackett 和 FlareSolverr 可以继续作为
+外部服务使用，此时不启用完整编排中的 `search` profile。
+
+旧 AList 数据目录由 UID `1001` 的 OpenList 进程写入。接管旧目录时需要保证该
+UID 拥有读写权限。Jellyfin 旧数据库首次由 v12 启动时会执行数据库升级，
+应等待升级完成后再访问媒体库。
+
+路径迁移会将旧媒体条目、外挂字幕和媒体库根目录改为 `openlist:///`。迁移后应再次
+执行预检，结果必须为 0 个待处理项。旧外挂字幕不会批量上传，首次播放字幕时先从
+`/legacy-subtitles` 返回，再由单并发后台任务上传到 OpenList；后续请求直接返回
+OpenList 302 地址。
+
 ## 备份
 
-停止 Core 后备份 `data/core`。在线备份应使用 SQLite backup API，
+停止 Core 后备份 `data`。在线备份应使用 SQLite backup API，
 不要只复制主数据库文件而遗漏 WAL。
 
 OpenList 和 Jellyfin 数据目录独立备份。Core 数据库不替代它们。

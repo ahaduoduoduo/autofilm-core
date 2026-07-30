@@ -9,7 +9,8 @@ Updated: 2026-07-30
 - `Dockerfile`：构建共享类型、React 前端和 Fastify 后端的单镜像。
 - `Dockerfile.telegram`：构建独立 Telegram Adapter 镜像。
 - `compose.yaml`：Core 与可选 Adapter/搜索服务。
-- `compose.full.yaml`：从相邻 fork 源码构建整个媒体系统。
+- `compose.full.yaml`：从相邻 fork 源码构建整个媒体系统；数据目录通过环境变量
+  指定，可接管现有 OpenList/Jellyfin 持久化目录。
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
 
 ## `packages/contracts`
