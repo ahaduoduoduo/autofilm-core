@@ -30,6 +30,7 @@ const modelSchema = z.object({
 
 const promptKeySchema = z.enum([
   "agent.main",
+  "conversation.summarizer",
   "subtitle.captcha.system",
   "subtitle.captcha.user",
   "subtitle.cleaner",

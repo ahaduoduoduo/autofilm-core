@@ -1,6 +1,6 @@
 # Architecture
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## 职责
 
@@ -12,6 +12,7 @@ AutoFilm Core 只处理业务状态：
 - 下载任务、进度和通知。
 - OpenList、Jellyfin、Jackett、TMDB、SubHD 的 API 调用。
 - 字幕临时处理和按成员追更。
+- Jellyfin 电影版本清单、重复项分析和影视主题摘要。
 
 聊天 Adapter 处理平台登录、加密媒体和消息投递。OpenList
 处理网盘驱动、Cookie、限速、文件操作与显式扫描。Jellyfin 处理媒体元数据、播放和
@@ -91,6 +92,11 @@ Core；它们继续保留媒体条目、播放历史、存储和文件状态。C
 验证码按成员、workspace 和下载请求隔离。每个 SubHD 下载还具有独立 session 与
 Cookie Jar，请求开始遵守统一间隔，但不同任务可以同时等待网络和 OCR 响应。追更条件
 与分集状态需要跨重启保留，因此存入 Core SQLite。
+
+会话原始消息始终保存在 `messages`。当前影视主题使用 TMDB ID 标识；Agent 明确
+切换作品后，Core 使用独立无工具请求生成上一主题摘要，保存到
+`conversation_topic_summaries`。发给模型的历史由较早主题摘要、当前主题完整消息和
+当前服务器时间组成。摘要不删除原始消息，也不拆分一次工具调用及其结果。
 
 Telegram 与 WeClaw 都在独立 Adapter 进程中。Telegram Adapter 使用 long polling，
 Core 只接收统一事件并通过统一 `/v1/messages` 接口发送结果。

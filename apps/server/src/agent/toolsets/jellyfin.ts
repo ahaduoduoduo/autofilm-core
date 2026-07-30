@@ -1,16 +1,147 @@
 import type { AgentTool, ToolDependencies } from "../tool-types.js";
 import { createSubtitleReference } from "../../subtitles/references.js";
 import {
+  JellyfinMovieInventory,
+} from "../media-inventory.js";
+import {
   objectSchema,
   requireArray,
+  requireNumber,
   requireString,
   stringProperty,
 } from "./schema.js";
 
 const IMAGE_TYPES = ["Primary", "Backdrop", "Logo", "Banner", "Thumb"];
+const RESOLUTION_CLASSES = [
+  "all",
+  "sd",
+  "720p",
+  "1080p",
+  "1440p",
+  "2160p",
+  "4320p",
+  "unknown",
+] as const;
+const DUPLICATE_CONFIDENCE = ["all", "confirmed", "candidate"] as const;
 
 export function createJellyfinTools(deps: ToolDependencies): AgentTool[] {
   return [
+    {
+      definition: {
+        name: "query_jellyfin_movies",
+        description:
+          "按实际视频流分辨率分页列出 Jellyfin 电影版本。只读取 Jellyfin 已保存的信息，不访问 OpenList；可用于查找需要升级画质的 720p/1080p 电影。",
+        parameters: objectSchema({
+          resolution: {
+            type: "string",
+            enum: RESOLUTION_CLASSES,
+            description: "分辨率类别；默认 all",
+          },
+          page: {
+            type: "integer",
+            minimum: 0,
+            description: "页码，从 0 开始",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 25,
+            description: "每页数量，默认 20，最大 25",
+          },
+        }),
+      },
+      execute: async (args) => {
+        const resolution = enumValue(
+          args.resolution,
+          RESOLUTION_CLASSES,
+          "all",
+        );
+        const page = integerArgument(args, "page", 0, 0, 100_000);
+        const limit = integerArgument(args, "limit", 20, 1, 25);
+        const all = await new JellyfinMovieInventory(deps.jellyfin).versions();
+        const matched =
+          resolution === "all"
+            ? all
+            : all.filter((version) => version.resolution === resolution);
+        const sorted = matched.sort(
+          (left, right) =>
+            left.name.localeCompare(right.name, "zh-CN") ||
+            (left.productionYear ?? 0) - (right.productionYear ?? 0),
+        );
+        const start = page * limit;
+        return {
+          resolution,
+          page,
+          limit,
+          totalMovies: new Set(all.map((item) => item.displayItemId)).size,
+          totalVersions: all.length,
+          totalMatched: sorted.length,
+          unknownResolutionVersions: all.filter(
+            (item) => item.resolution === "unknown",
+          ).length,
+          hasMore: start + limit < sorted.length,
+          nextPage: start + limit < sorted.length ? page + 1 : undefined,
+          versions: sorted.slice(start, start + limit),
+        };
+      },
+    },
+    {
+      definition: {
+        name: "find_duplicate_jellyfin_movies",
+        description:
+          "分页查找 Jellyfin 中的重复电影版本。TMDB/IMDb ID 相同为确定重复；仅标题和年份相同为疑似重复。只读查询，不能据此直接删除。",
+        parameters: objectSchema({
+          confidence: {
+            type: "string",
+            enum: DUPLICATE_CONFIDENCE,
+            description: "all、confirmed 或 candidate；默认 all",
+          },
+          page: {
+            type: "integer",
+            minimum: 0,
+            description: "页码，从 0 开始",
+          },
+          limit: {
+            type: "integer",
+            minimum: 1,
+            maximum: 10,
+            description: "每页重复组数量，默认 5，最大 10",
+          },
+        }),
+      },
+      execute: async (args) => {
+        const confidence = enumValue(
+          args.confidence,
+          DUPLICATE_CONFIDENCE,
+          "all",
+        );
+        const page = integerArgument(args, "page", 0, 0, 100_000);
+        const limit = integerArgument(args, "limit", 5, 1, 10);
+        const all = await new JellyfinMovieInventory(
+          deps.jellyfin,
+        ).duplicates();
+        const matched =
+          confidence === "all"
+            ? all
+            : all.filter((group) => group.confidence === confidence);
+        const start = page * limit;
+        return {
+          confidence,
+          page,
+          limit,
+          totalGroups: matched.length,
+          confirmedGroups: all.filter(
+            (group) => group.confidence === "confirmed",
+          ).length,
+          candidateGroups: all.filter(
+            (group) => group.confidence === "candidate",
+          ).length,
+          hasMore: start + limit < matched.length,
+          nextPage: start + limit < matched.length ? page + 1 : undefined,
+          groups: matched.slice(start, start + limit),
+        };
+      },
+    },
     {
       definition: {
         name: "view_jellyfin_images",
@@ -381,6 +512,33 @@ async function deleteJellyfinItems(
 function requireImageType(args: Record<string, unknown>): string {
   const value = requireString(args, "image_type");
   if (!IMAGE_TYPES.includes(value)) throw new Error("不支持的 Jellyfin 图片类型");
+  return value;
+}
+
+function enumValue<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  if (value === undefined) return fallback;
+  if (typeof value !== "string" || !allowed.includes(value as T)) {
+    throw new Error(`不支持的值：${String(value)}`);
+  }
+  return value as T;
+}
+
+function integerArgument(
+  args: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  if (args[key] === undefined) return fallback;
+  const value = requireNumber(args, key);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${key} 必须是 ${minimum} 到 ${maximum} 之间的整数`);
+  }
   return value;
 }
 

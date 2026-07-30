@@ -44,13 +44,15 @@ Updated: 2026-07-31
 
 ### `agent`
 
-- `service.ts`：持久化会话、按会话顺序执行顶层请求、并行工具迭代、TMDB 封面
-  媒体生成、只读追更检查和管理员扫码工具。
+- `service.ts`：持久化会话、按会话顺序执行顶层请求、并行工具迭代、运行时间注入、
+  影视主题摘要、TMDB 封面媒体生成、只读追更检查和管理员扫码工具。
 - `conversation-queue.ts`：同一会话按提交顺序执行，不同会话互不等待。
 - `catalog-poster.ts`：从本次 TMDB 搜索结果和最终回复中确定唯一条目，不猜测
   存在歧义的封面。
 - `media-destination.ts`：使用媒体库根目录、TMDB 英文名和季号生成电影、单季及
   多季合集下载目录，并返回正确的 Jellyfin 刷新目标与 TMDB ID。
+- `media-inventory.ts`：把 Jellyfin Movie 和 MediaSource 展开为实际版本，统一
+  识别裁切画面的 720p/1080p/1440p/2160p，并生成确定或疑似重复电影组。
 - `tool-executor.ts`：并行执行同轮工具并按原调用顺序返回结果。
 - `tools.ts`、`tool-types.ts`：工具组合入口和共享依赖。
 - `toolsets/`：基础目录、下载/OpenList、字幕、Jellyfin 和追更工具。
@@ -72,27 +74,28 @@ Updated: 2026-07-31
 - `database.ts`：SQLite WAL 和顺序迁移。
 - `user-store.ts`：成员、会话和外部身份。
 - `config-store.ts`：AI、模型、渠道和媒体服务配置。
-- `conversation-store.ts`：会话消息和 Native 事件去重。
+- `conversation-store.ts`：会话消息、Native 事件去重、当前影视主题和历史主题摘要。
 - `task-store.ts`：任务生命周期。
 - `outbox-store.ts`：主动聊天通知和指数退避。
 - `media-store.ts`：短期、限次读取的二维码和影片封面媒体。
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
 - `prompt-store.ts`：提示词初始化、读取、自定义和恢复默认值；系统升级只替换
   未自定义的旧版本。
-- `conversation-store.ts`：持久化聊天消息并按数据库插入序号读取；最近 80 条记录
-  命中请求中间位置时，向前扩展到该次用户请求起点，避免拆分工具调用与结果。
+- `conversation-store.ts` 保留全部原始聊天消息；模型视图使用最近 80 条完整请求。
+  当前影视主题保留完整消息，较早主题读取结构化摘要，不改写工具调用历史。
 
 ### `integrations`、`tasks`、`channels`
 
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
   内存任务状态、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
-  `RemoteRefresh`、Movie/Episode 精确删除、字幕读取和删除；所有字幕格式均以
+  Movie/MediaSource 分页清单、`RemoteRefresh`、Movie/Episode 精确删除、字幕读取
+  和删除；所有字幕格式均以
   保留原始长度的二进制请求上传到 AutoFilm 流式端点，不生成 Base64 副本；
   请求体使用 Node 读取流，不复制大型图形字幕。
 - `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
-  并提供季、分集日期和受限大小的封面读取。
+  并提供电影、剧集、季、单集的评分与简介、季集日期和受限大小的封面读取。
 - `integrations/subhd.ts`：识别关联影片页并返回完整字幕列表、评论回复，以及按任务
   隔离且可并发执行的下载会话；统一限制请求开始间隔。
 - `integrations/cookie-jar.ts`：管理单个 SubHD 下载会话的响应 Cookie，不在任务间

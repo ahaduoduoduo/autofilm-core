@@ -17,16 +17,22 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   - Anthropic Messages。
   - Gemini GenerateContent。
 - New API 可作为任意供应方配置，不是特殊代码路径。
-- 主 Agent、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
+- 主 Agent、影视主题摘要、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
   管理界面修改并恢复当前版本的系统默认内容；修改在下一次模型请求时生效。
-- 32 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
+- 36 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
   ASS 样式和按成员追更；管理员聊天另有 OpenList 扫码工具。
+- Jellyfin 电影按实际视频流分辨率分页查询，不访问 OpenList；重复电影分为
+  Provider ID 确定重复和标题年份疑似重复，并返回每个实际版本的画质、音轨与路径。
+- TMDB 电影、剧集整体、单季和单集评分、评分人数及剧情简介统一查询；中文简介
+  缺失时返回明确标注的英文内容。
 - TMDB 作品身份唯一确定后自动发送封面，渠道中的图片先于资源说明文字，便于成员
   直接核对作品。
 - 同一成员会话的顶层请求按顺序执行，避免工具调用历史交叉；不同会话和同一轮工具
   仍可并行。
 - 最近 80 条会话上下文按完整用户请求截取，不拆分工具调用与结果；历史中存在旧版
   孤立结果或进程中断时会在发送模型前自动恢复，同类供应方错误会使用当前请求重试。
+- 每次模型请求都包含服务器当前时间；精确的播出、上映和相对日期判断仍要求 Agent
+  调用时间工具。作品焦点切换时，上一作品的完整历史转换为可恢复摘要，原始消息保留。
 - Jackett 完整结果按文件大小降序分页，同一搜索词复用短期缓存；同轮只读工具
   并行执行。
 - SubHD 影片页完整字幕列表、详情评论、成员级多包临时工作区，以及 ZIP/RAR/7z
@@ -157,6 +163,8 @@ npm run build
 - [docs/ai-providers.md](docs/ai-providers.md)：供应方与协议模型。
 - [docs/conversation-recovery.md](docs/conversation-recovery.md)：会话截断、工具配对和
   供应方错误恢复。
+- [docs/media-inventory-and-memory.md](docs/media-inventory-and-memory.md)：
+  分辨率、重复电影、TMDB 分层详情、运行时间和影视主题摘要。
 - [docs/prompts.md](docs/prompts.md)：数据库提示词、默认版本和管理规则。
 - [docs/native-adapters.md](docs/native-adapters.md)：聊天 Adapter 契约。
 - [docs/openlist-jellyfin.md](docs/openlist-jellyfin.md)：媒体与任务交互。

@@ -9,6 +9,49 @@ import {
 
 export function createBaseTools(deps: ToolDependencies): AgentTool[] {
   const tools: AgentTool[] = [
+    ...(deps.mediaTopic
+      ? [{
+          definition: {
+            name: "set_active_media_topic",
+            description:
+              "在当前讨论焦点已经唯一确定为一部电影或电视剧后登记主题。切换到另一作品时，Core 会把上一作品的完整历史压缩为摘要；只是举例或同时比较多部作品时不要调用。",
+            parameters: objectSchema(
+              {
+                media_type: {
+                  type: "string",
+                  enum: ["movie", "tv"],
+                },
+                tmdb_id: {
+                  type: "integer",
+                  minimum: 1,
+                },
+                title: stringProperty("已确认的规范标题"),
+                production_year: {
+                  type: "integer",
+                  minimum: 1800,
+                  maximum: 3000,
+                },
+              },
+              ["media_type", "tmdb_id", "title"],
+            ),
+          },
+          execute: async (args: Record<string, unknown>) => {
+            const mediaType = requireString(args, "media_type");
+            if (mediaType !== "movie" && mediaType !== "tv") {
+              throw new Error("media_type must be movie or tv");
+            }
+            return deps.mediaTopic!.activate({
+              mediaType,
+              tmdbId: positiveInteger(args, "tmdb_id", 1),
+              title: requireString(args, "title"),
+              productionYear:
+                args.production_year === undefined
+                  ? undefined
+                  : positiveInteger(args, "production_year", 1800),
+            });
+          },
+        } satisfies AgentTool]
+      : []),
     {
       definition: {
         name: "search_catalog",
@@ -28,6 +71,59 @@ export function createBaseTools(deps: ToolDependencies): AgentTool[] {
         parameters: objectSchema({}),
       },
       execute: async () => deps.tmdb.trending(),
+    },
+    {
+      definition: {
+        name: "get_tmdb_metadata",
+        description:
+          "读取 TMDB 的电影、剧集整体、单季或单集评分、评分人数、剧情简介和播出日期。先用 search_catalog 确认真实 TMDB ID。",
+        parameters: objectSchema(
+          {
+            media_type: {
+              type: "string",
+              enum: ["movie", "tv"],
+              description: "电影使用 movie，电视剧使用 tv",
+            },
+            tmdb_id: {
+              type: "integer",
+              minimum: 1,
+              description: "search_catalog 返回的 TMDB ID",
+            },
+            season_number: {
+              type: "integer",
+              minimum: 0,
+              description: "可选季号；特别篇通常为第 0 季",
+            },
+            episode_number: {
+              type: "integer",
+              minimum: 1,
+              description: "可选集号；指定时必须同时指定季号",
+            },
+          },
+          ["media_type", "tmdb_id"],
+        ),
+      },
+      execute: async (args) => {
+        const mediaType = requireString(args, "media_type");
+        if (mediaType !== "movie" && mediaType !== "tv") {
+          throw new Error("media_type must be movie or tv");
+        }
+        const tmdbId = positiveInteger(args, "tmdb_id", 1);
+        const seasonNumber =
+          args.season_number === undefined
+            ? undefined
+            : positiveInteger(args, "season_number", 0);
+        const episodeNumber =
+          args.episode_number === undefined
+            ? undefined
+            : positiveInteger(args, "episode_number", 1);
+        return deps.tmdb.metadata({
+          mediaType,
+          tmdbId,
+          seasonNumber,
+          episodeNumber,
+        });
+      },
     },
     {
       definition: {
@@ -115,13 +211,17 @@ export function createBaseTools(deps: ToolDependencies): AgentTool[] {
         description: "获取服务端当前日期和时间。",
         parameters: objectSchema({}),
       },
-      execute: async () => ({
-        iso: new Date().toISOString(),
-        local: new Date().toLocaleString("zh-CN", {
+      execute: async () => {
+        const now = new Date();
+        return {
+          iso: now.toISOString(),
+          local: now.toLocaleString("zh-CN", {
           timeZone: "Asia/Shanghai",
           hour12: false,
-        }),
-      }),
+          }),
+          timeZone: "Asia/Shanghai",
+        };
+      },
     },
   ];
   if (deps.storageAuth) {
@@ -136,4 +236,16 @@ export function createBaseTools(deps: ToolDependencies): AgentTool[] {
     });
   }
   return tools;
+}
+
+function positiveInteger(
+  args: Record<string, unknown>,
+  key: string,
+  minimum: number,
+): number {
+  const value = requireNumber(args, key);
+  if (!Number.isInteger(value) || value < minimum) {
+    throw new Error(`${key} must be an integer greater than or equal to ${minimum}`);
+  }
+  return value;
 }

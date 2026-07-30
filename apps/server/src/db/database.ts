@@ -262,6 +262,36 @@ const migrations = [
   WHERE type IN ('native', 'telegram');
   DROP TABLE channel_configs_v6;
   `,
+  `
+  CREATE TABLE conversation_topic_state (
+    conversation_id TEXT PRIMARY KEY
+      REFERENCES conversations(id) ON DELETE CASCADE,
+    topic_key TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
+    tmdb_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    production_year INTEGER,
+    started_message_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE conversation_topic_summaries (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL
+      REFERENCES conversations(id) ON DELETE CASCADE,
+    topic_key TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
+    tmdb_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    production_year INTEGER,
+    summary TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(conversation_id, topic_key)
+  );
+  CREATE INDEX conversation_topic_summaries_recent_idx
+    ON conversation_topic_summaries(conversation_id, updated_at DESC);
+  `,
 ];
 
 export type AppDatabase = Database.Database;

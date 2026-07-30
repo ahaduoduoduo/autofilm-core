@@ -1,12 +1,19 @@
 import type { ConfigStore } from "../db/config-store.js";
-import type { ConversationStore } from "../db/conversation-store.js";
+import type {
+  ConversationStore,
+  MediaTopic,
+  TopicSummary,
+} from "../db/conversation-store.js";
 import type { TaskStore } from "../db/task-store.js";
 import type { UserStore } from "../db/user-store.js";
 import type { OutboxStore } from "../db/outbox-store.js";
 import type { EphemeralMediaStore } from "../db/media-store.js";
 import type { PromptStore } from "../db/prompt-store.js";
 import { createAiClient } from "../ai/client.js";
-import type { CanonicalMessage } from "../ai/types.js";
+import type {
+  AiClient,
+  CanonicalMessage,
+} from "../ai/types.js";
 import type { JackettClient } from "../integrations/jackett.js";
 import type { JellyfinClient } from "../integrations/jellyfin.js";
 import type { OpenListClient } from "../integrations/openlist.js";
@@ -81,7 +88,10 @@ export class AgentService {
       role: "user",
       content: input.text,
     };
-    this.deps.conversations.append(conversationId, userMessage);
+    const currentTurn = this.deps.conversations.append(
+      conversationId,
+      userMessage,
+    );
     const sessionUser = this.deps.users.sessionUser(input.userId);
     const openListConfig = this.deps.configs.service("openlist");
     const storageId = Number(openListConfig?.options.authStorageId);
@@ -136,25 +146,42 @@ export class AgentService {
             },
           }
         : undefined;
-    const tools = this.createTools(
-      input.userId,
-      notificationTarget,
-      storageAuth,
-    );
     const client = createAiClient(provider.protocol, {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       headers: provider.customHeaders,
     });
+    const tools = this.createTools(
+      input.userId,
+      notificationTarget,
+      storageAuth,
+      {
+        activate: (topic) =>
+          this.activateMediaTopic({
+            conversationId,
+            currentTurnMessageId: currentTurn.id,
+            topic,
+            client,
+            model: model.model,
+            maxOutputTokens: model.maxOutputTokens,
+          }),
+      },
+    );
     const catalogItems = new Map<number, CatalogItem>();
 
     for (let iteration = 0; iteration < 12; iteration += 1) {
-      const history = this.deps.conversations.history(conversationId);
+      const context = this.deps.conversations.modelHistory(conversationId);
       const result = await client.generate({
         model: model.model,
         messages: [
-          { role: "system", content: this.deps.prompts.get("agent.main") },
-          ...history,
+          {
+            role: "system",
+            content: runtimeSystemPrompt(
+              this.deps.prompts.get("agent.main"),
+              context.memory,
+            ),
+          },
+          ...context.messages,
         ],
         tools: tools.map((tool) => tool.definition),
         temperature: model.temperature,
@@ -185,19 +212,22 @@ export class AgentService {
         });
       }
     }
-    const history = this.deps.conversations.history(conversationId);
+    const context = this.deps.conversations.modelHistory(conversationId);
     const finalResult = await client.generate({
       model: model.model,
       messages: [
         {
           role: "system",
           content:
-            `${this.deps.prompts.get("agent.main")}\n\n` +
+            `${runtimeSystemPrompt(
+              this.deps.prompts.get("agent.main"),
+              context.memory,
+            )}\n\n` +
             "本次请求已经达到工具轮次边界。不得继续调用工具。根据已有工具结果说明" +
             "哪些项目已经成功、哪些失败、哪些尚未执行；不得把内部轮次边界或未执行项" +
             "描述为业务成功。",
         },
-        ...history,
+        ...context.messages,
       ],
       temperature: model.temperature,
       maxOutputTokens: model.maxOutputTokens,
@@ -279,7 +309,9 @@ export class AgentService {
     const messages: CanonicalMessage[] = [
       {
         role: "system",
-        content: this.deps.prompts.get("watchlist.evaluator"),
+        content: runtimeSystemPrompt(
+          this.deps.prompts.get("watchlist.evaluator"),
+        ),
       },
       {
         role: "user",
@@ -357,6 +389,9 @@ export class AgentService {
       targetId: string;
     },
     storageAuth?: { start(): Promise<unknown> },
+    mediaTopic?: {
+      activate(topic: MediaTopic): Promise<unknown>;
+    },
   ) {
     return createAgentTools({
       userId,
@@ -375,7 +410,94 @@ export class AgentService {
       media: this.deps.media,
       mediaBaseUrl: this.deps.mediaBaseUrl,
       storageAuth,
+      mediaTopic,
     });
+  }
+
+  private async activateMediaTopic(input: {
+    conversationId: string;
+    currentTurnMessageId: string;
+    topic: MediaTopic;
+    client: AiClient;
+    model: string;
+    maxOutputTokens: number | null;
+  }): Promise<Record<string, unknown>> {
+    const plan = this.deps.conversations.planTopicSwitch(
+      input.conversationId,
+      input.topic,
+      input.currentTurnMessageId,
+    );
+    if (!plan.changed) {
+      return {
+        changed: false,
+        activeTopic: input.topic,
+        message: "当前已经是该影视主题",
+      };
+    }
+
+    let previous = plan.previous;
+    if (previous && plan.messages.length > 0) {
+      previous = {
+        ...previous,
+        summary: await this.summarizeTopic(
+          input,
+          previous,
+          plan.messages,
+        ),
+      };
+    }
+    this.deps.conversations.commitTopicSwitch(
+      input.conversationId,
+      input.topic,
+      input.currentTurnMessageId,
+      previous,
+    );
+    return {
+      changed: true,
+      activeTopic: input.topic,
+      archivedTopic: previous
+        ? {
+            mediaType: previous.mediaType,
+            tmdbId: previous.tmdbId,
+            title: previous.title,
+          }
+        : undefined,
+    };
+  }
+
+  private async summarizeTopic(
+    input: {
+      client: AiClient;
+      model: string;
+      maxOutputTokens: number | null;
+    },
+    previous: TopicSummary,
+    messages: CanonicalMessage[],
+  ): Promise<string> {
+    const transcript = topicTranscript(messages);
+    const result = await input.client.generate({
+      model: input.model,
+      messages: [
+        {
+          role: "system",
+          content: this.deps.prompts.get("conversation.summarizer"),
+        },
+        {
+          role: "user",
+          content:
+            `作品：${previous.title}\n` +
+            `媒体类型：${previous.mediaType}\n` +
+            `TMDB ID：${previous.tmdbId}\n\n` +
+            `此前摘要：\n${previous.summary || "无"}\n\n` +
+            `本次归档对话：\n${transcript}`,
+        },
+      ],
+      temperature: 0,
+      maxOutputTokens: Math.min(input.maxOutputTokens ?? 2_000, 2_000),
+    });
+    const summary = result.content.trim();
+    if (!summary) throw new Error("影视主题摘要模型没有返回内容");
+    return summary;
   }
 }
 
@@ -408,4 +530,49 @@ export function formatToolResult(toolName: string, content: string): string {
     return content;
   }
   return truncate(content, 24_000);
+}
+
+function runtimeSystemPrompt(base: string, memory = ""): string {
+  const now = new Date();
+  const local = now.toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour12: false,
+  });
+  return [
+    base,
+    "## 当前运行时间",
+    `服务器时间：${local}（Asia/Shanghai）`,
+    `ISO 时间：${now.toISOString()}`,
+    memory,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function topicTranscript(messages: CanonicalMessage[]): string {
+  const blocks = messages.map((message) => {
+    const calls = (message.toolCalls ?? [])
+      .map(
+        (call) =>
+          `${call.name}(${truncate(JSON.stringify(call.arguments), 2_000)})`,
+      )
+      .join(", ");
+    return (
+      `[${message.role}${message.toolCallId ? ` ${message.toolCallId}` : ""}]` +
+      `${calls ? ` 工具：${calls}` : ""}\n` +
+      truncate(message.content, message.role === "tool" ? 6_000 : 12_000)
+    );
+  });
+  const selected: string[] = [];
+  let total = 0;
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index]!;
+    if (total + block.length > 100_000) {
+      selected.unshift("[较早内容因摘要输入上限省略]");
+      break;
+    }
+    selected.unshift(block);
+    total += block.length;
+  }
+  return selected.join("\n\n");
 }

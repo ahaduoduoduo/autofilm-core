@@ -40,16 +40,19 @@ describe("agent tool registry", () => {
         "delete_jellyfin_items",
         "delete_jellyfin_subtitles",
         "fetch_subtitle_archive",
+        "find_duplicate_jellyfin_movies",
         "get_current_time",
         "get_jellyfin_media_info",
         "get_subtitle_detail",
         "get_subtitle_workspace",
+        "get_tmdb_metadata",
         "list_download_tasks",
         "list_jellyfin_episodes",
         "list_jellyfin_subtitle_targets",
         "list_watchlist",
         "place_subtitles",
         "prepare_subtitle_placements",
+        "query_jellyfin_movies",
         "refresh_jellyfin_item",
         "refresh_jellyfin_remote_path",
         "remove_watchlist",
@@ -76,6 +79,21 @@ describe("agent tool registry", () => {
     expect(
       createAgentTools(dependencies(true)).some(
         (tool) => tool.definition.name === "start_openlist_storage_auth",
+      ),
+    ).toBe(true);
+  });
+
+  it("exposes topic switching only inside a persistent conversation", () => {
+    expect(
+      createAgentTools(dependencies()).some(
+        (tool) => tool.definition.name === "set_active_media_topic",
+      ),
+    ).toBe(false);
+    const deps = dependencies();
+    deps.mediaTopic = { activate: async () => ({ changed: true }) };
+    expect(
+      createAgentTools(deps).some(
+        (tool) => tool.definition.name === "set_active_media_topic",
       ),
     ).toBe(true);
   });

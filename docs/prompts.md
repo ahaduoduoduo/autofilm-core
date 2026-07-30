@@ -1,6 +1,6 @@
 # 数据库提示词
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。代码内仍保留
 每类提示词的系统默认模板，作用仅限首次初始化、默认版本升级和“恢复默认值”。
@@ -11,6 +11,7 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 | Key | 使用位置 | 上下文 |
 | --- | --- | --- |
 | `agent.main` | 成员日常聊天、媒体搜索与操作 | 保留最近 80 条会话消息 |
+| `conversation.summarizer` | 切换作品时整理上一影视主题 | 独立无工具请求 |
 | `subtitle.captcha.system` | SubHD 验证码识别系统指令 | 独立单次视觉请求 |
 | `subtitle.captcha.user` | 随验证码图片发送的识别要求 | 独立单次视觉请求 |
 | `subtitle.cleaner` | 字幕广告判断 | 独立单次请求 |
@@ -51,3 +52,9 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 旧版会话级累积字幕索引已改为任务级 `workspace_id`。它不写数据库，但可以在一次任务
 内累计多个压缩包，并为每个解压文件提供不可变 `workspace_file_id`。数字序号不再
 出现在 Agent 工具协议中。
+
+## 运行时附加信息
+
+Core 在数据库主提示词之外动态加入当前服务器时间和已保存的较早影视主题摘要。
+服务器时间每次请求重新生成，不属于可编辑行为规则。主题摘要本身由
+`conversation.summarizer` 生成，其提示词仍在数据库和管理页面中维护。

@@ -21,6 +21,11 @@ export interface JellyfinItem {
   SeasonId?: string;
 }
 
+export interface JellyfinItemsPage {
+  Items: JellyfinItem[];
+  TotalRecordCount: number;
+}
+
 export interface JellyfinImageInfo {
   ImageType: string;
   ImageIndex?: number;
@@ -60,6 +65,44 @@ export class JellyfinClient {
       headers: this.headers(config.credential),
     });
     return result.Items ?? [];
+  }
+
+  async movies(startIndex = 0, limit = 200): Promise<JellyfinItemsPage> {
+    const config = this.requireConfig();
+    const result = await requestJson<{
+      Items?: JellyfinItem[];
+      TotalRecordCount?: number;
+    }>(
+      withQuery(config.baseUrl, "/Items", {
+        Recursive: "true",
+        IncludeItemTypes: "Movie",
+        Fields:
+          "Path,ProviderIds,ProductionYear,MediaSources,MediaStreams",
+        EnableImages: "false",
+        StartIndex: String(Math.max(0, startIndex)),
+        Limit: String(Math.max(1, Math.min(limit, 500))),
+        SortBy: "SortName",
+        SortOrder: "Ascending",
+      }),
+      { headers: this.headers(config.credential) },
+    );
+    return {
+      Items: result.Items ?? [],
+      TotalRecordCount: result.TotalRecordCount ?? 0,
+    };
+  }
+
+  async allMovies(): Promise<JellyfinItem[]> {
+    const items: JellyfinItem[] = [];
+    const pageSize = 200;
+    let total = Number.POSITIVE_INFINITY;
+    while (items.length < total) {
+      const page = await this.movies(items.length, pageSize);
+      total = page.TotalRecordCount;
+      items.push(...page.Items);
+      if (page.Items.length === 0) break;
+    }
+    return items;
   }
 
   async remoteRefresh(input: {

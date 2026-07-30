@@ -109,4 +109,95 @@ describe("conversation history", () => {
     ).toEqual(["one", "two", "three"]);
     database.close();
   });
+
+  it("keeps raw messages while replacing an archived media topic with a summary", () => {
+    const directory = mkdtempSync(
+      path.join(os.tmpdir(), "autofilm-conversation-"),
+    );
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const users = new UserStore(database);
+    const conversations = new ConversationStore(database);
+    const user = users.create({
+      username: "memory-member",
+      displayName: "Memory Member",
+      role: "member",
+    });
+    const conversationId = conversations.getOrCreate({
+      userId: user.id,
+      channel: "wechat",
+      providerInstanceId: "wechat-main",
+      externalConversationId: "memory@wechat",
+    });
+    const first = conversations.append(conversationId, {
+      role: "user",
+      content: "讨论电影 A",
+    });
+    conversations.commitTopicSwitch(
+      conversationId,
+      {
+        mediaType: "movie",
+        tmdbId: 1,
+        title: "电影 A",
+        productionYear: 2020,
+      },
+      first.id,
+    );
+    conversations.append(conversationId, {
+      role: "assistant",
+      content: "电影 A 已经下载完成",
+    });
+    const second = conversations.append(conversationId, {
+      role: "user",
+      content: "接下来讨论电影 B",
+    });
+    const plan = conversations.planTopicSwitch(
+      conversationId,
+      {
+        mediaType: "movie",
+        tmdbId: 2,
+        title: "电影 B",
+        productionYear: 2021,
+      },
+      second.id,
+    );
+
+    expect(plan.messages.map((message) => message.content)).toEqual([
+      "讨论电影 A",
+      "电影 A 已经下载完成",
+    ]);
+    conversations.commitTopicSwitch(
+      conversationId,
+      {
+        mediaType: "movie",
+        tmdbId: 2,
+        title: "电影 B",
+        productionYear: 2021,
+      },
+      second.id,
+      {
+        ...plan.previous!,
+        summary: "已完成：电影 A 已下载。",
+      },
+    );
+
+    const context = conversations.modelHistory(conversationId);
+    expect(context.messages.map((message) => message.content)).toEqual([
+      "接下来讨论电影 B",
+    ]);
+    expect(context.memory).toContain("电影 A");
+    expect(context.memory).toContain("已下载");
+    expect(conversations.history(conversationId)).toHaveLength(3);
+    conversations.reset({
+      userId: user.id,
+      channel: "wechat",
+      providerInstanceId: "wechat-main",
+      externalConversationId: "memory@wechat",
+    });
+    expect(conversations.modelHistory(conversationId)).toEqual({
+      messages: [],
+      memory: "",
+    });
+    database.close();
+  });
 });
