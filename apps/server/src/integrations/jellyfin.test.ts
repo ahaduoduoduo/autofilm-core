@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ConfigStore } from "../db/config-store.js";
 import { JellyfinClient } from "./jellyfin.js";
@@ -54,7 +55,8 @@ describe("Jellyfin subtitle uploads", () => {
       itemId: "episode-1",
       format: ".SUP",
       language: "zh",
-      data: expected,
+      stream: Readable.from([expected]),
+      contentLength: expected.length,
       isForced: true,
     });
 

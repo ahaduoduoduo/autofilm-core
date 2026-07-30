@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import path from "node:path";
+import { Readable } from "node:stream";
 import type {
   WorkspacePlacementMapping,
   WorkspacePlacementPlan,
@@ -160,7 +161,7 @@ async function preparePlacementPlan(
 
   const mappings: Array<Omit<WorkspacePlacementMapping, "id">> = [];
   for (const input of inputs) {
-    const source = deps.subtitleWorkspaces.readFileById(
+    const source = deps.subtitleWorkspaces.fileById(
       deps.userId,
       workspaceId,
       input.fileId,
@@ -175,13 +176,17 @@ async function preparePlacementPlan(
       resolveSubtitleReference(item, input.replacementSubtitleRef);
     }
     mappings.push({
-      fileId: source.metadata.id,
-      fileName: source.metadata.filename,
-      relativePath: source.metadata.relativePath,
-      format: source.metadata.format,
-      languageHint: source.metadata.languageHint,
-      episodeHint: source.metadata.episodeHint,
-      fileDigest: digest(source.data),
+      fileId: source.id,
+      fileName: source.filename,
+      relativePath: source.relativePath,
+      format: source.format,
+      languageHint: source.languageHint,
+      episodeHint: source.episodeHint,
+      fileDigest: await deps.subtitleWorkspaces.fileDigestById(
+        deps.userId,
+        workspaceId,
+        input.fileId,
+      ),
       itemId: item.Id,
       itemName: item.Name,
       itemType: item.Type,
@@ -225,15 +230,23 @@ async function placeSubtitles(
         });
         continue;
       }
+      let phase = "读取字幕工作区文件";
       try {
-        const source = deps.subtitleWorkspaces.readFileById(
+        const source = deps.subtitleWorkspaces.fileById(
           deps.userId,
           workspaceId,
           mapping.fileId,
         );
-        if (digest(source.data) !== mapping.fileDigest) {
+        if (
+          await deps.subtitleWorkspaces.fileDigestById(
+            deps.userId,
+            workspaceId,
+            mapping.fileId,
+          ) !== mapping.fileDigest
+        ) {
           throw new Error("字幕工作区文件内容已经变化，拒绝执行旧放置计划");
         }
+        phase = "读取 Jellyfin 条目";
         let item = await deps.jellyfin.item(mapping.itemId);
         if (item.Type !== mapping.itemType) {
           throw new Error("Jellyfin 条目类型已经变化，拒绝执行旧放置计划");
@@ -246,34 +259,67 @@ async function placeSubtitles(
           | { removed: number; summary: string }
           | undefined;
         if (!mapping.uploadedAt) {
-          const cleaned = await deps.subtitleCleaner.clean(
-            source.metadata.filename,
-            source.data,
-          );
-          const lowerName = source.metadata.filename.toLowerCase();
-          await deps.jellyfin.uploadSubtitle({
-            itemId: mapping.itemId,
-            format: source.metadata.format,
-            language: jellyfinLanguage(source.metadata.languageHint),
-            data: cleaned.data,
-            isForced: /(^|[.\-_\s])forced([.\-_\s]|$)/i.test(lowerName),
-            isHearingImpaired: /(^|[.\-_\s])(sdh|hi)([.\-_\s]|$)/i.test(
-              lowerName,
-            ),
-          });
+          const extension = path.extname(source.filename).toLowerCase();
+          const isText = [".ass", ".ssa", ".srt", ".vtt"].includes(extension);
+          let uploadStream: Readable;
+          let contentLength: number;
+          if (isText) {
+            phase = "清理文本字幕";
+            const buffered = deps.subtitleWorkspaces.readFileById(
+              deps.userId,
+              workspaceId,
+              mapping.fileId,
+            );
+            const cleaned = await deps.subtitleCleaner.clean(
+              buffered.metadata.filename,
+              buffered.data,
+            );
+            uploadStream = Readable.from([cleaned.data]);
+            contentLength = cleaned.data.byteLength;
+            cleaning = {
+              removed: cleaned.removed,
+              summary: cleaned.summary,
+            };
+          } else {
+            const opened = deps.subtitleWorkspaces.openFileById(
+              deps.userId,
+              workspaceId,
+              mapping.fileId,
+            );
+            uploadStream = opened.stream;
+            contentLength = opened.sizeBytes;
+            cleaning = {
+              removed: 0,
+              summary: "SUP 或其他二进制字幕不执行广告清理",
+            };
+          }
+          const lowerName = source.filename.toLowerCase();
+          phase = "上传字幕到 Jellyfin";
+          try {
+            await deps.jellyfin.uploadSubtitle({
+              itemId: mapping.itemId,
+              format: source.format,
+              language: jellyfinLanguage(source.languageHint),
+              stream: uploadStream,
+              contentLength,
+              isForced: /(^|[.\-_\s])forced([.\-_\s]|$)/i.test(lowerName),
+              isHearingImpaired: /(^|[.\-_\s])(sdh|hi)([.\-_\s]|$)/i.test(
+                lowerName,
+              ),
+            });
+          } finally {
+            uploadStream.destroy();
+          }
           deps.subtitleWorkspaces.markPlacementUploaded(
             deps.userId,
             workspaceId,
             planId,
             mapping.id,
           );
-          cleaning = {
-            removed: cleaned.removed,
-            summary: cleaned.summary,
-          };
         }
 
         if (mapping.replacementSubtitleRef) {
+          phase = "删除被替换的旧字幕";
           item = await deps.jellyfin.item(mapping.itemId);
           const replacement = resolveSubtitleReference(
             item,
@@ -294,14 +340,14 @@ async function placeSubtitles(
           workspaceFileId: mapping.fileId,
           jellyfinItemId: mapping.itemId,
           jellyfinName: mapping.itemName,
-          format: source.metadata.format,
-          language: jellyfinLanguage(source.metadata.languageHint),
+          format: source.format,
+          language: jellyfinLanguage(source.languageHint),
           removedLines: cleaning?.removed,
           cleaning: cleaning?.summary,
           replacementDeleted: Boolean(mapping.replacementSubtitleRef),
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = `${phase}失败：${errorDetails(error)}`;
         deps.subtitleWorkspaces.failPlacementMapping(
           deps.userId,
           workspaceId,
@@ -420,6 +466,22 @@ function placementPlanView(
   };
 }
 
-function digest(data: Buffer): string {
-  return createHash("sha256").update(data).digest("hex");
+function errorDetails(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const details = [error.message];
+  let cause = error.cause;
+  while (cause) {
+    if (cause instanceof Error) {
+      const code =
+        "code" in cause && typeof cause.code === "string"
+          ? `${cause.code}: `
+          : "";
+      details.push(`${code}${cause.message}`);
+      cause = cause.cause;
+    } else {
+      details.push(String(cause));
+      break;
+    }
+  }
+  return details.join("；原因：");
 }

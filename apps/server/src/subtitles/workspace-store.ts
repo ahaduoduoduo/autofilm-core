@@ -1,10 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
+  createReadStream,
   mkdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
+import type { ReadStream } from "node:fs";
 import path from "node:path";
 import { episodeHint, languageHint } from "./hints.js";
 import type {
@@ -193,13 +196,39 @@ export class SubtitleWorkspaceStore {
     metadata: WorkspaceFile;
     data: Buffer;
   } {
-    const workspace = this.require(userId, id);
-    const metadata = workspace.files.find((file) => file.id === fileId);
-    if (!metadata) throw new Error(`字幕文件 ID ${fileId} 不存在`);
+    const { metadata, filePath } = this.resolveFile(userId, id, fileId);
     return {
       metadata,
-      data: readFileSync(path.join(this.directory(id), metadata.storageName)),
+      data: readFileSync(filePath),
     };
+  }
+
+  fileById(userId: string, id: string, fileId: string): WorkspaceFile {
+    return this.resolveFile(userId, id, fileId).metadata;
+  }
+
+  openFileById(userId: string, id: string, fileId: string): {
+    metadata: WorkspaceFile;
+    stream: ReadStream;
+    sizeBytes: number;
+  } {
+    const { metadata, filePath } = this.resolveFile(userId, id, fileId);
+    return {
+      metadata,
+      stream: createReadStream(filePath),
+      sizeBytes: statSync(filePath).size,
+    };
+  }
+
+  async fileDigestById(
+    userId: string,
+    id: string,
+    fileId: string,
+  ): Promise<string> {
+    const { filePath } = this.resolveFile(userId, id, fileId);
+    const hash = createHash("sha256");
+    for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+    return hash.digest("hex");
   }
 
   createPlacementPlan(input: {
@@ -323,6 +352,20 @@ export class SubtitleWorkspaceStore {
 
   private directory(id: string): string {
     return path.join(this.root, id);
+  }
+
+  private resolveFile(
+    userId: string,
+    id: string,
+    fileId: string,
+  ): { metadata: WorkspaceFile; filePath: string } {
+    const workspace = this.require(userId, id);
+    const metadata = workspace.files.find((file) => file.id === fileId);
+    if (!metadata) throw new Error(`字幕文件 ID ${fileId} 不存在`);
+    return {
+      metadata,
+      filePath: path.join(this.directory(id), metadata.storageName),
+    };
   }
 
   private createTaskCode(workspace: SubtitleWorkspace): string {

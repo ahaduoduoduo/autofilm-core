@@ -1,4 +1,5 @@
 import type { ConfigStore } from "../db/config-store.js";
+import type { Readable } from "node:stream";
 import { jsonHeaders, requestJson, requestOk, withQuery } from "./http.js";
 
 export interface JellyfinItem {
@@ -281,7 +282,8 @@ export class JellyfinClient {
     itemId: string;
     format: string;
     language: string;
-    data: Buffer;
+    stream: Readable;
+    contentLength: number;
     isForced?: boolean;
     isHearingImpaired?: boolean;
   }): Promise<void> {
@@ -303,13 +305,13 @@ export class JellyfinClient {
         headers: {
           ...this.headers(config.credential),
           "content-type": "application/octet-stream",
-          "content-length": String(input.data.byteLength),
+          "content-length": String(input.contentLength),
         },
-        // Node fetch accepts Buffer at runtime; the DOM BodyInit declaration
-        // does not include Node's Buffer type.
-        body: input.data as unknown as BodyInit,
+        body: input.stream as unknown as BodyInit,
+        // Node fetch requires half duplex when the request body is a stream.
+        duplex: "half",
         signal: AbortSignal.timeout(10 * 60_000),
-      },
+      } as RequestInit & { duplex: "half" },
     );
   }
 

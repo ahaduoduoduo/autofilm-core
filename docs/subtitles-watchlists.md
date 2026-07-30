@@ -80,11 +80,14 @@ Jellyfin 字幕流数字序号，也不填写 OpenList 视频路径。
   外挂字幕流。
 - ASS、SSA、SRT、VTT、SUP/PGS 等所有格式使用同一流式接口；请求不进行 Base64
   编码，也不受 ASP.NET Core 默认 30 MB JSON 请求限制。
+- SUP/PGS 从 workspace 临时文件直接按流发送，不再整体读入 Core 内存；文本字幕
+  在独立 AI 清理完成后，将清理结果作为读取流发送。
 - Jellyfin 原生 JSON 字幕上传接口仅为 Jellyfin Web、第三方客户端和插件保留，
   AutoFilm Core 不再调用。
 - 新字幕上传成功后才按可选 `replace_subtitle_ref` 删除旧字幕。
 - 删除前重新读取 Jellyfin 条目并核对摘要；字幕流发生变化时拒绝按旧位置猜测。
-- 单项失败不会停止其他映射；失败时返回逐项结果并保留 workspace。
+- 单项失败不会停止其他映射；失败时返回具体执行阶段、底层网络原因和逐项结果，并
+  保留 workspace。
 
 纯删除使用 `delete_jellyfin_subtitles`。字幕新增、替换和删除都不调用目录刷新。
 

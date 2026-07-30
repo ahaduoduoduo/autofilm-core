@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -22,7 +23,7 @@ afterEach(() => {
 });
 
 describe("subtitle workspaces", () => {
-  it("aggregates archives and isolates concurrent captcha state by user", () => {
+  it("aggregates archives and isolates concurrent captcha state by user", async () => {
     const dataDir = mkdtempSync(path.join(os.tmpdir(), "autofilm-subtitles-"));
     directories.push(dataDir);
     const store = new SubtitleWorkspaceStore(dataDir);
@@ -92,6 +93,21 @@ describe("subtitle workspaces", () => {
         .readFileById("user-1", workspace.id, aggregated.files[1]!.id)
         .data.toString(),
     ).toBe("second");
+    const opened = store.openFileById(
+      "user-1",
+      workspace.id,
+      aggregated.files[1]!.id,
+    );
+    const chunks: Buffer[] = [];
+    for await (const chunk of opened.stream) chunks.push(Buffer.from(chunk));
+    expect(Buffer.concat(chunks).toString()).toBe("second");
+    expect(
+      await store.fileDigestById(
+        "user-1",
+        workspace.id,
+        aggregated.files[1]!.id,
+      ),
+    ).toBe(createHash("sha256").update("second").digest("hex"));
   });
 });
 

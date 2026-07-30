@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import type { SubtitleComment, SubtitleDetail, SubtitleWorkspace } from "../../subtitles/types.js";
 import { analyzeAss, modifyAss } from "../../subtitles/ass-style.js";
 import { extractSubtitles } from "../../subtitles/extract.js";
@@ -360,11 +361,13 @@ async function adjustSubtitleStyle(
         : "keep",
     blackBarMarginV: 30,
   });
+  const data = Buffer.from(modified, "utf8");
   await deps.jellyfin.uploadSubtitle({
     itemId,
     format: "ass",
     language: "chi",
-    data: Buffer.from(modified, "utf8"),
+    stream: Readable.from([data]),
+    contentLength: data.byteLength,
   });
   return {
     itemId,

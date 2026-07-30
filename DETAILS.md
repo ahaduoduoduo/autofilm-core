@@ -85,7 +85,8 @@ Updated: 2026-07-30
   内存任务状态、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
   `RemoteRefresh`、字幕读取和删除；所有字幕格式均以保留原始长度的二进制请求
-  上传到 AutoFilm 流式端点，不生成 Base64 副本。
+  上传到 AutoFilm 流式端点，不生成 Base64 副本；请求体使用 Node 读取流，不复制
+  大型图形字幕。
 - `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
   并提供季、分集日期和受限大小的封面读取。
@@ -131,7 +132,8 @@ Updated: 2026-07-30
 - `ass-style.ts`：旧版 ASS 样式分析、行内标签和黑边特效坐标处理。
 - `hints.ts`：从解压相对路径推断集号、语言和 Jellyfin 语言标签。
 - `workspace-store.ts`：一个任务累计多个字幕包、文件和验证码的成员级临时工作区；
-  文件只使用 UUID，并保存不可变放置计划和逐项执行状态。
+  文件只使用 UUID，并保存不可变放置计划和逐项执行状态；摘要按固定大小分块计算，
+  SUP/PGS 可直接打开文件读取流。
 - `references.ts`：为 Jellyfin 外挂字幕生成摘要引用，并在删除或替换前解析当前流。
 - `types.ts`：字幕搜索、验证码、提取文件、放置计划和临时工作区类型。
 
