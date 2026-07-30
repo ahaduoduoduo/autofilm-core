@@ -16,7 +16,8 @@ Updated: 2026-07-30
 一次字幕任务使用一个成员级 workspace：
 
 1. `create_subtitle_workspace` 创建空工作区。
-2. 一个或多个 `fetch_subtitle_archive` 使用相同 `workspace_id` 下载字幕包。
+2. 一个或多个 `fetch_subtitle_archive` 使用相同 `workspace_id` 下载字幕包；同一批
+   分集不得拆成逐集 workspace，多个包在同一工具轮次并行下载。
 3. 每个包解压后保留来源字幕 ID、压缩包名和完整相对目录。
 4. `get_subtitle_workspace` 返回每个文件的不可变 `workspace_file_id`、集号、语言、
    格式和大小。工作区不生成或接受数字序号。

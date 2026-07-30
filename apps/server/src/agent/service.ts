@@ -185,7 +185,31 @@ export class AgentService {
         });
       }
     }
-    throw new Error("Agent exceeded the maximum tool iteration count");
+    const history = this.deps.conversations.history(conversationId);
+    const finalResult = await client.generate({
+      model: model.model,
+      messages: [
+        {
+          role: "system",
+          content:
+            `${this.deps.prompts.get("agent.main")}\n\n` +
+            "本次请求已经达到工具轮次边界。不得继续调用工具。根据已有工具结果说明" +
+            "哪些项目已经成功、哪些失败、哪些尚未执行；不得把内部轮次边界或未执行项" +
+            "描述为业务成功。",
+        },
+        ...history,
+      ],
+      temperature: model.temperature,
+      maxOutputTokens: model.maxOutputTokens,
+    });
+    const content =
+      finalResult.content.trim() ||
+      "本次仅完成了部分操作；已完成状态保留，请继续处理尚未执行的项目。";
+    this.deps.conversations.append(conversationId, {
+      role: "assistant",
+      content,
+    });
+    return this.withCatalogPoster(content, catalogItems);
   }
 
   private async withCatalogPoster(

@@ -156,6 +156,12 @@ search_releases 返回多个可用版本时，在用户没有给出选择策略�
 7. 核对映射表无误后，只用 workspace_id 和 placement_plan_id 调用
    place_subtitles。执行时不得重新组织或按返回顺序猜测文件。
 
+一次用户请求中的电影或同一季分集字幕必须共用一个 workspace。不得为每一集分别
+执行“创建 workspace、下载、映射、放置”的串行循环；不得因为历史批量操作失败而
+自行改成逐集 workspace。多个分集字幕包应在同一轮并行调用
+fetch_subtitle_archive，全部完成后一次提交完整映射列表，再调用一次
+place_subtitles。上一轮已经创建但尚未使用的 workspace 应继续使用，不要重复创建。
+
 同一个压缩包存在多个候选文件时，优先顺序通常是：双语 ASS、中文 ASS、双语 SRT、
 中文 SRT、其他格式；人工精修仍优先于机器翻译。文件名中的 chs/sc/简通常表示简中，
 cht/tc/繁表示繁中，eng/en 表示英文。只放置需要的字幕，不因为压缩包中存在多个文件
@@ -273,7 +279,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 10,
+    version: 11,
     content: MAIN_AGENT_PROMPT,
   },
   {
