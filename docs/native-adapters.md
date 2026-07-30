@@ -1,11 +1,26 @@
 # Native chat adapters
 
-Updated: 2026-07-28
+Updated: 2026-07-29
 
 Core 实现 WeClaw `Native Message Service 2026-07-01`。完整通用协议也记录在
 WeClaw fork 的 `docs/native-services.md`。
 
 ## WeClaw 配置
+
+官方 Compose 将 `weclaw/` 同时挂载给 WeClaw 和 Core。Core 只读访问该目录，
+自动识别 `accounts/` 中的登录账号及 `config.json` 中的 Native Agent 配置。
+扫码完成后无需在管理界面填写 `provider_instance_id`、服务地址或双向令牌。
+
+WeClaw 的独立管理界面默认发布在 `http://主机地址:18011`。浏览器可以直接添加
+微信登录账号、配置其他 Agent，并按联系人分配可用 Agent。AutoFilm 页面只管理
+AutoFilm 自身看到的微信渠道和成员身份。
+
+自动识别使用：
+
+- `AUTOFILM_WECLAW_DATA_DIR=/weclaw`
+- `AUTOFILM_WECLAW_URL=http://weclaw:18011`
+
+下面的配置只用于独立部署或开发其他 Native Adapter，不属于日常管理步骤。
 
 ```json
 {
@@ -41,6 +56,17 @@ WeClaw 发送扁平事件字段：
 
 Core 以 `event_id` 去重。重复请求返回第一次保存的响应。
 
+发送 `/clear` 可清除当前聊天对应的 AutoFilm 上下文。WeClaw 也接受 `/new`，
+Telegram Adapter 也接受 `/reset`；Adapter 会把这些命令转换为
+`conversation.reset`，Core 删除该会话的历史消息。
+
+Agent 最终回复可能同时包含文字和 Core 短期媒体 URL。Core 在返回 Adapter 前提取
+`AUTOFILM_MEDIA_BASE_URL/v1/media/{token}`，生成独立的 `image` 消息，并从文字
+消息中移除该容器地址。外部网页链接不受影响。
+
+WeClaw 使用结构化消息的 `media_url` 下载并发送微信图片；Telegram Adapter 使用
+Bot API 发送图片。Adapter 不需要解析 Agent 的自然语言或识别某一种模型输出格式。
+
 ## 主动消息
 
 Core 调用 Adapter 的 `POST /v1/messages`。任务完成通知经过持久化 Outbox。
@@ -48,8 +74,12 @@ Core 调用 Adapter 的 `POST /v1/messages`。任务完成通知经过持久化 
 
 `AUTOFILM_MEDIA_BASE_URL` 必须是 Adapter 容器能够访问的 Core URL。
 
+## Telegram
+
+仓库内 `apps/telegram-adapter` 已实现独立 Telegram Bot 容器。它使用相同入站和
+主动消息接口，配置与会话 ID 规则见 `telegram-adapter.md`。
+
 ## 其他平台
 
 Telegram、微信之外的平台只需实现相同 HTTP 协议。平台 Token、Webhook、
-消息格式和媒体上传属于 Adapter，不进入 Core。当前仓库尚未提供 Telegram
-参考 Adapter，状态见 `TODO.md`。
+消息格式和媒体上传属于 Adapter，不进入 Core。

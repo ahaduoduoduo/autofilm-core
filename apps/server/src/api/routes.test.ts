@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../app.js";
 import type { AppConfig } from "../config.js";
 import { hashPassword } from "../security/password.js";
@@ -10,13 +10,14 @@ const apps: Array<Awaited<ReturnType<typeof buildApp>>> = [];
 const directories: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   for (const entry of apps.splice(0)) await entry.app.close();
   for (const directory of directories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
 });
 
-async function testApp() {
+async function testApp(overrides: Partial<AppConfig> = {}) {
   const dataDir = mkdtempSync(path.join(os.tmpdir(), "autofilm-core-"));
   directories.push(dataDir);
   const config: AppConfig = {
@@ -26,11 +27,16 @@ async function testApp() {
     databasePath: path.join(dataDir, "test.sqlite"),
     publicUrl: "http://localhost:3100",
     mediaBaseUrl: "http://autofilm-core:3100",
+    telegramAdapterUrl: "http://telegram-adapter:18012",
+    weClawDataDir: undefined,
+    weClawUrl: "http://weclaw:18011",
     logLevel: "silent",
     masterKey: Buffer.alloc(32, 3).toString("base64"),
     adminUsername: undefined,
     adminPassword: undefined,
     bootstrapAi: undefined,
+    watchlistIntervalMs: 21_600_000,
+    ...overrides,
   };
   const built = await buildApp(config);
   apps.push(built);
@@ -75,6 +81,160 @@ describe("authentication and administration routes", () => {
       },
     });
     expect(repeated.statusCode).toBe(409);
+  });
+
+  it("configures Telegram through the internal adapter without exposing service tokens", async () => {
+    const { app, context } = await testApp();
+    const setup = await app.inject({
+      method: "POST",
+      url: "/api/setup",
+      payload: {
+        username: "telegram-admin",
+        displayName: "Telegram Admin",
+        password: "a secure password 123",
+      },
+    });
+    const sessionCookie = setup.cookies[0]!.value;
+    let adapterPayload: Record<string, unknown> | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+        adapterPayload = JSON.parse(String(init?.body)) as Record<
+          string,
+          unknown
+        >;
+        return new Response(
+          JSON.stringify({
+            configured: true,
+            bot_id: 123,
+            bot_username: "autofilm_test_bot",
+            bot_name: "AutoFilm Test",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }),
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/admin/channels/telegram/setup",
+      cookies: { autofilm_session: sessionCookie },
+      payload: {
+        botToken: "123456789:telegram-test-token",
+        enabled: true,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().bot.bot_username).toBe("autofilm_test_bot");
+    expect(adapterPayload?.botToken).toBe("123456789:telegram-test-token");
+    expect(adapterPayload?.coreToken).not.toBe(adapterPayload?.outboundToken);
+    const channel = context.configs.listChannels()[0];
+    expect(channel?.providerInstanceId).toBe("telegram-main");
+    expect(channel?.hasInboundToken).toBe(true);
+    expect(channel?.hasOutboundToken).toBe(true);
+  });
+
+  it("lists, edits, and resets database-backed prompts", async () => {
+    const { app } = await testApp();
+    const setup = await app.inject({
+      method: "POST",
+      url: "/api/setup",
+      payload: {
+        username: "prompt-admin",
+        displayName: "Prompt Admin",
+        password: "a secure password 123",
+      },
+    });
+    const cookies = { autofilm_session: setup.cookies[0]!.value };
+    const initial = await app.inject({
+      method: "GET",
+      url: "/api/admin/prompts",
+      cookies,
+    });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json()).toHaveLength(5);
+    expect(initial.json()[0].key).toBe("agent.main");
+    expect(initial.json()[0].content).toContain("资源评估");
+    expect(initial.json()[0].customized).toBe(false);
+
+    const updated = await app.inject({
+      method: "PUT",
+      url: "/api/admin/prompts/agent.main",
+      cookies,
+      payload: { content: "自定义主提示词" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().customized).toBe(true);
+    expect(updated.json().content).toBe("自定义主提示词");
+
+    const reset = await app.inject({
+      method: "POST",
+      url: "/api/admin/prompts/agent.main/reset",
+      cookies,
+    });
+    expect(reset.statusCode).toBe(200);
+    expect(reset.json().customized).toBe(false);
+    expect(reset.json().content).toContain("资源评估");
+  });
+
+  it("automatically registers logged-in WeClaw accounts without exposing tokens", async () => {
+    const weClawDataDir = mkdtempSync(path.join(os.tmpdir(), "autofilm-weclaw-"));
+    directories.push(weClawDataDir);
+    mkdirSync(path.join(weClawDataDir, "accounts"));
+    writeFileSync(
+      path.join(weClawDataDir, "config.json"),
+      JSON.stringify({
+        agents: {
+          autofilm: {
+            type: "native",
+            api_key: "weclaw-to-core-token-with-length",
+            outbound_token: "core-to-weclaw-token",
+          },
+        },
+      }),
+    );
+    writeFileSync(
+      path.join(weClawDataDir, "accounts", "account.json"),
+      JSON.stringify({ ilink_bot_id: "bot-account@im.bot" }),
+    );
+
+    const { app, context } = await testApp({ weClawDataDir });
+    const channel = context.configs.listChannels()[0];
+    expect(channel?.providerInstanceId).toBe("bot-account@im.bot");
+    expect(channel?.baseUrl).toBe("http://weclaw:18011");
+    expect(channel?.hasInboundToken).toBe(true);
+    expect(channel?.hasOutboundToken).toBe(true);
+
+    const setup = await app.inject({
+      method: "POST",
+      url: "/api/setup",
+      payload: {
+        username: "weclaw-admin",
+        displayName: "WeClaw Admin",
+        password: "a secure password 123",
+      },
+    });
+    const status = await app.inject({
+      method: "GET",
+      url: "/api/admin/channels/weclaw/status",
+      cookies: { autofilm_session: setup.cookies[0]!.value },
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toEqual({
+      available: true,
+      configReady: true,
+      accounts: [
+        {
+          providerInstanceId: "bot-account@im.bot",
+          configured: true,
+          enabled: true,
+        },
+      ],
+    });
+    expect(status.body).not.toContain("weclaw-to-core-token");
+    expect(status.body).not.toContain("core-to-weclaw-token");
   });
 
   it("rejects unauthenticated administrator requests", async () => {

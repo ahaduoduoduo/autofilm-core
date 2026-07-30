@@ -13,6 +13,10 @@ export interface ToolCall {
 export interface CanonicalMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  images?: Array<{
+    mediaType: string;
+    dataBase64: string;
+  }>;
   toolCalls?: ToolCall[];
   toolCallId?: string;
 }

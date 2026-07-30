@@ -1,31 +1,20 @@
-import {
-  Bot,
-  Boxes,
-  ChevronRight,
-  Film,
-  FlaskConical,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  MessageSquareMore,
-  Moon,
-  Sun,
-  Users,
-  X,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { Film, LogOut } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { SessionUser } from "@autofilm/contracts";
 import { Button } from "./Ui.js";
 
 const navigation = [
-  { to: "/", label: "总览", icon: LayoutDashboard, end: true },
-  { to: "/ai", label: "AI 与模型", icon: Bot },
-  { to: "/members", label: "成员", icon: Users },
-  { to: "/channels", label: "聊天渠道", icon: MessageSquareMore },
-  { to: "/services", label: "媒体服务", icon: Boxes },
-  { to: "/tasks", label: "任务", icon: Film },
-  { to: "/playground", label: "Agent 测试", icon: FlaskConical },
+  { to: "/", label: "总览", end: true },
+  { to: "/ai", label: "AI 与模型" },
+  { to: "/prompts", label: "提示词" },
+  { to: "/members", label: "成员" },
+  { to: "/channels", label: "聊天渠道" },
+  { to: "/services", label: "媒体服务" },
+  { to: "/tasks", label: "任务" },
+  { to: "/watchlists", label: "追更" },
+  { to: "/playground", label: "Agent 测试" },
 ];
 
 export function Shell({
@@ -41,110 +30,99 @@ export function Shell({
   onLogout: () => Promise<void>;
   children: ReactNode;
 }) {
-  const [dark, setDark] = useState(
-    () =>
-      localStorage.getItem("autofilm-theme") !== "light" &&
-      (localStorage.getItem("autofilm-theme") === "dark" ||
-        window.matchMedia("(prefers-color-scheme: dark)").matches),
+  const activeIndex = navigation.findIndex((item) =>
+    item.end
+      ? path === item.to
+      : path === item.to || path.startsWith(`${item.to}/`),
   );
-  const [open, setOpen] = useState(false);
+  const resolvedIndex = activeIndex < 0 ? 0 : activeIndex;
+  const previousIndex = useRef(resolvedIndex);
+  const direction = resolvedIndex >= previousIndex.current ? 1 : -1;
 
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("autofilm-theme", dark ? "dark" : "light");
-  }, [dark]);
-  useEffect(() => setOpen(false), [path]);
+    previousIndex.current = resolvedIndex;
+  }, [resolvedIndex]);
 
   return (
     <div className="shell">
-      <aside className={`sidebar ${open ? "sidebar-open" : ""}`}>
-        <div className="sidebar-brand">
-          <div className="brand-mark">A</div>
-          <div>
-            <strong>AutoFilm</strong>
-            <span>CORE</span>
+      <header className="app-header">
+        <div className="page-container header-content">
+          <Film className="app-logo" size={32} strokeWidth={2} />
+          <div className="header-actions">
+            <span className="current-user">
+              {user.displayName} · {roleName(user.role)}
+            </span>
+            <Button variant="secondary" onClick={() => void onLogout()}>
+              <LogOut size={15} />
+              登出
+            </Button>
           </div>
-          <button
-            className="mobile-close"
-            onClick={() => setOpen(false)}
-            aria-label="关闭导航"
-          >
-            <X size={20} />
-          </button>
         </div>
-        <div className="sidebar-label">管理</div>
-        <nav>
-          {navigation.map((item) => {
-            const Icon = item.icon;
-            const active = item.end
-              ? path === item.to
-              : path === item.to || path.startsWith(`${item.to}/`);
-            return (
-              <a
-                key={item.to}
-                href={item.to}
-                className={`nav-item ${active ? "nav-active" : ""}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  onNavigate(item.to);
-                }}
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-                <ChevronRight className="nav-arrow" size={15} />
-              </a>
-            );
-          })}
-        </nav>
-        <div className="sidebar-footer">
-          <div className="avatar">
-            {user.displayName.slice(0, 1).toUpperCase()}
-          </div>
-          <div className="user-meta">
-            <strong>{user.displayName}</strong>
-            <span>{roleName(user.role)}</span>
-          </div>
-          <button className="logout-button" onClick={() => void onLogout()}>
-            <LogOut size={17} />
-          </button>
-        </div>
-      </aside>
-      {open && (
-        <button
-          className="sidebar-scrim"
-          onClick={() => setOpen(false)}
-          aria-label="关闭导航"
-        />
-      )}
+      </header>
       <div className="main-column">
-        <header className="topbar">
-          <Button
-            variant="ghost"
-            className="icon-button mobile-menu"
-            onClick={() => setOpen(true)}
-          >
-            <Menu size={20} />
-          </Button>
-          <div className="topbar-context">
-            <span className="status-dot" />
-            Core 正常运行
+        <main className="page-container main-content">
+          <nav className="top-tabs" aria-label="管理页面">
+            <div className="top-tabs-track">
+              <motion.div
+                className="top-tab-indicator"
+                style={{ width: `${100 / navigation.length}%` }}
+                animate={{ x: `${resolvedIndex * 100}%` }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+              {navigation.map((item) => {
+                const active = item.end
+                  ? path === item.to
+                  : path === item.to || path.startsWith(`${item.to}/`);
+                return (
+                  <a
+                    key={item.to}
+                    href={item.to}
+                    className={`top-tab ${active ? "top-tab-active" : ""}`}
+                    aria-current={active ? "page" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onNavigate(item.to);
+                    }}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
+            </div>
+          </nav>
+          <div className="page-stage">
+            <AnimatePresence initial={false} custom={direction} mode="popLayout">
+              <motion.div
+                key={path}
+                className="page-content"
+                custom={direction}
+                variants={pageVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </div>
-          <Button
-            variant="secondary"
-            className="icon-button"
-            onClick={() => setDark((value) => !value)}
-            aria-label="切换主题"
-          >
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
-          </Button>
-        </header>
-        <main className="main-content">
-          {children}
         </main>
       </div>
     </div>
   );
 }
+
+const pageVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? "100%" : "-100%",
+    opacity: 0,
+  }),
+  center: { x: 0, opacity: 1 },
+  exit: (direction: number) => ({
+    x: direction < 0 ? "100%" : "-100%",
+    opacity: 0,
+  }),
+};
 
 function roleName(role: SessionUser["role"]): string {
   return role === "owner" ? "所有者" : role === "admin" ? "管理员" : "成员";

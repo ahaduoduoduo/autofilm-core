@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppContext } from "../app-context.js";
 import { hashPassword } from "../security/password.js";
 import { createToken } from "../security/tokens.js";
+import { requestJson } from "../integrations/http.js";
 import { requireAdmin } from "./auth.js";
 
 const providerSchema = z.object({
@@ -27,6 +28,14 @@ const modelSchema = z.object({
   maxOutputTokens: z.number().int().positive().max(1_000_000).nullable().optional(),
 });
 
+const promptKeySchema = z.enum([
+  "agent.main",
+  "subtitle.captcha.system",
+  "subtitle.captcha.user",
+  "subtitle.cleaner",
+  "watchlist.evaluator",
+]);
+
 const memberSchema = z.object({
   username: z.string().trim().min(3).max(64),
   displayName: z.string().trim().min(1).max(100),
@@ -49,7 +58,7 @@ const identitySchema = z.object({
 const channelSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(100),
-  type: z.enum(["native", "telegram"]),
+  type: z.literal("native"),
   providerInstanceId: z.string().trim().min(1).max(200),
   baseUrl: z.union([z.literal(""), z.string().url()]).default(""),
   inboundToken: z.string().min(24).optional(),
@@ -57,15 +66,34 @@ const channelSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
-const serviceSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(100),
-  type: z.enum(["openlist", "jellyfin", "jackett", "tmdb"]),
-  baseUrl: z.union([z.literal(""), z.string().url()]),
-  credential: z.string().optional(),
-  options: z.record(z.string(), z.unknown()).default({}),
-  enabled: z.boolean().default(true),
-});
+const serviceSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(1).max(100),
+    type: z.enum(["openlist", "jellyfin", "jackett", "tmdb", "subhd"]),
+    baseUrl: z.union([z.literal(""), z.string().url()]),
+    credential: z.string().optional(),
+    options: z.record(z.string(), z.unknown()).default({}),
+    enabled: z.boolean().default(true),
+  })
+  .superRefine((input, context) => {
+    if (input.type !== "openlist") return;
+    for (const key of ["movieLibraryRoot", "tvLibraryRoot"] as const) {
+      const value = input.options[key];
+      if (
+        value !== undefined &&
+        (typeof value !== "string" ||
+          !value.startsWith("/") ||
+          value.includes(".."))
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["options", key],
+          message: `${key} must be a safe absolute OpenList path`,
+        });
+      }
+    }
+  });
 
 export async function registerAdminRoutes(
   app: FastifyInstance,
@@ -126,8 +154,41 @@ export async function registerAdminRoutes(
       request.body,
       reply,
     );
-    return input ? context.agent.testModel(input) : undefined;
+    if (!input) return;
+    try {
+      return await context.agent.testModel(input);
+    } catch (error) {
+      return reply.code(400).send({
+        error: `模型测试失败：${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
   });
+
+  app.get("/api/admin/prompts", async () => context.prompts.list());
+  app.put<{ Params: { key: string } }>(
+    "/api/admin/prompts/:key",
+    async (request, reply) => {
+      const key = promptKeySchema.safeParse(request.params.key);
+      if (!key.success) {
+        return reply.code(404).send({ error: "Prompt not found" });
+      }
+      const input = parse(
+        z.object({ content: z.string().trim().min(1).max(100_000) }),
+        request.body,
+        reply,
+      );
+      return input ? context.prompts.save(key.data, input.content) : undefined;
+    },
+  );
+  app.post<{ Params: { key: string } }>(
+    "/api/admin/prompts/:key/reset",
+    async (request, reply) => {
+      const key = promptKeySchema.safeParse(request.params.key);
+      return key.success
+        ? context.prompts.reset(key.data)
+        : reply.code(404).send({ error: "Prompt not found" });
+    },
+  );
 
   app.get("/api/admin/members", async () => context.users.listMembers());
   app.post("/api/admin/members", async (request, reply) => {
@@ -204,6 +265,82 @@ export async function registerAdminRoutes(
   app.post("/api/admin/channels/token", async () => ({
     token: createToken(),
   }));
+  app.get("/api/admin/channels/weclaw/status", async () =>
+    context.weClawRegistration.status(),
+  );
+  app.post("/api/admin/channels/weclaw/reconcile", async (request, reply) => {
+    const input = parse(
+      z.object({ enabled: z.boolean().optional() }),
+      request.body ?? {},
+      reply,
+    );
+    return input
+      ? context.weClawRegistration.reconcile(input.enabled)
+      : undefined;
+  });
+  app.post("/api/admin/channels/telegram/setup", async (request, reply) => {
+    const input = parse(
+      z.object({
+        botToken: z.string().trim().min(10).max(256),
+        enabled: z.boolean().default(true),
+      }),
+      request.body,
+      reply,
+    );
+    if (!input) return;
+    const providerInstanceId = "telegram-main";
+    const existing = context.configs
+      .listChannels()
+      .find(
+        (channel) =>
+          channel.providerInstanceId === providerInstanceId ||
+          channel.baseUrl.includes("telegram-adapter"),
+      );
+    const existingSecret = existing
+      ? context.configs.channelByInstance("native", existing.providerInstanceId)
+      : undefined;
+    const inboundToken = createToken();
+    const outboundToken = createToken();
+    let bot: {
+      configured: boolean;
+      bot_id: number;
+      bot_username: string;
+      bot_name: string;
+    };
+    try {
+      bot = await requestJson(`${context.config.telegramAdapterUrl}/v1/setup`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(existingSecret?.outboundToken
+            ? { authorization: `Bearer ${existingSecret.outboundToken}` }
+            : {}),
+        },
+        body: JSON.stringify({
+          botToken: input.botToken,
+          coreUrl: context.config.mediaBaseUrl,
+          coreToken: inboundToken,
+          outboundToken,
+          providerInstanceId,
+        }),
+      });
+    } catch (error) {
+      return reply.code(400).send({
+        error: `Telegram 连接失败：${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+    const channel = context.configs.saveChannel({
+      id: existing?.id,
+      name: bot.bot_username ? `@${bot.bot_username}` : bot.bot_name || "Telegram",
+      type: "native",
+      providerInstanceId,
+      baseUrl: context.config.telegramAdapterUrl,
+      inboundToken,
+      outboundToken,
+      enabled: input.enabled,
+    });
+    return { channel, bot };
+  });
   app.delete<{ Params: { id: string } }>(
     "/api/admin/channels/:id",
     async (request) => {
@@ -241,6 +378,8 @@ export async function registerAdminRoutes(
           return { results: await context.tmdb.trending() };
         case "jackett":
           return { results: await context.jackett.search("test") };
+        case "subhd":
+          return context.subhd.test();
       }
     },
   );
@@ -300,6 +439,18 @@ export async function registerAdminRoutes(
   );
 
   app.get("/api/admin/tasks", async () => context.tasks.list(200));
+  app.get("/api/admin/watchlists", async () => context.watchlists.list());
+  app.delete<{ Params: { id: string } }>(
+    "/api/admin/watchlists/:id",
+    async (request, reply) => {
+      const entry = context.watchlists
+        .list()
+        .find((candidate) => candidate.id === request.params.id);
+      if (!entry) return reply.code(404).send({ error: "Watchlist not found" });
+      context.watchlists.remove(entry.userId, entry.id);
+      return { ok: true };
+    },
+  );
   app.post("/api/admin/agent/test", async (request, reply) => {
     const input = parse(
       z.object({

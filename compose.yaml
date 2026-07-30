@@ -4,6 +4,8 @@ services:
       context: .
     image: ghcr.io/ahaduoduoduo/autofilm-core:latest
     restart: unless-stopped
+    group_add:
+      - "0"
     ports:
       - "${AUTOFILM_PORT:-3100}:3100"
     environment:
@@ -12,11 +14,16 @@ services:
       AUTOFILM_DATA_DIR: /data
       AUTOFILM_PUBLIC_URL: "${AUTOFILM_PUBLIC_URL:-http://localhost:3100}"
       AUTOFILM_MEDIA_BASE_URL: "${AUTOFILM_MEDIA_BASE_URL:-http://autofilm-core:3100}"
+      AUTOFILM_TELEGRAM_ADAPTER_URL: http://telegram-adapter:18012
+      AUTOFILM_WECLAW_DATA_DIR: /weclaw
+      AUTOFILM_WECLAW_URL: http://weclaw:18011
+      AUTOFILM_WATCHLIST_INTERVAL_SECONDS: "${AUTOFILM_WATCHLIST_INTERVAL_SECONDS:-21600}"
       AUTOFILM_MASTER_KEY: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
       AUTOFILM_ADMIN_USERNAME: "${AUTOFILM_ADMIN_USERNAME:-}"
       AUTOFILM_ADMIN_PASSWORD: "${AUTOFILM_ADMIN_PASSWORD:-}"
     volumes:
       - ./data:/data
+      - ./weclaw:/weclaw:ro
     healthcheck:
       test:
         - CMD
@@ -38,9 +45,44 @@ services:
     depends_on:
       autofilm-core:
         condition: service_healthy
+    command:
+      - start
+      - --foreground
+    ports:
+      - "${WECLAW_PORT:-18011}:18011"
     volumes:
-      - ./weclaw/config:/app/config
-      - ./weclaw/data:/app/data
+      - ./weclaw:/root/.weclaw
+    networks:
+      - autofilm
+
+  telegram-adapter:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram
+    image: ghcr.io/ahaduoduoduo/autofilm-telegram-adapter:latest
+    restart: unless-stopped
+    depends_on:
+      autofilm-core:
+        condition: service_healthy
+    environment:
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      TELEGRAM_CORE_URL: http://autofilm-core:3100
+      TELEGRAM_CORE_TOKEN: "${TELEGRAM_CORE_TOKEN:-}"
+      TELEGRAM_OUTBOUND_TOKEN: "${TELEGRAM_OUTBOUND_TOKEN:-}"
+      TELEGRAM_PROVIDER_INSTANCE_ID: "${TELEGRAM_PROVIDER_INSTANCE_ID:-telegram-main}"
+      TELEGRAM_DATA_DIR: /data
+    volumes:
+      - telegram-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:18012/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - autofilm
 
@@ -65,3 +107,6 @@ services:
 networks:
   autofilm:
     name: autofilm
+
+volumes:
+  telegram-data:

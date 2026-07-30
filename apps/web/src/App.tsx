@@ -12,6 +12,8 @@ import { ChannelsPage } from "./pages/ChannelsPage.js";
 import { ServicesPage } from "./pages/ServicesPage.js";
 import { TasksPage } from "./pages/TasksPage.js";
 import { PlaygroundPage } from "./pages/PlaygroundPage.js";
+import { WatchlistsPage } from "./pages/WatchlistsPage.js";
+import { PromptsPage } from "./pages/PromptsPage.js";
 import { Button, Card } from "./components/Ui.js";
 import { MessageSquareMore } from "lucide-react";
 
@@ -56,7 +58,6 @@ export function App() {
   if (loading) {
     return (
       <div className="app-loading">
-        <div className="brand-mark large">A</div>
         <Loading />
       </div>
     );
@@ -75,7 +76,6 @@ export function App() {
       <ToastProvider>
         <div className="member-access-page">
           <Card className="member-access-card">
-            <div className="brand-mark large">A</div>
             <MessageSquareMore size={28} />
             <h1>{user.displayName}</h1>
             <p>
@@ -127,12 +127,16 @@ function pageFor(path: string, user: SessionUser) {
       return <AiPage />;
     case "/members":
       return <MembersPage user={user} />;
+    case "/prompts":
+      return <PromptsPage />;
     case "/channels":
       return <ChannelsPage />;
     case "/services":
       return <ServicesPage />;
     case "/tasks":
       return <TasksPage />;
+    case "/watchlists":
+      return <WatchlistsPage />;
     case "/playground":
       return <PlaygroundPage />;
     default:

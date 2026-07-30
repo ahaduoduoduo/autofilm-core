@@ -4,7 +4,7 @@
   border-radius: 20px;
   color: var(--green);
   display: flex;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   gap: 7px;
   padding: 7px 10px;
@@ -33,29 +33,14 @@
   width: 36px;
 }
 
-.metric-purple {
-  background: var(--purple-soft);
-  color: var(--purple-text);
-}
-
-.metric-cyan {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-}
-
-.metric-rose {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
-.metric-amber {
-  background: var(--amber-soft);
-  color: var(--amber);
+.metric-icon {
+  background: var(--bg-subtle);
+  color: var(--text-soft);
 }
 
 .metric-label {
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .metric-value {
@@ -68,7 +53,7 @@
 
 .metric-detail {
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 4px;
 }
 
@@ -91,13 +76,14 @@
 
 .panel-head h2,
 .section-title h2 {
-  font-size: 15px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .panel-head p,
 .section-title p {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 13px;
   margin-top: 3px;
 }
 
@@ -122,7 +108,7 @@
   align-items: center;
   background: var(--bg-subtle);
   border-radius: 8px;
-  color: var(--purple-text);
+  color: var(--text-soft);
   display: inline-flex;
   flex: 0 0 auto;
   height: 30px;
@@ -138,7 +124,7 @@
 }
 
 .task-main strong {
-  font-size: 11px;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -146,7 +132,7 @@
 
 .task-main span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .compact-empty {
@@ -156,9 +142,7 @@
 }
 
 .architecture-panel {
-  background:
-    radial-gradient(circle at 90% 10%, var(--purple-soft), transparent 35%),
-    var(--bg-elevated);
+  background: var(--bg-elevated);
 }
 
 .architecture-flow {
@@ -178,18 +162,18 @@
 }
 
 .flow-node strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .flow-node span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .flow-node-active {
-  background: var(--purple-soft);
-  border-color: color-mix(in srgb, var(--purple) 35%, var(--border));
-  color: var(--purple-text);
+  background: var(--bg-subtle);
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .flow-line {
@@ -208,7 +192,7 @@
 }
 
 .flow-line span {
-  background: var(--purple);
+  background: var(--text-soft);
   border-radius: 50%;
   height: 4px;
   left: -1.5px;
@@ -219,7 +203,7 @@
 
 .architecture-note {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
@@ -255,9 +239,9 @@
 
 .config-icon {
   align-items: center;
-  background: var(--purple-soft);
+  background: var(--bg-subtle);
   border-radius: 10px;
-  color: var(--purple-text);
+  color: var(--text-soft);
   display: flex;
   height: 36px;
   justify-content: center;
@@ -272,17 +256,17 @@
 }
 
 .config-title strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .config-title span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .config-description {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 13px;
   margin: 13px 0 2px;
 }
 
@@ -291,7 +275,7 @@
   border-radius: 7px;
   color: var(--text-soft);
   font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 15px;
   overflow: hidden;
   padding: 7px 8px;
@@ -302,7 +286,7 @@
 .config-meta {
   color: var(--text-faint);
   display: flex;
-  font-size: 9px;
+  font-size: 12px;
   gap: 14px;
   margin-top: 10px;
 }
@@ -347,7 +331,7 @@
 .data-head {
   background: var(--bg-subtle);
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 750;
   letter-spacing: 0.05em;
   min-height: 39px;
@@ -362,7 +346,7 @@
 .primary-cell {
   align-items: center;
   display: flex;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
   gap: 8px;
   min-width: 0;
@@ -371,7 +355,7 @@
 .primary-cell code,
 .data-row > code {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -383,10 +367,10 @@
 
 .protocol-note,
 .warning-note {
-  background: var(--purple-soft);
+  background: var(--bg-subtle);
   border-radius: 9px;
-  color: var(--purple-text);
-  font-size: 10px;
+  color: var(--text);
+  font-size: 12px;
   line-height: 1.6;
   padding: 9px 11px;
 }
@@ -404,6 +388,6 @@
 .test-result span {
   color: var(--text-faint);
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 8px;
 }

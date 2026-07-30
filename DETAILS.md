@@ -1,12 +1,13 @@
 # Repository details
 
-Updated: 2026-07-28
+Updated: 2026-07-30
 
 ## 根目录
 
 - `package.json`：npm workspace 命令。
 - `tsconfig.base.json`：共享 TypeScript 严格配置。
 - `Dockerfile`：构建共享类型、React 前端和 Fastify 后端的单镜像。
+- `Dockerfile.telegram`：构建独立 Telegram Adapter 镜像。
 - `compose.yaml`：Core 与可选 Adapter/搜索服务。
 - `compose.full.yaml`：从相邻 fork 源码构建整个媒体系统。
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
@@ -18,7 +19,7 @@ Updated: 2026-07-28
 
 ## `apps/server/src`
 
-- `index.ts`：进程入口，启动任务进度、Outbox 和清理定时器。
+- `index.ts`：进程入口，启动任务进度、OpenList 鉴权、追更、Outbox 和清理定时器。
 - `app.ts`：组装数据库、服务、路由和静态前端。
 - `config.ts`：环境变量校验和数据目录。
 - `bootstrap.ts`：可选环境变量所有者与首个 AI 供应方初始化。
@@ -26,7 +27,7 @@ Updated: 2026-07-28
 
 ### `ai`
 
-- `types.ts`：渠道和供应方无关的消息、工具与响应类型。
+- `types.ts`：渠道和供应方无关的消息、图片、工具与响应类型。
 - `client.ts`：按协议选择 Adapter。
 - `openai-responses.ts`：Responses 请求与函数调用映射。
 - `openai-chat.ts`：Chat Completions 兼容映射。
@@ -36,9 +37,16 @@ Updated: 2026-07-28
 
 ### `agent`
 
-- `service.ts`：持久化会话、模型调用、工具迭代和管理员扫码工具。
-- `tools.ts`：TMDB、Jackett、OpenList、Jellyfin、任务和时间工具。
-- `prompt.ts`：下载确认、远端路径和凭据安全规则。
+- `service.ts`：持久化会话、模型调用、并行工具迭代、只读追更检查和管理员扫码工具。
+- `media-destination.ts`：使用媒体库根目录、TMDB 英文名和季号生成电影、单季及
+  多季合集下载目录，并返回正确的 Jellyfin 刷新目标。
+- `tool-executor.ts`：并行执行同轮工具并按原调用顺序返回结果。
+- `tools.ts`、`tool-types.ts`：工具组合入口和共享依赖。
+- `toolsets/`：基础目录、下载/OpenList、字幕、Jellyfin 和追更工具。
+- `toolsets/subtitle-placement.ts`：用文件 UUID 生成不可变字幕映射计划，校验摘要、
+  重复使用和 Jellyfin 目标，并处理部分失败重试。
+- `prompt.ts`：可迁移的旧版 Agent 行为、当前远端媒体规则，以及各独立 AI
+  上下文的默认提示词和版本。
 
 ### `api`
 
@@ -55,30 +63,79 @@ Updated: 2026-07-28
 - `task-store.ts`：任务生命周期。
 - `outbox-store.ts`：主动聊天通知和指数退避。
 - `media-store.ts`：短期、限次读取的二维码媒体。
+- `watchlist-store.ts`：按成员隔离的追更和分集状态。
+- `prompt-store.ts`：提示词初始化、读取、自定义和恢复默认值；系统升级只替换
+  未自定义的旧版本。
 
 ### `integrations`、`tasks`、`channels`
 
-- `integrations/openlist.ts`：离线下载、内存任务状态、调度器和扫码会话。
-- `integrations/jellyfin.ts`：媒体搜索和 `RemoteRefresh`。
-- `integrations/jackett.ts`、`tmdb.ts`：发布版本和影片目录。
-- `tasks/progress-worker.ts`：每 15 秒读取 OpenList 内存任务状态。
+- `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
+  内存任务状态、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
+- `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
+  `RemoteRefresh`、字幕读取、上传和删除。
+- `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
+- `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
+  并提供季与分集日期。
+- `integrations/subhd.ts`：识别关联影片页并返回完整字幕列表、评论回复，以及按任务
+  隔离且可并发执行的下载会话；统一限制请求开始间隔。
+- `integrations/cookie-jar.ts`：管理单个 SubHD 下载会话的响应 Cookie，不在任务间
+  共享状态。
+- `integrations/weclaw-registration.ts`：读取同一 Compose 的 WeClaw 配置与登录账号，
+  自动建立 Core 渠道记录且不向浏览器返回令牌。
+- `tasks/progress-worker.ts`：每 2 秒读取 OpenList 内存任务状态，处理 115
+  短时失败、远端任务删除和备用磁力；任务完成后按目标目录合并 Jellyfin
+  刷新请求并保存重试状态。
+- `tasks/openlist-auth-worker.ts`：低频检查 115 登录凭据；失效时向每个已配置渠道中的
+  owner/admin 身份发送通知，同一次失效不重复发送。
+- `tasks/watchlist-worker.ts`：按间隔读取 TMDB 并调用只读 Agent 检查追更条件。
 - `channels/outbound.ts`：向 Native Adapter 发送主动消息。
+- `channels/agent-messages.ts`：把 Agent 最终文本中的 Core 临时媒体 URL 提取为
+  Native 图片消息，并保留其余文字。
+
+### `subtitles`
+
+- `captcha-recognizer.ts`：独立视觉模型上下文和固定 OCR 提示词。
+- `download-service.ts`：每个下载独立执行最多五次自动验证码处理；人工验证码不占用
+  全局等待状态。
+- `extract.ts`：7z/unzip/unrar 多级解压、UTF-8/UTF-16/GB18030 编码归一化和
+  字幕格式限制。
+- `cleaner.ts`：每个文本字幕使用独立 AI 请求分析全部事件，不做正则预筛选。
+- `ass-style.ts`：旧版 ASS 样式分析、行内标签和黑边特效坐标处理。
+- `hints.ts`：从解压相对路径推断集号、语言和 Jellyfin 语言标签。
+- `workspace-store.ts`：一个任务累计多个字幕包、文件和验证码的成员级临时工作区；
+  文件只使用 UUID，并保存不可变放置计划和逐项执行状态。
+- `references.ts`：为 Jellyfin 外挂字幕生成摘要引用，并在删除或替换前解析当前流。
+- `types.ts`：字幕搜索、验证码、提取文件、放置计划和临时工作区类型。
 
 ## `apps/web/src`
 
 - `App.tsx`：认证状态和轻量浏览器路由。
-- `components/Shell.tsx`：响应式侧栏、主题和用户菜单。
+- `components/Shell.tsx`：旧版风格的顶部栏、动画横向标签导航、页面切换和用户信息。
 - `components/Ui.tsx`、`Toast.tsx`：可复用管理组件。
 - `pages/AuthPage.tsx`：初始化与登录。
 - `pages/DashboardPage.tsx`：运行概况。
 - `pages/AiPage.tsx`：供应方、模型和连接测试。
 - `pages/MembersPage.tsx`：成员和外部身份审批。
-- `pages/ChannelsPage.tsx`：Native Adapter 和 WeClaw 配置示例。
+- `pages/ChannelsPage.tsx`：WeClaw 自动识别状态、Telegram 一步连接和其他
+  Native Adapter 高级配置。
 - `pages/ServicesPage.tsx`：媒体服务和 115 扫码登录。
 - `pages/TasksPage.tsx`：任务进度。
+- `pages/WatchlistsPage.tsx`：管理员查看和删除追更项。
+- `pages/PromptsPage.tsx`：查看、编辑和恢复五类数据库提示词。
 - `pages/PlaygroundPage.tsx`：管理员 Agent 测试。
-- `styles/`：按设计令牌、布局、组件和页面拆分的样式。
+- `styles/`：按中性设计令牌、顶部布局、基础组件和业务页面拆分的样式。
+
+## `apps/telegram-adapter/src`
+
+- `index.ts`：独立容器入口和退出处理。
+- `config.ts`：进程参数、独立数据卷配置、环境变量兼容初始化和运行配置校验。
+- `telegram.ts`：Telegram Bot API、消息发送和会话标识转换。
+- `adapter.ts`：内部初始化接口、long polling、Native 入站事件和
+  `/v1/messages` 出站服务。
 
 复杂流程分别记录在 `docs/architecture.md`、`docs/ai-providers.md`、
-`docs/native-adapters.md`、`docs/openlist-jellyfin.md` 和
-`docs/security.md`。
+`docs/prompts.md`、`docs/native-adapters.md`、`docs/openlist-jellyfin.md` 和
+`docs/security.md`；字幕与追更见 `docs/subtitles-watchlists.md`，管理界面规范见
+`docs/admin-ui.md`；115 重试和 Telegram 分别见
+`docs/instant-offline-retry.md`、`docs/telegram-adapter.md`；自动下载目录见
+`docs/media-download-paths.md`。

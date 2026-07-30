@@ -60,6 +60,12 @@ export class GeminiGenerateContentClient implements AiClient {
       }
       const parts: Array<Record<string, unknown>> = [
         { text: message.content || " " },
+        ...(message.images ?? []).map((image) => ({
+          inlineData: {
+            mimeType: image.mediaType,
+            data: image.dataBase64,
+          },
+        })),
       ];
       for (const call of message.toolCalls ?? []) {
         parts.push({

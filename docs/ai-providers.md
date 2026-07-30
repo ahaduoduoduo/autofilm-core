@@ -1,6 +1,6 @@
 # AI suppliers and protocols
 
-Updated: 2026-07-28
+Updated: 2026-07-29
 
 ## 两个独立概念
 
@@ -21,6 +21,10 @@ Core 不检查供应方名称，也没有 `newapi` 分支。
 
 Base URL 应包含版本前缀，例如 `https://provider.example/v1`。Core
 在其后追加表中路径。
+
+`openai-responses` 使用标准 `stream: true` 模式，由 Core 在服务端解析 SSE
+文本、用量和工具调用事件。模型测试、主 Agent 和验证码上下文仍接收聚合后的
+完整结果；兼容层也接受供应方在流式请求后返回普通 JSON。
 
 模型配置引用供应方，并保存真实 `model` 值、是否默认、temperature
 和最大输出 Token。只有一个模型可设为默认。

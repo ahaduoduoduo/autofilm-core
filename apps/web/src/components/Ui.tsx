@@ -149,7 +149,6 @@ export function EmptyState({
 }
 
 export function PageHeader({
-  eyebrow,
   title,
   description,
   actions,
@@ -162,7 +161,6 @@ export function PageHeader({
   return (
     <div className="page-header">
       <div>
-        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h1>{title}</h1>
         <p>{description}</p>
       </div>

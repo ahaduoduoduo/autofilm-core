@@ -7,6 +7,7 @@ import type {
   ServiceConfigSummary,
   ServiceType,
 } from "@autofilm/contracts";
+import { DEFAULT_MEDIA_LIBRARY_ROOTS } from "@autofilm/contracts";
 import type { AppDatabase } from "./database.js";
 import type { SecretVault } from "../security/vault.js";
 import { hashToken } from "../security/tokens.js";
@@ -39,7 +40,7 @@ interface ModelRow {
 interface ChannelRow {
   id: string;
   name: string;
-  type: "native" | "telegram";
+  type: "native";
   provider_instance_id: string;
   base_url: string;
   inbound_token_hash: string | null;
@@ -241,7 +242,7 @@ export class ConfigStore {
   saveChannel(input: {
     id?: string;
     name: string;
-    type: "native" | "telegram";
+    type: "native";
     providerInstanceId: string;
     baseUrl: string;
     inboundToken?: string;
@@ -333,6 +334,14 @@ export class ConfigStore {
       : undefined;
     const id = previous?.id ?? randomUUID();
     const now = new Date().toISOString();
+    const options =
+      input.type === "openlist"
+        ? {
+            movieLibraryRoot: DEFAULT_MEDIA_LIBRARY_ROOTS.movie,
+            tvLibraryRoot: DEFAULT_MEDIA_LIBRARY_ROOTS.tv,
+            ...input.options,
+          }
+        : input.options;
     this.db.transaction(() => {
       if (input.enabled) {
         this.db
@@ -361,7 +370,7 @@ export class ConfigStore {
           input.credential === undefined
             ? previous?.credential_encrypted ?? null
             : this.vault.encrypt(input.credential),
-          JSON.stringify(input.options),
+          JSON.stringify(options),
           Number(input.enabled),
           previous?.created_at ?? now,
           now,

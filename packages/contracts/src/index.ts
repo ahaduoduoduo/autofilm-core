@@ -48,6 +48,16 @@ export interface ModelProfile {
   updatedAt: string;
 }
 
+export interface PromptConfigSummary {
+  key: string;
+  name: string;
+  description: string;
+  content: string;
+  customized: boolean;
+  defaultVersion: number;
+  updatedAt: string;
+}
+
 export interface MemberSummary {
   id: string;
   username: string;
@@ -73,7 +83,7 @@ export interface ExternalIdentity {
 export interface ChannelConfigSummary {
   id: string;
   name: string;
-  type: "native" | "telegram";
+  type: "native";
   providerInstanceId: string;
   baseUrl: string;
   enabled: boolean;
@@ -83,7 +93,33 @@ export interface ChannelConfigSummary {
   updatedAt: string;
 }
 
-export type ServiceType = "openlist" | "jellyfin" | "jackett" | "tmdb";
+export type ServiceType =
+  | "openlist"
+  | "jellyfin"
+  | "jackett"
+  | "tmdb"
+  | "subhd";
+
+export const DEFAULT_MEDIA_LIBRARY_ROOTS = {
+  movie: "/115/nvideo/movie",
+  tv: "/115/nvideo/tv",
+} as const;
+
+export interface WatchlistSummary {
+  id: string;
+  userId: string;
+  tmdbId: number;
+  title: string;
+  originalTitle: string;
+  season: number;
+  totalEpisodes: number;
+  conditions: string;
+  destination: string;
+  status: "active" | "completed" | "paused";
+  nextCheckAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface ServiceConfigSummary {
   id: string;

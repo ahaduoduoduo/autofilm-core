@@ -3,6 +3,7 @@ import type {
   ServiceConfigSummary,
   ServiceType,
 } from "@autofilm/contracts";
+import { DEFAULT_MEDIA_LIBRARY_ROOTS } from "@autofilm/contracts";
 import {
   Boxes,
   CirclePlus,
@@ -12,6 +13,7 @@ import {
   Pencil,
   QrCode,
   Search,
+  Subtitles,
   TestTube2,
   Trash2,
 } from "lucide-react";
@@ -58,6 +60,12 @@ const serviceInfo: Record<
     description: "影片身份、海报和播出信息",
     icon: Boxes,
     defaultUrl: "https://api.themoviedb.org/3",
+  },
+  subhd: {
+    label: "SubHD",
+    description: "字幕搜索、详情、下载与验证码处理",
+    icon: Subtitles,
+    defaultUrl: "https://subhd.tv",
   },
 };
 
@@ -252,7 +260,7 @@ function ServiceModal({
   const [credential, setCredential] = useState("");
   const [enabled, setEnabled] = useState(value.enabled ?? true);
   const [options, setOptions] = useState<Record<string, unknown>>(
-    value.options ?? defaultOptions(type),
+    { ...defaultOptions(type), ...(value.options ?? {}) },
   );
   const [busy, setBusy] = useState(false);
 
@@ -314,49 +322,120 @@ function ServiceModal({
             required
           />
         </Field>
-        <Field
-          label={credentialLabel(type)}
-          hint={value.hasCredential ? "留空表示保留当前值" : credentialHint(type)}
-        >
-          <Input
-            type="password"
-            value={credential}
-            onChange={(e) => setCredential(e.target.value)}
-            autoComplete="new-password"
-          />
-        </Field>
+        {type !== "subhd" && (
+          <Field
+            label={credentialLabel(type)}
+            hint={value.hasCredential ? "留空表示保留当前值" : credentialHint(type)}
+          >
+            <Input
+              type="password"
+              value={credential}
+              onChange={(e) => setCredential(e.target.value)}
+              autoComplete="new-password"
+            />
+          </Field>
+        )}
         {type === "openlist" && (
-          <div className="form-grid">
-            <Field label="离线下载工具">
-              <Input
-                value={String(options.offlineDownloadTool ?? "115 Cloud")}
-                onChange={(e) =>
+          <>
+            <div className="form-grid">
+              <Field
+                label="电影媒体库根目录"
+                hint="Core 会在下面按月份创建下载目录"
+              >
+                <Input
+                  value={String(
+                    options.movieLibraryRoot ??
+                      DEFAULT_MEDIA_LIBRARY_ROOTS.movie,
+                  )}
+                  onChange={(e) =>
+                    setOptions((current) => ({
+                      ...current,
+                      movieLibraryRoot: e.target.value,
+                    }))
+                  }
+                  required
+                />
+              </Field>
+              <Field
+                label="电视剧媒体库根目录"
+                hint="单季进入剧名/Sxx，多季合集进入剧名根目录"
+              >
+                <Input
+                  value={String(
+                    options.tvLibraryRoot ?? DEFAULT_MEDIA_LIBRARY_ROOTS.tv,
+                  )}
+                  onChange={(e) =>
+                    setOptions((current) => ({
+                      ...current,
+                      tvLibraryRoot: e.target.value,
+                    }))
+                  }
+                  required
+                />
+              </Field>
+            </div>
+            <div className="form-grid">
+              <Field label="离线下载工具">
+                <Input
+                  value={String(options.offlineDownloadTool ?? "115 Cloud")}
+                  onChange={(e) =>
+                    setOptions((current) => ({
+                      ...current,
+                      offlineDownloadTool: e.target.value,
+                    }))
+                  }
+                />
+              </Field>
+              <Field
+                label="115 Storage ID"
+                hint="仅用于管理扫码会话，不进入 Jellyfin 媒体模型"
+              >
+                <Input
+                  type="number"
+                  min="1"
+                  value={String(options.authStorageId ?? "")}
+                  onChange={(e) =>
+                    setOptions((current) => ({
+                      ...current,
+                      authStorageId: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    }))
+                  }
+                />
+              </Field>
+            </div>
+            <div className="form-grid">
+              <Field
+                label="115 秒传时限（秒）"
+                hint="超过时限即删除任务并尝试备用磁力；建议 20 秒"
+              >
+                <Input
+                  type="number"
+                  min="10"
+                  max="120"
+                  value={String(options.instantOfflineTimeoutSeconds ?? 20)}
+                  onChange={(e) =>
+                    setOptions((current) => ({
+                      ...current,
+                      instantOfflineTimeoutSeconds:
+                        Number(e.target.value) || 20,
+                    }))
+                  }
+                />
+              </Field>
+              <Toggle
+                checked={options.instantOfflineRetryEnabled !== false}
+                onChange={(checked) =>
                   setOptions((current) => ({
                     ...current,
-                    offlineDownloadTool: e.target.value,
+                    instantOfflineRetryEnabled: checked,
                   }))
                 }
+                label="启用秒传失败自动换磁力"
               />
-            </Field>
-            <Field
-              label="115 Storage ID"
-              hint="仅用于管理扫码会话，不进入 Jellyfin 媒体模型"
-            >
-              <Input
-                type="number"
-                min="1"
-                value={String(options.authStorageId ?? "")}
-                onChange={(e) =>
-                  setOptions((current) => ({
-                    ...current,
-                    authStorageId: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
-                  }))
-                }
-              />
-            </Field>
-          </div>
+            </div>
+          </>
         )}
         {type === "jackett" && (
           <Field label="结果接口路径">
@@ -383,6 +462,24 @@ function ServiceModal({
             />
           </Field>
         )}
+        {type === "subhd" && (
+          <Field
+            label="请求间隔（毫秒）"
+            hint="SubHD 请求串行执行；增加间隔可降低被限流概率"
+          >
+            <Input
+              type="number"
+              min="500"
+              value={String(options.requestDelayMs ?? 800)}
+              onChange={(e) =>
+                setOptions((current) => ({
+                  ...current,
+                  requestDelayMs: Number(e.target.value) || 800,
+                }))
+              }
+            />
+          </Field>
+        )}
         <Toggle checked={enabled} onChange={setEnabled} label="启用此服务" />
         <div className="modal-actions">
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -396,10 +493,18 @@ function ServiceModal({
 }
 
 function defaultOptions(type: ServiceType): Record<string, unknown> {
-  if (type === "openlist") return { offlineDownloadTool: "115 Cloud" };
+  if (type === "openlist")
+    return {
+      offlineDownloadTool: "115 Cloud",
+      instantOfflineRetryEnabled: true,
+      instantOfflineTimeoutSeconds: 20,
+      movieLibraryRoot: DEFAULT_MEDIA_LIBRARY_ROOTS.movie,
+      tvLibraryRoot: DEFAULT_MEDIA_LIBRARY_ROOTS.tv,
+    };
   if (type === "jackett")
     return { path: "/api/v2.0/indexers/all/results" };
   if (type === "tmdb") return { language: "zh-CN" };
+  if (type === "subhd") return { requestDelayMs: 800 };
   return {};
 }
 
@@ -517,14 +622,16 @@ function OpenListAuthModal({
 }
 
 function credentialLabel(type: ServiceType): string {
-  if (type === "openlist") return "OpenList 管理员 Token";
+  if (type === "openlist") return "OpenList AutoFilm 服务 Token";
   if (type === "jellyfin") return "Jellyfin API Key";
   if (type === "jackett") return "Jackett API Key";
-  return "TMDB Read Access Token";
+  if (type === "subhd") return "不需要凭据";
+  return "TMDB Read Access Token / v3 API Key";
 }
 
 function credentialHint(type: ServiceType): string {
   if (type === "openlist")
-    return "用于离线下载和读取内存任务状态；115 Cookie 不会进入 Core";
+    return "受限于 /api/autofilm；不能访问普通管理接口，115 Cookie 不会进入 Core";
+  if (type === "subhd") return "SubHD 使用公开网页接口";
   return "凭据使用主密钥加密后保存在 Core 数据库";
 }

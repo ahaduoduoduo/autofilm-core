@@ -21,7 +21,15 @@ import { JackettClient } from "./integrations/jackett.js";
 import { JellyfinClient } from "./integrations/jellyfin.js";
 import { OpenListClient } from "./integrations/openlist.js";
 import { TmdbClient } from "./integrations/tmdb.js";
+import { SubHDClient } from "./integrations/subhd.js";
+import { WatchlistStore } from "./db/watchlist-store.js";
+import { SubtitleWorkspaceStore } from "./subtitles/workspace-store.js";
+import { CaptchaRecognizer } from "./subtitles/captcha-recognizer.js";
+import { SubtitleDownloadService } from "./subtitles/download-service.js";
+import { SubtitleCleaner } from "./subtitles/cleaner.js";
 import { SecretVault } from "./security/vault.js";
+import { WeClawRegistration } from "./integrations/weclaw-registration.js";
+import { PromptStore } from "./db/prompt-store.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -35,22 +43,42 @@ export async function buildApp(config: AppConfig) {
   const vault = new SecretVault(config.masterKey);
   const users = new UserStore(db);
   const configs = new ConfigStore(db, vault);
+  const prompts = new PromptStore(db);
+  const weClawRegistration = new WeClawRegistration({
+    configs,
+    dataDir: config.weClawDataDir,
+    baseUrl: config.weClawUrl,
+  });
   const conversations = new ConversationStore(db);
   const tasks = new TaskStore(db);
   const outbox = new OutboxStore(db);
   const media = new EphemeralMediaStore(db);
+  const watchlists = new WatchlistStore(db);
   const tmdb = new TmdbClient(configs);
   const jackett = new JackettClient(configs);
   const openList = new OpenListClient(configs);
   const jellyfin = new JellyfinClient(configs);
+  const subhd = new SubHDClient(configs);
+  const subtitleWorkspaces = new SubtitleWorkspaceStore(config.dataDir);
+  const subtitleDownloads = new SubtitleDownloadService(
+    subhd,
+    new CaptchaRecognizer(configs, prompts),
+  );
+  const subtitleCleaner = new SubtitleCleaner(configs, prompts);
   const agent = new AgentService({
     configs,
+    prompts,
     conversations,
     tasks,
     tmdb,
     jackett,
     openList,
     jellyfin,
+    subhd,
+    watchlists,
+    subtitleWorkspaces,
+    subtitleDownloads,
+    subtitleCleaner,
     users,
     outbox,
     media,
@@ -61,14 +89,21 @@ export async function buildApp(config: AppConfig) {
     db,
     users,
     configs,
+    prompts,
     conversations,
     tasks,
     outbox,
     media,
+    watchlists,
+    subtitleWorkspaces,
+    subtitleDownloads,
+    subtitleCleaner,
+    weClawRegistration,
     tmdb,
     jackett,
     openList,
     jellyfin,
+    subhd,
     agent,
   };
 
@@ -99,6 +134,17 @@ export async function buildApp(config: AppConfig) {
   await registerAuthRoutes(app, context);
   await registerAdminRoutes(app, context);
   await registerNativeRoutes(app, context);
+
+  await weClawRegistration.reconcile();
+  const weClawTimer = config.weClawDataDir
+    ? setInterval(() => {
+        void weClawRegistration.reconcile();
+      }, 5_000)
+    : undefined;
+  weClawTimer?.unref();
+  app.addHook("onClose", async () => {
+    if (weClawTimer) clearInterval(weClawTimer);
+  });
 
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const webRoot = path.resolve(moduleDir, "../../web/dist");

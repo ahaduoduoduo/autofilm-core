@@ -137,4 +137,10 @@ export class ConversationStore {
       )
       .run(eventId, responseJson, new Date().toISOString());
   }
+
+  deleteProcessedEventsBefore(timestamp: string): void {
+    this.db
+      .prepare("DELETE FROM processed_events WHERE processed_at < ?")
+      .run(timestamp);
+  }
 }

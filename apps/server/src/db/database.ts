@@ -57,7 +57,7 @@ const migrations = [
   CREATE TABLE channel_configs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('native', 'telegram')),
+    type TEXT NOT NULL CHECK (type = 'native'),
     provider_instance_id TEXT NOT NULL,
     base_url TEXT NOT NULL DEFAULT '',
     inbound_token_hash TEXT,
@@ -140,15 +140,6 @@ const migrations = [
     processed_at TEXT NOT NULL
   );
 
-  CREATE TABLE audit_events (
-    id TEXT PRIMARY KEY,
-    actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-    action TEXT NOT NULL,
-    target_type TEXT NOT NULL,
-    target_id TEXT,
-    details_json TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL
-  );
   `,
   `
   CREATE TABLE outbox_messages (
@@ -180,6 +171,96 @@ const migrations = [
     created_at TEXT NOT NULL
   );
   CREATE INDEX ephemeral_media_expiry_idx ON ephemeral_media(expires_at);
+  `,
+  `
+  ALTER TABLE service_configs RENAME TO service_configs_v3;
+  CREATE TABLE service_configs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (
+      type IN ('openlist', 'jellyfin', 'jackett', 'tmdb', 'subhd')
+    ),
+    base_url TEXT NOT NULL DEFAULT '',
+    credential_encrypted TEXT,
+    options_json TEXT NOT NULL DEFAULT '{}',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  INSERT INTO service_configs
+    (id, name, type, base_url, credential_encrypted, options_json,
+     enabled, created_at, updated_at)
+  SELECT id, name, type, base_url, credential_encrypted, options_json,
+         enabled, created_at, updated_at
+  FROM service_configs_v3;
+  DROP TABLE service_configs_v3;
+
+  CREATE TABLE watchlists (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tmdb_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    original_title TEXT NOT NULL DEFAULT '',
+    season INTEGER NOT NULL,
+    total_episodes INTEGER NOT NULL DEFAULT 0,
+    conditions TEXT NOT NULL DEFAULT '',
+    destination TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active'
+      CHECK (status IN ('active', 'completed', 'paused')),
+    channel TEXT,
+    provider_instance_id TEXT,
+    target_id TEXT,
+    next_check_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(user_id, tmdb_id, season)
+  );
+  CREATE INDEX watchlists_due_idx ON watchlists(status, next_check_at);
+
+  CREATE TABLE watchlist_episodes (
+    watchlist_id TEXT NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
+    episode_number INTEGER NOT NULL,
+    air_date TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'upcoming'
+      CHECK (status IN ('upcoming', 'aired', 'notified', 'downloaded')),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(watchlist_id, episode_number)
+  );
+  `,
+  `
+  CREATE TABLE prompt_configs (
+    key TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    customized INTEGER NOT NULL DEFAULT 0,
+    default_version INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  `,
+  `
+  DROP TABLE IF EXISTS audit_events;
+
+  ALTER TABLE channel_configs RENAME TO channel_configs_v6;
+  CREATE TABLE channel_configs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type = 'native'),
+    provider_instance_id TEXT NOT NULL,
+    base_url TEXT NOT NULL DEFAULT '',
+    inbound_token_hash TEXT,
+    outbound_token_encrypted TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(type, provider_instance_id)
+  );
+  INSERT INTO channel_configs
+    (id, name, type, provider_instance_id, base_url, inbound_token_hash,
+     outbound_token_encrypted, enabled, created_at, updated_at)
+  SELECT id, name, 'native', provider_instance_id, base_url, inbound_token_hash,
+         outbound_token_encrypted, enabled, created_at, updated_at
+  FROM channel_configs_v6
+  WHERE type IN ('native', 'telegram');
+  DROP TABLE channel_configs_v6;
   `,
 ];
 

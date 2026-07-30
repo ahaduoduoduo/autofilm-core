@@ -8,9 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @autofilm/contracts && npm run build -w @autofilm/web && npm run build -w @autofilm/server",
+    "build": "npm run build -w @autofilm/contracts && npm run build -w @autofilm/web && npm run build -w @autofilm/server && npm run build -w @autofilm/telegram-adapter",
     "dev": "concurrently -n server,web -c magenta,cyan \"npm run dev -w @autofilm/server\" \"npm run dev -w @autofilm/web\"",
-    "test": "npm run build -w @autofilm/contracts && npm run test -w @autofilm/server && npm run test -w @autofilm/web",
+    "test": "npm run build -w @autofilm/contracts && npm run test -w @autofilm/server && npm run test -w @autofilm/web && npm run test -w @autofilm/telegram-adapter",
     "typecheck": "npm run typecheck -ws --if-present",
     "lint": "npm run lint -ws --if-present"
   },

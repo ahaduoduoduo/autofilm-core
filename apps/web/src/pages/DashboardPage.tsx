@@ -42,7 +42,6 @@ export function DashboardPage() {
       value: summary.activeTasks,
       detail: summary.failedTasks ? `${summary.failedTasks} 个任务失败` : "运行状态正常",
       icon: Activity,
-      tone: "purple",
     },
     {
       label: "已授权成员",
@@ -51,21 +50,18 @@ export function DashboardPage() {
         ? `${summary.pendingIdentities} 个身份待处理`
         : "没有待处理身份",
       icon: Users,
-      tone: "cyan",
     },
     {
       label: "AI 供应方",
       value: summary.providers,
       detail: "协议与供应方独立配置",
       icon: Bot,
-      tone: "rose",
     },
     {
       label: "媒体服务",
       value: summary.services,
       detail: "OpenList · Jellyfin · 搜索",
       icon: Boxes,
-      tone: "amber",
     },
   ];
 
@@ -86,7 +82,7 @@ export function DashboardPage() {
           const Icon = item.icon;
           return (
             <Card className="metric-card" key={item.label}>
-              <div className={`metric-icon metric-${item.tone}`}>
+              <div className="metric-icon">
                 <Icon size={20} />
               </div>
               <div className="metric-label">{item.label}</div>

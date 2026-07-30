@@ -1,6 +1,6 @@
 # OpenList and Jellyfin interaction
 
-Updated: 2026-07-28
+Updated: 2026-07-30
 
 ## 文件职责
 
@@ -11,16 +11,17 @@ Core 不读取具体网盘对象 ID。离线下载目标使用 OpenList 绝对�
 OpenList 内部决定路径属于 115、其他网盘或本地存储。115 Cookie
 始终留在 OpenList 驱动。
 
-## 三种不同事件
+## 三种独立操作
 
 1. Core 向 OpenList 创建离线下载。
-2. Core 每 15 秒读取 OpenList 内存任务进度。
-3. OpenList 在文件变更后直接向 Jellyfin 发送对象事件。
+2. Core 短间隔读取 OpenList 内存任务进度。
+3. 下载完成后，Core 显式调用 Jellyfin `RemoteRefresh`。
 
-第 2 项不是目录扫描，不维护 Jellyfin 文件映射。第 3 项替代旧版精准刷新插件和
-Core 目录轮询。
+第 2 项不是目录扫描，不维护 Jellyfin 文件映射。OpenList 上传、移动、重命名和
+删除文件时不会自动修改 Jellyfin。
 
-管理员或 Agent 仍可显式调用 Jellyfin `RemoteRefresh`。它用于人工指定远端路径，
+管理员或 Agent 可显式调用 Jellyfin `RemoteRefresh`。OpenList 也保留一个显式
+的 `/api/autofilm/jellyfin/scan` 操作，供管理员将指定路径导入 Jellyfin。两者都
 不是常驻同步机制。
 
 ## 115 扫码
@@ -34,10 +35,34 @@ Core 使用 OpenList 管理端 AutoFilm 扫码 API：
 扫码成功后 OpenList 使用该 Storage 原有 `QRCodeSource`，校验新 Cookie，
 更新驱动字段并保存 Storage。Core 不接收 Cookie。
 
+OpenList 还提供低频凭据健康检查。Core 不解释 115 错误文本，而是读取明确的
+`authenticated` 状态；失效时向所有已配置且已有管理员身份的聊天渠道发送通知。
+
 管理界面中的 Storage ID 只用于选择需要重新认证的 OpenList Storage，
 不会写入 Jellyfin 条目，也不会成为媒体路径的一部分。
 
 ## 任务状态
 
 Core 保存 OpenList 返回的任务 ID、标题、成员、目标目录和通知目标。
-OpenList 任务进入终态后 Core 更新本地任务，并通过原聊天 Adapter 通知成员。
+Core 通过受限的 `GET /api/autofilm/offline-tasks` 读取内存任务快照；该接口
+不列目录、不读取 115 文件对象，也不开放任务取消或删除能力。OpenList 任务进入
+终态后 Core 更新本地任务，并通过原聊天 Adapter 通知成员。
+
+下载目标目录不由 Agent 自由填写。Core 根据 OpenList 服务配置的媒体库根目录、
+TMDB ID、媒体类型和季号生成目录；完整规则见
+[media-download-paths.md](media-download-paths.md)。
+
+## 字幕管理
+
+Agent 不把 OpenList 路径作为字幕目标。Core 先从 Jellyfin 取得 Movie 或 Episode ID，
+再把字幕内容提交给 Jellyfin 标准字幕接口：
+
+- 本地媒体使用 Jellyfin 原生字幕保存和自动命名逻辑。
+- `openlist:///` 媒体由 Jellyfin AutoFilm 字幕服务上传到对应 OpenList 目录，
+  自动选择未占用的语言文件名，并立即写入媒体流记录。
+- 删除和替换使用 Core 生成的不可变 `subtitle_ref`。Core 执行前重新读取 Jellyfin
+  字幕并校验文件摘要，内部解析当前流位置；Agent 不使用数字流序号。Core 不直接
+  删除 OpenList 文件。
+
+因此字幕新增、替换和删除后不调用 `RemoteRefresh`。下载完成后的媒体目录导入仍使用
+`RemoteRefresh`，两种操作互不替代。

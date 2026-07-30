@@ -25,12 +25,12 @@
 }
 
 .pending-copy strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .pending-copy span {
   color: var(--text-soft);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .pending-list {
@@ -65,16 +65,16 @@
 }
 
 .pending-user strong {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .pending-user small {
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .pending-user > svg {
-  color: var(--purple);
+  color: var(--text-soft);
 }
 
 .member-row {
@@ -98,13 +98,13 @@
 
 .member-cell strong,
 .task-title-cell strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .member-cell small,
 .task-title-cell small {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .identity-chips {
@@ -114,11 +114,11 @@
 }
 
 .identity-chip {
-  background: var(--purple-soft);
+  background: var(--bg-subtle);
   border-radius: 12px;
-  color: var(--purple-text);
+  color: var(--text);
   cursor: pointer;
-  font-size: 9px;
+  font-size: 12px;
   padding: 4px 7px;
 }
 
@@ -126,7 +126,7 @@
   align-items: center;
   color: var(--text-faint);
   display: flex;
-  font-size: 10px;
+  font-size: 12px;
   gap: 7px;
   margin-top: 12px;
 }
@@ -147,7 +147,7 @@
 
 .identity-summary span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .boundary-card {
@@ -160,9 +160,9 @@
 
 .boundary-icon {
   align-items: center;
-  background: var(--purple-soft);
+  background: var(--bg-subtle);
   border-radius: 10px;
-  color: var(--purple-text);
+  color: var(--text-soft);
   display: flex;
   height: 40px;
   justify-content: center;
@@ -174,12 +174,12 @@
 }
 
 .boundary-card strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .boundary-card p {
   color: var(--text-soft);
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 2px;
 }
 
@@ -198,12 +198,70 @@
 }
 
 .token-toolbar strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .token-toolbar span {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
+}
+
+.telegram-setup-guide {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.telegram-setup-guide > div {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+}
+
+.telegram-setup-guide > div > span {
+  align-items: center;
+  background: var(--text);
+  border-radius: 50%;
+  color: var(--bg);
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 750;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
+.telegram-setup-guide p {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.telegram-setup-guide strong {
+  font-size: 13px;
+}
+
+.telegram-setup-guide small {
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.telegram-setup-guide a {
+  color: var(--text);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.telegram-setup-guide code {
+  color: var(--text);
 }
 
 .code-panel {
@@ -227,12 +285,12 @@
   align-items: center;
   color: #9992a8;
   display: flex;
-  font-size: 9px;
+  font-size: 11px;
   gap: 5px;
 }
 
 .code-panel pre {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.65;
   margin: 0;
   max-height: 240px;
@@ -266,12 +324,12 @@
 }
 
 .service-hint strong {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .service-hint small {
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .service-configured {
@@ -294,7 +352,7 @@
 }
 
 .qr-placeholder > svg {
-  color: var(--purple);
+  color: var(--text-soft);
   margin-bottom: 15px;
 }
 
@@ -304,7 +362,7 @@
 
 .qr-placeholder p {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 6px;
   max-width: 330px;
 }
@@ -321,6 +379,6 @@
 
 .qr-session > span:last-child {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
   margin-top: 7px;
 }

@@ -5,11 +5,13 @@ COPY package.json package-lock.json* tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/tsconfig.json ./packages/contracts/
 COPY apps/server/package.json apps/server/tsconfig.json ./apps/server/
 COPY apps/web/package.json apps/web/tsconfig.json apps/web/tsconfig.node.json ./apps/web/
+COPY apps/telegram-adapter/package.json apps/telegram-adapter/tsconfig.json ./apps/telegram-adapter/
 RUN npm install
 
 COPY packages/contracts ./packages/contracts
 COPY apps/server ./apps/server
 COPY apps/web ./apps/web
+COPY apps/telegram-adapter ./apps/telegram-adapter
 RUN npm run build
 RUN npm prune --omit=dev
 
@@ -19,7 +21,11 @@ ENV NODE_ENV=production \
     AUTOFILM_PORT=3100 \
     AUTOFILM_DATA_DIR=/data
 WORKDIR /app
-RUN useradd --system --uid 10001 --create-home autofilm \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      fontconfig fonts-dejavu-core p7zip-full unzip unrar-free \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home autofilm \
     && mkdir -p /data \
     && chown autofilm:autofilm /data
 

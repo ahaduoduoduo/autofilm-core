@@ -65,17 +65,6 @@ export class TaskStore {
     ).map(toTask);
   }
 
-  activeByExternalId(externalId: string): TaskSummary | undefined {
-    const row = this.db
-      .prepare(
-        `SELECT * FROM tasks
-         WHERE external_id = ? AND state IN ('queued', 'running', 'waiting')
-         ORDER BY created_at DESC LIMIT 1`,
-      )
-      .get(externalId) as TaskRow | undefined;
-    return row ? toTask(row) : undefined;
-  }
-
   byExternalId(externalId: string): TaskSummary | undefined {
     const row = this.db
       .prepare(

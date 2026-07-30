@@ -22,8 +22,8 @@
 }
 
 .mini-metric-icon.accent {
-  background: var(--purple-soft);
-  color: var(--purple-text);
+  background: var(--bg-subtle);
+  color: var(--text-soft);
 }
 
 .mini-metric-icon.success {
@@ -38,7 +38,7 @@
 
 .mini-metric > span:nth-child(2) {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .mini-metric strong {
@@ -67,7 +67,7 @@
 }
 
 .progress-track > span {
-  background: var(--purple);
+  background: var(--primary);
   border-radius: inherit;
   display: block;
   height: 100%;
@@ -79,7 +79,7 @@
 
 .progress-cell small {
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 12px;
   min-width: 38px;
 }
 
@@ -87,7 +87,7 @@
   align-items: center;
   color: var(--text-faint);
   display: flex;
-  font-size: 9px;
+  font-size: 12px;
   gap: 5px;
 }
 
@@ -110,9 +110,9 @@
 .agent-avatar,
 .chat-welcome-icon {
   align-items: center;
-  background: var(--purple-soft);
+  background: var(--bg-subtle);
   border-radius: 10px;
-  color: var(--purple-text);
+  color: var(--text-soft);
   display: flex;
   height: 34px;
   justify-content: center;
@@ -125,14 +125,14 @@
 }
 
 .playground-head strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .playground-head span {
   align-items: center;
   color: var(--text-faint);
   display: flex;
-  font-size: 8px;
+  font-size: 11px;
   gap: 5px;
 }
 
@@ -171,7 +171,7 @@
 
 .chat-welcome p {
   color: var(--text-soft);
-  font-size: 11px;
+  font-size: 13px;
   margin: 6px 0 18px;
 }
 
@@ -188,7 +188,7 @@
   border-radius: 20px;
   color: var(--text-soft);
   cursor: pointer;
-  font-size: 9px;
+  font-size: 12px;
   padding: 7px 10px;
 }
 
@@ -209,7 +209,7 @@
 .chat-item > div {
   background: var(--bg-subtle);
   border-radius: 4px 12px 12px;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.7;
   padding: 9px 11px;
   white-space: pre-wrap;
@@ -221,16 +221,16 @@
 }
 
 .chat-user > div {
-  background: var(--purple);
+  background: var(--primary);
   border-radius: 12px 4px 12px 12px;
-  color: white;
+  color: var(--primary-foreground);
 }
 
 .chat-avatar {
   align-items: center;
-  background: var(--purple-soft);
+  background: var(--bg-subtle);
   border-radius: 8px;
-  color: var(--purple-text);
+  color: var(--text-soft);
   display: flex;
   flex: 0 0 auto;
   height: 29px;

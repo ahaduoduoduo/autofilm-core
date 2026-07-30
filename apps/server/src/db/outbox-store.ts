@@ -139,6 +139,15 @@ export class OutboxStore {
         id,
       );
   }
+
+  deleteDeliveredBefore(timestamp: string): void {
+    this.db
+      .prepare(
+        `DELETE FROM outbox_messages
+         WHERE state IN ('sent', 'failed') AND updated_at < ?`,
+      )
+      .run(timestamp);
+  }
 }
 
 function toMessage(row: OutboxRow): OutboxMessage {

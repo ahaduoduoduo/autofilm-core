@@ -1,60 +1,33 @@
 :root {
-  color-scheme: light;
-  --bg: #f6f6fa;
-  --bg-elevated: #ffffff;
-  --bg-subtle: #f0eff5;
-  --bg-hover: #ebe9f3;
-  --text: #17161d;
-  --text-soft: #666470;
-  --text-faint: #96939f;
-  --border: #e5e3eb;
-  --border-strong: #d6d2df;
-  --purple: #7558e8;
-  --purple-hover: #6547d9;
-  --purple-soft: #ede9ff;
-  --purple-text: #5a3fcb;
-  --green: #168a62;
-  --green-soft: #e2f7ee;
-  --amber: #a46312;
-  --amber-soft: #fff1d8;
-  --red: #c23d52;
-  --red-soft: #fee9ed;
-  --cyan: #147f94;
-  --cyan-soft: #ddf5f8;
-  --shadow-sm: 0 1px 2px rgb(22 19 31 / 5%);
-  --shadow-md: 0 16px 45px rgb(37 29 67 / 9%);
-  --radius-sm: 9px;
-  --radius: 14px;
-  --radius-lg: 22px;
-  --sidebar: 238px;
-  font-family:
-    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Microsoft YaHei", sans-serif;
-}
-
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0d0d13;
-  --bg-elevated: #15141d;
-  --bg-subtle: #1d1b26;
-  --bg-hover: #252231;
-  --text: #f2f0f7;
-  --text-soft: #aaa6b6;
-  --text-faint: #777382;
-  --border: #292633;
-  --border-strong: #3a3548;
-  --purple: #8e74f5;
-  --purple-hover: #9f88f9;
-  --purple-soft: #29213f;
-  --purple-text: #b9a8ff;
+  --bg: #09090b;
+  --bg-elevated: #09090b;
+  --bg-subtle: #27272a;
+  --bg-hover: #27272a;
+  --text: #fafafa;
+  --text-soft: #a1a1aa;
+  --text-faint: #a1a1aa;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --primary: #fafafa;
+  --primary-hover: #e4e4e7;
+  --primary-foreground: #18181b;
   --green: #63d1aa;
   --green-soft: #17362d;
   --amber: #edb45e;
   --amber-soft: #3a2b17;
   --red: #f07f91;
   --red-soft: #3d1f28;
-  --cyan: #6dc9dc;
-  --cyan-soft: #17323a;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 16%);
-  --shadow-md: 0 18px 52px rgb(0 0 0 / 28%);
+  --shadow-sm:
+    0 1px 2px rgb(0 0 0 / 45%),
+    inset 0 1px rgb(255 255 255 / 3.5%);
+  --shadow-md:
+    0 18px 48px rgb(0 0 0 / 45%),
+    inset 0 1px rgb(255 255 255 / 4%);
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-lg: 12px;
+  font-family:
+    Geist, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
 }

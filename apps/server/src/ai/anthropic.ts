@@ -53,6 +53,14 @@ export class AnthropicMessagesClient implements AiClient {
       }
       const content: Array<Record<string, unknown>> = [
         { type: "text", text: message.content || " " },
+        ...(message.images ?? []).map((image) => ({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: image.mediaType,
+            data: image.dataBase64,
+          },
+        })),
       ];
       for (const call of message.toolCalls ?? []) {
         content.push({

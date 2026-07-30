@@ -15,6 +15,7 @@ body {
   font-size: 14px;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
+  font-family: inherit;
 }
 
 button,
@@ -52,8 +53,8 @@ pre {
 }
 
 ::selection {
-  background: var(--purple-soft);
-  color: var(--purple-text);
+  background: var(--bg-subtle);
+  color: var(--text);
 }
 
 ::-webkit-scrollbar {
@@ -84,9 +85,7 @@ pre {
 
 .app-loading {
   align-items: center;
-  background:
-    radial-gradient(circle at 50% 40%, var(--purple-soft), transparent 35%),
-    var(--bg);
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -105,7 +104,7 @@ pre {
 .loading span,
 .typing span {
   animation: pulse-dot 1.2s ease-in-out infinite;
-  background: var(--purple);
+  background: var(--primary);
   border-radius: 50%;
   height: 6px;
   width: 6px;

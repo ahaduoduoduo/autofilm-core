@@ -7,6 +7,7 @@ import type {
 import { z } from "zod";
 import type { AppContext } from "../app-context.js";
 import { hashToken } from "../security/tokens.js";
+import { agentMessages } from "../channels/agent-messages.js";
 
 const eventSchema = z.object({
   version: z.string().min(1).max(30),
@@ -104,7 +105,9 @@ export async function registerNativeRoutes(
             externalConversationId: event.conversation_id,
             text,
           });
-          response = { messages: [{ type: "text", text: content }] };
+          response = {
+            messages: agentMessages(content, context.config.mediaBaseUrl),
+          };
         } catch (error) {
           request.log.error({ err: error }, "native agent request failed");
           response = {

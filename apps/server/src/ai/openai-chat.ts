@@ -79,7 +79,17 @@ function toChatMessage(message: CanonicalMessage): Record<string, unknown> {
   }
   return {
     role: message.role,
-    content: message.content,
+    content: message.images?.length
+      ? [
+          { type: "text", text: message.content },
+          ...message.images.map((image) => ({
+            type: "image_url",
+            image_url: {
+              url: `data:${image.mediaType};base64,${image.dataBase64}`,
+            },
+          })),
+        ]
+      : message.content,
     tool_calls: message.toolCalls?.map((call) => ({
       id: call.id,
       type: "function",

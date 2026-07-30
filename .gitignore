@@ -3,6 +3,7 @@ dist/
 coverage/
 .env
 data/
+weclaw/
 *.log
 *.tsbuildinfo
 .DS_Store

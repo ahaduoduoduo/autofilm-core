@@ -3,6 +3,8 @@ import { bootstrap } from "./bootstrap.js";
 import { loadConfig } from "./config.js";
 import { ProgressWorker } from "./tasks/progress-worker.js";
 import { OutboundMessageWorker } from "./channels/outbound.js";
+import { WatchlistWorker } from "./tasks/watchlist-worker.js";
+import { OpenListAuthWorker } from "./tasks/openlist-auth-worker.js";
 
 const config = loadConfig();
 const { app, context } = await buildApp(config);
@@ -11,24 +13,52 @@ await bootstrap(config, context.users, context.configs);
 const progressWorker = new ProgressWorker(
   context.openList,
   context.tasks,
-  15_000,
+  2_000,
   context.outbox,
+  context.jellyfin,
 );
 const outboundWorker = new OutboundMessageWorker(
   context.configs,
   context.users,
   context.outbox,
 );
+const watchlistWorker = new WatchlistWorker(
+  context.watchlists,
+  context.tmdb,
+  context.agent,
+  context.outbox,
+  config.watchlistIntervalMs,
+);
+const openListAuthWorker = new OpenListAuthWorker(
+  context.openList,
+  context.configs,
+  context.users,
+  context.outbox,
+);
 progressWorker.start();
 outboundWorker.start();
+watchlistWorker.start();
+openListAuthWorker.start();
 const mediaCleanupTimer = setInterval(
-  () => context.media.deleteExpired(),
+  () => {
+    context.media.deleteExpired();
+    context.subtitleWorkspaces.deleteExpired();
+    context.users.deleteExpiredSessions();
+    context.conversations.deleteProcessedEventsBefore(
+      new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString(),
+    );
+    context.outbox.deleteDeliveredBefore(
+      new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString(),
+    );
+  },
   60 * 60_000,
 );
 mediaCleanupTimer.unref();
 app.addHook("onClose", async () => {
   progressWorker.stop();
   outboundWorker.stop();
+  watchlistWorker.stop();
+  openListAuthWorker.stop();
   clearInterval(mediaCleanupTimer);
 });
 

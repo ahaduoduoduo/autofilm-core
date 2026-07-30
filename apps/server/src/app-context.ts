@@ -11,19 +11,33 @@ import type { JackettClient } from "./integrations/jackett.js";
 import type { JellyfinClient } from "./integrations/jellyfin.js";
 import type { OpenListClient } from "./integrations/openlist.js";
 import type { TmdbClient } from "./integrations/tmdb.js";
+import type { SubHDClient } from "./integrations/subhd.js";
+import type { WatchlistStore } from "./db/watchlist-store.js";
+import type { SubtitleWorkspaceStore } from "./subtitles/workspace-store.js";
+import type { SubtitleDownloadService } from "./subtitles/download-service.js";
+import type { SubtitleCleaner } from "./subtitles/cleaner.js";
+import type { WeClawRegistration } from "./integrations/weclaw-registration.js";
+import type { PromptStore } from "./db/prompt-store.js";
 
 export interface AppContext {
   config: AppConfig;
   db: AppDatabase;
   users: UserStore;
   configs: ConfigStore;
+  prompts: PromptStore;
   conversations: ConversationStore;
   tasks: TaskStore;
   outbox: OutboxStore;
   media: EphemeralMediaStore;
+  watchlists: WatchlistStore;
+  subtitleWorkspaces: SubtitleWorkspaceStore;
+  subtitleDownloads: SubtitleDownloadService;
+  subtitleCleaner: SubtitleCleaner;
+  weClawRegistration: WeClawRegistration;
   agent: AgentService;
   tmdb: TmdbClient;
   jackett: JackettClient;
   openList: OpenListClient;
   jellyfin: JellyfinClient;
+  subhd: SubHDClient;
 }
