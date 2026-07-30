@@ -7,6 +7,7 @@ interface ConversationRow {
 }
 
 interface MessageRow {
+  sequence: number;
   role: "user" | "assistant" | "tool";
   content: string;
   tool_calls_json: string | null;
@@ -76,27 +77,51 @@ export class ConversationStore {
         input.externalConversationId,
       ) as ConversationRow | undefined;
     if (row) {
-      this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(row.id);
+      this.db
+        .prepare("DELETE FROM messages WHERE conversation_id = ?")
+        .run(row.id);
     }
   }
 
   history(conversationId: string, limit = 80): CanonicalMessage[] {
-    const rows = this.db
+    let rows = this.db
       .prepare(
-        `SELECT role, content, tool_calls_json, tool_call_id FROM (
-           SELECT * FROM messages WHERE conversation_id = ?
-           ORDER BY created_at DESC LIMIT ?
-         ) ORDER BY created_at`,
+        `SELECT sequence, role, content, tool_calls_json, tool_call_id FROM (
+           SELECT rowid AS sequence, role, content, tool_calls_json, tool_call_id
+           FROM messages
+           WHERE conversation_id = ?
+           ORDER BY rowid DESC
+           LIMIT ?
+         )
+         ORDER BY sequence`,
       )
-      .all(conversationId, limit) as MessageRow[];
-    return rows.map((row) => ({
-      role: row.role,
-      content: row.content,
-      toolCalls: row.tool_calls_json
-        ? (JSON.parse(row.tool_calls_json) as ToolCall[])
-        : undefined,
-      toolCallId: row.tool_call_id ?? undefined,
-    }));
+      .all(conversationId, Math.max(1, limit)) as MessageRow[];
+    const first = rows[0];
+    if (first && first.role !== "user") {
+      const turnStart = this.db
+        .prepare(
+          `SELECT rowid AS sequence
+           FROM messages
+           WHERE conversation_id = ? AND rowid < ? AND role = 'user'
+           ORDER BY rowid DESC
+           LIMIT 1`,
+        )
+        .get(conversationId, first.sequence) as
+        | { sequence: number }
+        | undefined;
+      if (turnStart) {
+        rows = this.db
+          .prepare(
+            `SELECT rowid AS sequence, role, content, tool_calls_json,
+                    tool_call_id
+             FROM messages
+             WHERE conversation_id = ? AND rowid >= ?
+             ORDER BY rowid`,
+          )
+          .all(conversationId, turnStart.sequence) as MessageRow[];
+      }
+    }
+    return rows.map(toCanonicalMessage);
   }
 
   append(conversationId: string, message: CanonicalMessage): void {
@@ -143,4 +168,16 @@ export class ConversationStore {
       .prepare("DELETE FROM processed_events WHERE processed_at < ?")
       .run(timestamp);
   }
+}
+
+function toCanonicalMessage(row: MessageRow): CanonicalMessage {
+  const toolCalls = row.tool_calls_json
+    ? (JSON.parse(row.tool_calls_json) as ToolCall[])
+    : undefined;
+  return {
+    role: row.role,
+    content: row.content,
+    ...(toolCalls ? { toolCalls } : {}),
+    ...(row.tool_call_id ? { toolCallId: row.tool_call_id } : {}),
+  };
 }

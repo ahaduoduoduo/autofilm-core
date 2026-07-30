@@ -25,6 +25,8 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   直接核对作品。
 - 同一成员会话的顶层请求按顺序执行，避免工具调用历史交叉；不同会话和同一轮工具
   仍可并行。
+- 最近 80 条会话上下文按完整用户请求截取，不拆分工具调用与结果；历史中存在旧版
+  孤立结果或进程中断时会在发送模型前自动恢复，同类供应方错误会使用当前请求重试。
 - Jackett 完整结果按文件大小降序分页，同一搜索词复用短期缓存；同轮只读工具
   并行执行。
 - SubHD 影片页完整字幕列表、详情评论、成员级多包临时工作区，以及 ZIP/RAR/7z
@@ -150,6 +152,8 @@ npm run build
 - [docs/system-repositories.md](docs/system-repositories.md)：六个仓库、上游和修改边界。
 - [docs/communication.md](docs/communication.md)：服务通信矩阵与用户交互流程。
 - [docs/ai-providers.md](docs/ai-providers.md)：供应方与协议模型。
+- [docs/conversation-recovery.md](docs/conversation-recovery.md)：会话截断、工具配对和
+  供应方错误恢复。
 - [docs/prompts.md](docs/prompts.md)：数据库提示词、默认版本和管理规则。
 - [docs/native-adapters.md](docs/native-adapters.md)：聊天 Adapter 契约。
 - [docs/openlist-jellyfin.md](docs/openlist-jellyfin.md)：媒体与任务交互。
