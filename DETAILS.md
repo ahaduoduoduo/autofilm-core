@@ -96,7 +96,8 @@ Updated: 2026-07-30
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。
 - `tasks/watchlist-worker.ts`：按间隔读取 TMDB 并调用只读 Agent 检查追更条件。
-- `channels/outbound.ts`：向 Native Adapter 发送主动消息。
+- `channels/outbound.ts`：向 Native Adapter 发送主动消息；Adapter 因缺少当前会话
+  令牌返回 409 时延后投递，不消耗失败次数。
 - `channels/agent-messages.ts`：把 Agent 最终文本中的 Core 临时媒体 URL 提取为
   Native 图片消息，并保留其余文字。
 

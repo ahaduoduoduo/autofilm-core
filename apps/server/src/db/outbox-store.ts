@@ -140,6 +140,21 @@ export class OutboxStore {
       );
   }
 
+  defer(id: string, error: string, delayMs = 30_000): void {
+    const now = new Date();
+    this.db
+      .prepare(
+        `UPDATE outbox_messages SET state = 'pending',
+           next_attempt_at = ?, last_error = ?, updated_at = ? WHERE id = ?`,
+      )
+      .run(
+        new Date(now.getTime() + delayMs).toISOString(),
+        error.slice(0, 1000),
+        now.toISOString(),
+        id,
+      );
+  }
+
   deleteDeliveredBefore(timestamp: string): void {
     this.db
       .prepare(

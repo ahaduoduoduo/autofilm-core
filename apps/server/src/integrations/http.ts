@@ -4,6 +4,16 @@ export interface ApiEnvelope<T> {
   data: T;
 }
 
+export class ServiceHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly responseBody: string,
+  ) {
+    super(`Service returned HTTP ${status}: ${responseBody.slice(0, 500)}`);
+    this.name = "ServiceHttpError";
+  }
+}
+
 export async function requestJson<T>(
   url: string,
   init: RequestInit,
@@ -14,9 +24,7 @@ export async function requestJson<T>(
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(
-      `Service returned HTTP ${response.status}: ${text.slice(0, 500)}`,
-    );
+    throw new ServiceHttpError(response.status, text);
   }
   try {
     return JSON.parse(text) as T;
@@ -46,9 +54,7 @@ export async function requestOk(
   });
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(
-      `Service returned HTTP ${response.status}: ${text.slice(0, 500)}`,
-    );
+    throw new ServiceHttpError(response.status, text);
   }
 }
 

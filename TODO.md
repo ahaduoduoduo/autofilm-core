@@ -6,6 +6,8 @@ Updated: 2026-07-30
 
 - [x] 2026-07-30：离线任务完成后使用 OpenList 返回的最终结果路径精确刷新
   Jellyfin，并拒绝目标目录以外的结果路径。
+- [x] 2026-07-30：微信主动通知缺少当前会话令牌时保留在 Outbox，不消耗失败
+  次数；用户下一次发送消息后继续投递。
 - [x] 建立独立 `ahaduoduoduo/autofilm-core` 仓库和 npm workspace。
 - [x] 实现 SQLite 数据库、首次所有者初始化、会话认证和角色模型。
 - [x] 实现 AI 供应方/协议分离和四种协议 Adapter。

@@ -1,7 +1,10 @@
 import type { ConfigStore } from "../db/config-store.js";
 import type { OutboxMessage, OutboxStore } from "../db/outbox-store.js";
 import type { UserStore } from "../db/user-store.js";
-import { requestJson } from "../integrations/http.js";
+import {
+  requestJson,
+  ServiceHttpError,
+} from "../integrations/http.js";
 
 export class OutboundMessageWorker {
   private timer: NodeJS.Timeout | undefined;
@@ -65,6 +68,14 @@ export class OutboundMessageWorker {
       );
       this.outbox.markSent(message.id);
     } catch (error) {
+      if (
+        error instanceof ServiceHttpError &&
+        error.status === 409 &&
+        error.responseBody.includes("no current context token")
+      ) {
+        this.outbox.defer(message.id, error.message);
+        return;
+      }
       this.outbox.markFailed(
         message.id,
         message.attempts,
