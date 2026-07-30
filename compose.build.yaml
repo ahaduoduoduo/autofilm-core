@@ -30,4 +30,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.telegram
-

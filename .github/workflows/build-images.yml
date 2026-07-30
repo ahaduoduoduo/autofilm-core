@@ -350,4 +350,3 @@ jobs:
         run: |
           echo "### weclaw" >> "$GITHUB_STEP_SUMMARY"
           echo "\`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
-
