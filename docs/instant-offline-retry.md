@@ -23,6 +23,12 @@ Core 每 2 秒读取 OpenList 的内存任务快照。默认规则是：
 每次尝试的 URL、结束时间和失败原因保存在任务 `metadata.attempts` 中。继续任务
 不重新搜索 Jackett，也不产生新的成员任务。
 
+备用资源提示由进度 Worker 通过 Outbox 主动发送，不伪装成 Agent 历史消息。成员
+随后只回复序号、资源名或确认使用备用资源时，Agent 必须读取
+`list_download_tasks`，根据 `awaitingFallbackSelection`、`attemptIndex` 和
+`candidateUrls` 解释选择。只确认使用备用资源但未指定具体项时，使用第一个尚未
+尝试的候选。
+
 ## 成功后的处理
 
 OpenList 成功快照同时返回真实生成的 `result_path`。Core 使用该精确路径调用

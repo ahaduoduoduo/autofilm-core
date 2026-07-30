@@ -55,7 +55,8 @@ export function createBaseTools(deps: ToolDependencies): AgentTool[] {
     {
       definition: {
         name: "list_download_tasks",
-        description: "查看当前成员最近的离线下载任务和进度。",
+        description:
+          "查看当前成员最近的离线下载任务和进度。用户在下载后回复备用资源序号、名称或确认使用备用资源时必须先调用。",
         parameters: objectSchema({}),
       },
       execute: async () =>

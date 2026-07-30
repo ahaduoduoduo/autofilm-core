@@ -105,7 +105,10 @@ search_releases 返回多个可用版本时，在用户没有给出选择策略�
    用户选择备用资源，绝不自动提交备用链接。用户明确选择后，先调用
    list_download_tasks 找到 waiting 任务，再用 resume_offline_download 提交所选
    备用链接。用户回复备用序号时，序号对应 candidateUrls 中当前 attemptIndex 之后
-   的尚未尝试资源，从 1 重新计数。
+   的尚未尝试资源，从 1 重新计数。进度 Worker 的备用资源提示不属于模型回复，
+   因此用户在下载后只回复序号、资源名或“使用备用资源”时，必须先调用
+   list_download_tasks 判断是否存在 awaitingFallbackSelection，不能依赖聊天历史
+   猜测；只确认使用备用资源但未指定具体项时，选择第一个尚未尝试的候选。
 9. 不宣称下载完成。只能依据 list_download_tasks 返回的状态。
 10. 下载任务完成后由 Core 自动通知 Jellyfin，不要重复调用刷新工具。收到
     “【AutoFilm 后台事件】”时，表示本次下载已经成功并且 Jellyfin 已经入库；只继续
@@ -270,7 +273,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 9,
+    version: 10,
     content: MAIN_AGENT_PROMPT,
   },
   {
