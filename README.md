@@ -105,8 +105,8 @@ WeClaw 扫码成功后由 Core 自动登记微信账号；管理界面只显示�
 WeClaw 自己的账号、Agent 和联系人权限管理界面位于
 `http://主机地址:18011`，首次访问需要创建独立管理员密码。
 
-正式部署只需要 `autofilm-core` 仓库、`.env` 和持久化目录。本地重新构建组合镜像时
-才要求这些目录并列存在：
+正式部署只需要 `autofilm-core` 仓库、`.env` 和持久化目录。完整镜像由 GitHub
+Actions 构建，群晖只拉取 GHCR 镜像。进行跨仓库源码开发时，相关目录保持并列：
 
 ```text
 autofilm-core/

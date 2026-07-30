@@ -76,6 +76,10 @@ gh workflow run build-images.yml \
 工作流当前发布 `linux/amd64`，与本项目群晖部署一致。镜像由公开仓库 Actions
 创建并关联到仓库，保持公开拉取权限。
 
+完整系统镜像只在 GitHub Actions 构建。群晖生产主机只执行 `docker compose pull`
+和 `docker compose up -d`，不运行完整系统的 `docker compose build`，避免编译过程
+占用媒体服务所需的 CPU、内存和存储空间。
+
 ## 完整系统部署
 
 `compose.full.yaml` 默认只拉取 GHCR 镜像。正式部署不需要另外五个源码仓库：
@@ -170,25 +174,11 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 
 公开部署不需要个人迁移能力时，将 Jellyfin 改为 `:latest`。
 
-## 可选本地构建
+## 本地开发检查
 
-正式部署不执行本地编译。开发人员需要验证未发布源码时，六个仓库保持同级，并同时
-使用运行文件与构建覆盖：
-
-```bash
-docker compose \
-  -f compose.full.yaml \
-  -f compose.build.yaml \
-  build
-docker compose \
-  -f compose.full.yaml \
-  -f compose.build.yaml \
-  --profile wechat \
-  up -d
-```
-
-`compose.build.yaml` 把 `pull_policy` 改为 `never`，避免本地镜像被 GHCR 标签替换。
-OpenList 通过额外上下文编译修改版前端；Jellyfin 同样编译修改版 Jellyfin Web。
+正式部署不执行本地镜像编译。开发阶段只运行当前组件的类型检查、单元测试或目标构建；
+需要验证容器产物时触发 GitHub Actions 的对应组件任务，不在群晖上构建完整系统。
+`compose.build.yaml` 仅保留为其他开发主机的调试参考，不用于本项目的生产更新。
 
 ## 单仓库编译参考
 
