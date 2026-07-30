@@ -305,7 +305,9 @@ export class JellyfinClient {
           "content-type": "application/octet-stream",
           "content-length": String(input.data.byteLength),
         },
-        body: input.data,
+        // Node fetch accepts Buffer at runtime; the DOM BodyInit declaration
+        // does not include Node's Buffer type.
+        body: input.data as unknown as BodyInit,
         signal: AbortSignal.timeout(10 * 60_000),
       },
     );
