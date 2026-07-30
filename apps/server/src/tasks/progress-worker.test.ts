@@ -108,7 +108,63 @@ describe("OpenList task progress worker", () => {
     database.close();
   });
 
-  it("does not complete or refresh a 100 percent task without an end time", async () => {
+  it("maps explicit OpenList canceled and failed terminal states", async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const tasks = new TaskStore(database);
+    const canceled = tasks.create({
+      type: "offline-download",
+      title: "Canceled",
+      state: "running",
+      externalId: "remote-canceled",
+    });
+    const failed = tasks.create({
+      type: "offline-download",
+      title: "Failed",
+      state: "running",
+      externalId: "remote-failed",
+    });
+    const worker = new ProgressWorker(
+      {
+        async listOfflineTasks() {
+          return [
+            {
+              id: "remote-canceled",
+              name: "Canceled",
+              state: 4,
+              status: "已取消",
+              progress: 20,
+              total_bytes: 1024,
+              error: "",
+            },
+            {
+              id: "remote-failed",
+              name: "Failed",
+              state: 7,
+              status: "失败",
+              progress: 40,
+              total_bytes: 1024,
+              error: "",
+            },
+          ];
+        },
+        async deleteOfflineTask() {},
+        async startOfflineDownload() {
+          return [];
+        },
+      },
+      tasks,
+    );
+
+    await worker.tick();
+
+    expect(tasks.get(canceled.id)?.state).toBe("cancelled");
+    expect(tasks.get(failed.id)?.state).toBe("failed");
+    database.close();
+  });
+
+  it("does not complete or refresh a non-succeeded task with progress and end time", async () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
     directories.push(directory);
     const database = openDatabase(path.join(directory, "test.sqlite"));
@@ -136,6 +192,7 @@ describe("OpenList task progress worker", () => {
               progress: 100,
               total_bytes: 2048,
               error: "",
+              end_time: new Date().toISOString(),
             },
           ];
         },

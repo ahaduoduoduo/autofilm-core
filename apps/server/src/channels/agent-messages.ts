@@ -21,10 +21,10 @@ export function agentMessages(
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   const messages: NativeOutboundMessage[] = [];
-  if (text) messages.push({ type: "text", text });
   for (const mediaUrl of mediaUrls) {
     messages.push({ type: "image", media_url: mediaUrl });
   }
+  if (text) messages.push({ type: "text", text });
   return messages;
 }
 

@@ -29,6 +29,11 @@ export interface TmdbSeason {
   }>;
 }
 
+export interface TmdbImage {
+  data: Buffer;
+  contentType: string;
+}
+
 interface TmdbItem {
   id: number;
   media_type?: string;
@@ -165,6 +170,37 @@ export class TmdbClient {
         overview: episode.overview ?? "",
       })),
     };
+  }
+
+  async poster(posterPath: string): Promise<TmdbImage> {
+    if (!/^\/[A-Za-z0-9._-]+$/.test(posterPath)) {
+      throw new Error("TMDB returned an invalid poster path");
+    }
+    const config = this.configs.service("tmdb");
+    if (!config) throw new Error("TMDB service is not configured");
+    const imageBaseUrl = String(
+      config.options.imageBaseUrl ?? "https://image.tmdb.org/t/p/w500",
+    ).replace(/\/+$/, "");
+    const response = await fetch(`${imageBaseUrl}${posterPath}`, {
+      headers: { accept: "image/*" },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) {
+      throw new Error(`TMDB poster returned HTTP ${response.status}`);
+    }
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      throw new Error("TMDB poster response is not an image");
+    }
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (contentLength > 8 * 1024 * 1024) {
+      throw new Error("TMDB poster exceeds the 8 MiB limit");
+    }
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.length > 8 * 1024 * 1024) {
+      throw new Error("TMDB poster exceeds the 8 MiB limit");
+    }
+    return { data, contentType };
   }
 }
 

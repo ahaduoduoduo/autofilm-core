@@ -10,7 +10,7 @@ import type { CanonicalMessage } from "../ai/types.js";
 import type { JackettClient } from "../integrations/jackett.js";
 import type { JellyfinClient } from "../integrations/jellyfin.js";
 import type { OpenListClient } from "../integrations/openlist.js";
-import type { TmdbClient } from "../integrations/tmdb.js";
+import type { CatalogItem, TmdbClient } from "../integrations/tmdb.js";
 import type { SubHDClient } from "../integrations/subhd.js";
 import type { WatchlistStore } from "../db/watchlist-store.js";
 import type { SubtitleWorkspaceStore } from "../subtitles/workspace-store.js";
@@ -18,6 +18,11 @@ import type { SubtitleDownloadService } from "../subtitles/download-service.js";
 import type { SubtitleCleaner } from "../subtitles/cleaner.js";
 import { createAgentTools } from "./tools.js";
 import { executeToolCalls } from "./tool-executor.js";
+import { ConversationQueue } from "./conversation-queue.js";
+import {
+  rememberCatalogResults,
+  selectedCatalogItem,
+} from "./catalog-poster.js";
 
 export interface AgentDependencies {
   configs: ConfigStore;
@@ -40,9 +45,23 @@ export interface AgentDependencies {
 }
 
 export class AgentService {
+  private readonly conversationQueue = new ConversationQueue();
+
   constructor(private readonly deps: AgentDependencies) {}
 
   async respond(input: {
+    userId: string;
+    channel: string;
+    providerInstanceId: string;
+    externalConversationId: string;
+    text: string;
+  }): Promise<string> {
+    return this.conversationQueue.run(conversationKey(input), () =>
+      this.respondInConversation(input),
+    );
+  }
+
+  private async respondInConversation(input: {
     userId: string;
     channel: string;
     providerInstanceId: string;
@@ -127,6 +146,7 @@ export class AgentService {
       apiKey: provider.apiKey,
       headers: provider.customHeaders,
     });
+    const catalogItems = new Map<number, CatalogItem>();
 
     for (let iteration = 0; iteration < 12; iteration += 1) {
       const history = this.deps.conversations.history(conversationId);
@@ -147,7 +167,7 @@ export class AgentService {
           role: "assistant",
           content,
         });
-        return content;
+        return this.withCatalogPoster(content, catalogItems);
       }
 
       this.deps.conversations.append(conversationId, {
@@ -157,6 +177,7 @@ export class AgentService {
       });
       const toolResults = await executeToolCalls(result.toolCalls, tools);
       for (const { call, content } of toolResults) {
+        rememberCatalogResults(call.name, content, catalogItems);
         this.deps.conversations.append(conversationId, {
           role: "tool",
           content: formatToolResult(call.name, content),
@@ -167,13 +188,36 @@ export class AgentService {
     throw new Error("Agent exceeded the maximum tool iteration count");
   }
 
-  reset(input: {
+  private async withCatalogPoster(
+    content: string,
+    catalogItems: Map<number, CatalogItem>,
+  ): Promise<string> {
+    const item = selectedCatalogItem(content, catalogItems);
+    if (!item?.posterPath) return content;
+    try {
+      const poster = await this.deps.tmdb.poster(item.posterPath);
+      const token = this.deps.media.create({
+        content: poster.data,
+        contentType: poster.contentType,
+        fileName: `tmdb-${item.id}-poster.jpg`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        reads: 10,
+      });
+      return `${this.deps.mediaBaseUrl}/v1/media/${token}\n\n${content}`;
+    } catch {
+      return content;
+    }
+  }
+
+  async reset(input: {
     userId: string;
     channel: string;
     providerInstanceId: string;
     externalConversationId: string;
-  }): void {
-    this.deps.conversations.reset(input);
+  }): Promise<void> {
+    await this.conversationQueue.run(conversationKey(input), async () => {
+      this.deps.conversations.reset(input);
+    });
   }
 
   async evaluateWatchlist(input: {
@@ -309,6 +353,20 @@ export class AgentService {
       storageAuth,
     });
   }
+}
+
+function conversationKey(input: {
+  userId: string;
+  channel: string;
+  providerInstanceId: string;
+  externalConversationId: string;
+}): string {
+  return JSON.stringify([
+    input.userId,
+    input.channel,
+    input.providerInstanceId,
+    input.externalConversationId,
+  ]);
 }
 
 function truncate(value: string, length: number): string {

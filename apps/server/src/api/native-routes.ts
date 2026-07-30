@@ -76,7 +76,7 @@ export async function registerNativeRoutes(
         ],
       };
     } else if (event.event_type === "conversation.reset") {
-      context.agent.reset({
+      await context.agent.reset({
         userId: identity.userId,
         channel: event.provider,
         providerInstanceId: event.provider_instance_id,

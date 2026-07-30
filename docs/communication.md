@@ -51,13 +51,17 @@ OpenList -> Jellyfin        http://jellyfin:8096
 1. 成员在微信、Telegram 或其他 Adapter 中发送请求。
 2. Adapter 把平台消息转换为统一 Native 事件。
 3. Core 校验 Adapter、外部身份和成员权限。
-4. Core 调用选定模型。模型可在同一轮并行搜索 TMDB、Jackett 和 SubHD。
+4. 同一会话的新消息等待上一条完整结束；不同会话继续并行。Core 调用选定模型，
+   模型可在同一轮并行搜索 TMDB、Jackett 和 SubHD。
 5. Jackett 返回完整结果；Core 只按文件大小降序分页，不写死质量评分和过滤规则。
-6. Agent 选择资源后，Core 根据 TMDB ID、媒体类型和季号计算 OpenList 目标目录。
-7. OpenList 创建离线任务；Core 每 2 秒读取 OpenList 内存任务状态。任务结束后，
-   快照同时返回 115 实际生成的结果路径，Core 用该路径精确通知 Jellyfin。
-8. 115 秒传超过短时限时，OpenList 删除失败任务，Core 尝试下一个候选磁力。
-9. 完成后 Core 显式调用 Jellyfin `RemoteRefresh`，并通过原 Adapter 通知成员。
+6. TMDB 身份唯一确定后，Core 获取对应封面；Adapter 先发送封面，再发送 Agent
+   的作品和资源说明。
+7. Agent 选择资源后，Core 根据 TMDB ID、媒体类型和季号计算 OpenList 目标目录。
+8. OpenList 创建离线任务；Core 每 15 秒读取 OpenList 内存任务状态。只有
+   `StateSucceeded` 才视为完成；快照同时返回 115 实际生成的结果路径，Core 用
+   该路径精确通知 Jellyfin。
+9. 115 秒传超过短时限时，OpenList 删除失败任务，Core 尝试下一个候选磁力。
+10. 完成后 Core 显式调用 Jellyfin `RemoteRefresh`，并通过原 Adapter 通知成员。
 
 第 7 步不列举网盘目录，也不是文件同步。普通文件变更与 Jellyfin 无关。
 
@@ -108,7 +112,7 @@ Infuse 或 Jellyfin 发起删除时：
 
 ## 手动扫描
 
-OpenList 文件夹菜单中的“扫描到 Jellyfin”是显式管理操作：
+OpenList 文件夹右键菜单和移动端勾选工具栏中的“扫描到 Jellyfin”是显式管理操作：
 
 1. 前端检查目录是否属于 Jellyfin 已添加的 OpenList 媒体库。
 2. OpenList 使用配置的 Jellyfin API Key 请求远端刷新。

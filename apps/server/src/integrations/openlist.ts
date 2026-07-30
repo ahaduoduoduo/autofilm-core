@@ -15,6 +15,12 @@ export interface OpenListTask {
   end_time?: string;
 }
 
+export const OPENLIST_TASK_STATE = {
+  succeeded: 2,
+  canceled: 4,
+  failed: 7,
+} as const;
+
 export interface OpenListAuthSession {
   session_id: string;
   state: string;

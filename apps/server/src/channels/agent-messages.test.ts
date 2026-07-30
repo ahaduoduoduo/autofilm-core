@@ -9,12 +9,12 @@ describe("agent channel messages", () => {
         "http://autofilm-core:3100",
       ),
     ).toEqual([
-      { type: "text", text: "这是当前封面：" },
       {
         type: "image",
         media_url:
           "http://autofilm-core:3100/v1/media/token_123-abc",
       },
+      { type: "text", text: "这是当前封面：" },
     ]);
   });
 
@@ -26,8 +26,8 @@ describe("agent channel messages", () => {
         "http://autofilm-core:3100",
       ),
     ).toEqual([
-      { type: "text", text: "候选：https://example.test/poster.jpg" },
       { type: "image", media_url: internal },
+      { type: "text", text: "候选：https://example.test/poster.jpg" },
     ]);
   });
 });

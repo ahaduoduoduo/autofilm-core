@@ -1,6 +1,9 @@
 import type { TaskStore } from "../db/task-store.js";
 import type { OutboxStore } from "../db/outbox-store.js";
-import type { OpenListTask } from "../integrations/openlist.js";
+import {
+  OPENLIST_TASK_STATE,
+  type OpenListTask,
+} from "../integrations/openlist.js";
 import type { TaskSummary } from "@autofilm/contracts";
 
 interface OpenListTaskSource {
@@ -346,11 +349,16 @@ export class ProgressWorker {
 function inferState(
   task: OpenListTask,
 ): "running" | "completed" | "failed" | "cancelled" {
-  if (task.error) return "failed";
-  const status = task.status.toLowerCase();
-  if (status.includes("cancel")) return "cancelled";
-  if (task.end_time) return "completed";
-  return "running";
+  switch (task.state) {
+    case OPENLIST_TASK_STATE.succeeded:
+      return "completed";
+    case OPENLIST_TASK_STATE.canceled:
+      return "cancelled";
+    case OPENLIST_TASK_STATE.failed:
+      return "failed";
+    default:
+      return "running";
+  }
 }
 
 function validResultPath(

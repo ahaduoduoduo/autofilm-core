@@ -43,7 +43,11 @@ Updated: 2026-07-30
 
 ### `agent`
 
-- `service.ts`：持久化会话、模型调用、并行工具迭代、只读追更检查和管理员扫码工具。
+- `service.ts`：持久化会话、按会话顺序执行顶层请求、并行工具迭代、TMDB 封面
+  媒体生成、只读追更检查和管理员扫码工具。
+- `conversation-queue.ts`：同一会话按提交顺序执行，不同会话互不等待。
+- `catalog-poster.ts`：从本次 TMDB 搜索结果和最终回复中确定唯一条目，不猜测
+  存在歧义的封面。
 - `media-destination.ts`：使用媒体库根目录、TMDB 英文名和季号生成电影、单季及
   多季合集下载目录，并返回正确的 Jellyfin 刷新目标与 TMDB ID。
 - `tool-executor.ts`：并行执行同轮工具并按原调用顺序返回结果。
@@ -68,7 +72,7 @@ Updated: 2026-07-30
 - `conversation-store.ts`：会话消息和 Native 事件去重。
 - `task-store.ts`：任务生命周期。
 - `outbox-store.ts`：主动聊天通知和指数退避。
-- `media-store.ts`：短期、限次读取的二维码媒体。
+- `media-store.ts`：短期、限次读取的二维码和影片封面媒体。
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
 - `prompt-store.ts`：提示词初始化、读取、自定义和恢复默认值；系统升级只替换
   未自定义的旧版本。
@@ -81,15 +85,16 @@ Updated: 2026-07-30
   `RemoteRefresh`、字幕读取、上传和删除。
 - `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
-  并提供季与分集日期。
+  并提供季、分集日期和受限大小的封面读取。
 - `integrations/subhd.ts`：识别关联影片页并返回完整字幕列表、评论回复，以及按任务
   隔离且可并发执行的下载会话；统一限制请求开始间隔。
 - `integrations/cookie-jar.ts`：管理单个 SubHD 下载会话的响应 Cookie，不在任务间
   共享状态。
 - `integrations/weclaw-registration.ts`：读取同一 Compose 的 WeClaw 配置与登录账号，
   自动建立 Core 渠道记录且不向浏览器返回令牌。
-- `tasks/progress-worker.ts`：每 2 秒读取 OpenList 内存任务状态，处理 115
-  短时失败、远端任务删除和备用磁力；只在 OpenList 提供结束时间后认定任务完成。
+- `tasks/progress-worker.ts`：每 15 秒读取 OpenList 内存任务状态，处理 115
+  短时失败、远端任务删除和备用磁力；只把 OpenList `StateSucceeded` 认定为完成，
+  `StateCanceled` 和 `StateFailed` 分别映射为取消和失败。
   完成后优先使用云端最终结果路径精确刷新 Jellyfin，且该路径必须位于任务目标
   目录内；旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
