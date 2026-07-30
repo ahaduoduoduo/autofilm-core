@@ -108,6 +108,103 @@ describe("OpenList task progress worker", () => {
     database.close();
   });
 
+  it("does not complete or refresh a 100 percent task without an end time", async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const tasks = new TaskStore(database);
+    const outbox = new OutboxStore(database);
+    const local = tasks.create({
+      type: "offline-download",
+      title: "Still finalizing",
+      state: "running",
+      externalId: "remote-finalizing",
+      metadata: {
+        destination: "/115/Movies/Still Finalizing",
+      },
+    });
+    const refreshes: string[] = [];
+    const worker = new ProgressWorker(
+      {
+        async listOfflineTasks() {
+          return [
+            {
+              id: "remote-finalizing",
+              name: "Still finalizing",
+              state: 1,
+              status: "[115 Cloud]: 离线任务下载中",
+              progress: 100,
+              total_bytes: 2048,
+              error: "",
+            },
+          ];
+        },
+        async deleteOfflineTask() {},
+        async startOfflineDownload() {
+          return [];
+        },
+      },
+      tasks,
+      15_000,
+      outbox,
+      {
+        async remoteRefresh(input) {
+          refreshes.push(input.path);
+        },
+      },
+    );
+
+    await worker.tick();
+
+    expect(tasks.get(local.id)?.state).toBe("running");
+    expect(tasks.get(local.id)?.progress).toBe(100);
+    expect(outbox.claimDue()).toHaveLength(0);
+    expect(refreshes).toHaveLength(0);
+    database.close();
+  });
+
+  it("does not regress a completed task when a stale running snapshot arrives", async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const tasks = new TaskStore(database);
+    const local = tasks.create({
+      type: "offline-download",
+      title: "Already completed",
+      state: "completed",
+      externalId: "remote-completed",
+    });
+    tasks.update(local.id, { statusText: "succeeded" });
+    const worker = new ProgressWorker(
+      {
+        async listOfflineTasks() {
+          return [
+            {
+              id: "remote-completed",
+              name: "Already completed",
+              state: 1,
+              status: "downloading",
+              progress: 99,
+              total_bytes: 2048,
+              error: "",
+            },
+          ];
+        },
+        async deleteOfflineTask() {},
+        async startOfflineDownload() {
+          return [];
+        },
+      },
+      tasks,
+    );
+
+    await worker.tick();
+
+    expect(tasks.get(local.id)?.state).toBe("completed");
+    expect(tasks.get(local.id)?.statusText).toBe("succeeded");
+    database.close();
+  });
+
   it("groups completed downloads by destination and refreshes Jellyfin once", async () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
     directories.push(directory);

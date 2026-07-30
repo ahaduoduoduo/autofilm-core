@@ -89,8 +89,8 @@ Updated: 2026-07-30
 - `integrations/weclaw-registration.ts`：读取同一 Compose 的 WeClaw 配置与登录账号，
   自动建立 Core 渠道记录且不向浏览器返回令牌。
 - `tasks/progress-worker.ts`：每 2 秒读取 OpenList 内存任务状态，处理 115
-  短时失败、远端任务删除和备用磁力；任务完成后按目标目录合并 Jellyfin
-  刷新请求并保存重试状态。
+  短时失败、远端任务删除和备用磁力；只在 OpenList 提供结束时间后认定任务完成，
+  再按目标目录合并 Jellyfin 刷新请求并保存重试状态。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。

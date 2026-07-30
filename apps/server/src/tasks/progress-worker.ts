@@ -90,6 +90,7 @@ export class ProgressWorker {
   private async updateFromRemote(remote: OpenListTask): Promise<void> {
     const local = this.tasks.byExternalId(remote.id);
     if (!local) return;
+    if (["completed", "failed", "cancelled"].includes(local.state)) return;
     const state = inferState(remote);
     if (
       ["failed", "cancelled"].includes(state) &&
@@ -334,7 +335,7 @@ function inferState(
   if (task.error) return "failed";
   const status = task.status.toLowerCase();
   if (status.includes("cancel")) return "cancelled";
-  if (task.end_time || task.progress >= 100) return "completed";
+  if (task.end_time) return "completed";
   return "running";
 }
 
