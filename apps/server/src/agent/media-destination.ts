@@ -61,6 +61,7 @@ export async function resolveMediaDestination(
     return {
       destination,
       refreshPath: destination,
+      providerIds: { Tmdb: String(selection.tmdbId) },
       mediaTitle: details.title || mediaTitle,
       mediaType: selection.mediaType,
       tmdbId: selection.tmdbId,

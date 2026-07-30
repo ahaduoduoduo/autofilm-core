@@ -19,6 +19,7 @@ interface JellyfinRefreshTarget {
     refresh?: boolean;
     forceProbe?: boolean;
     providerIds?: Record<string, string>;
+    providerTarget?: "movie";
   }): Promise<void>;
 }
 
@@ -30,6 +31,7 @@ interface JellyfinRefreshState {
   completedAt?: string;
   error?: string;
   providerIds?: Record<string, string>;
+  providerTarget?: "movie";
 }
 
 export class ProgressWorker {
@@ -147,6 +149,9 @@ export class ProgressWorker {
     const providerIds = parseProviderIds(
       task.metadata.jellyfinProviderIds,
     );
+    const providerTarget = taskMediaType(task) === "movie"
+      ? "movie"
+      : undefined;
     return {
       jellyfinRefresh: {
         state: "pending",
@@ -154,6 +159,7 @@ export class ProgressWorker {
         attempts: 0,
         nextAttemptAt: new Date().toISOString(),
         providerIds,
+        providerTarget,
       } satisfies JellyfinRefreshState,
     };
   }
@@ -180,12 +186,16 @@ export class ProgressWorker {
     for (const [path, tasks] of due) {
       try {
         const providerIds = jellyfinRefreshState(tasks[0]!)?.providerIds;
+        const providerTarget = jellyfinRefreshState(
+          tasks[0]!,
+        )?.providerTarget;
         await this.jellyfin.remoteRefresh({
           path,
           recursive: true,
           refresh: true,
           forceProbe: false,
           ...(providerIds ? { providerIds } : {}),
+          ...(providerTarget ? { providerTarget } : {}),
         });
         const completedAt = new Date().toISOString();
         for (const task of tasks) {
@@ -365,6 +375,15 @@ function parseProviderIds(value: unknown): Record<string, string> | undefined {
       Boolean(entry[0]) && typeof entry[1] === "string" && Boolean(entry[1]),
   );
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function taskMediaType(task: TaskSummary): string | undefined {
+  const media = task.metadata.media;
+  if (!media || typeof media !== "object" || Array.isArray(media)) {
+    return undefined;
+  }
+  const type = (media as Record<string, unknown>).type;
+  return typeof type === "string" ? type : undefined;
 }
 
 function instantPolicy(

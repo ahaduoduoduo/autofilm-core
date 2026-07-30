@@ -77,7 +77,7 @@ describe("media download destination", () => {
       new Date("2026-07-29T12:00:00Z"),
     );
     expect(result.destination).toBe("/115/nvideo/movie/2026-07");
-    expect(result.providerIds).toBeUndefined();
+    expect(result.providerIds).toEqual({ Tmdb: "456" });
   });
 
   it("rejects a TV download without a season and a movie with seasons", async () => {

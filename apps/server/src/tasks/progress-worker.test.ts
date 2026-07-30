@@ -179,6 +179,8 @@ describe("OpenList task progress worker", () => {
       metadata: {
         destination,
         jellyfinRefreshPath: destination,
+        jellyfinProviderIds: { Tmdb: "1375646" },
+        media: { type: "movie", tmdbId: 1375646 },
       },
     });
     const refreshes: string[] = [];
@@ -218,6 +220,12 @@ describe("OpenList task progress worker", () => {
 
     expect(refreshes).toEqual([resultPath]);
     expect(tasks.get(local.id)?.metadata.remoteResultPath).toBe(resultPath);
+    expect(
+      tasks.get(local.id)?.metadata.jellyfinRefresh,
+    ).toMatchObject({
+      providerIds: { Tmdb: "1375646" },
+      providerTarget: "movie",
+    });
     database.close();
   });
 

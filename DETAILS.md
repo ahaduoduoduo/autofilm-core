@@ -45,7 +45,7 @@ Updated: 2026-07-30
 
 - `service.ts`：持久化会话、模型调用、并行工具迭代、只读追更检查和管理员扫码工具。
 - `media-destination.ts`：使用媒体库根目录、TMDB 英文名和季号生成电影、单季及
-  多季合集下载目录，并返回正确的 Jellyfin 刷新目标。
+  多季合集下载目录，并返回正确的 Jellyfin 刷新目标与 TMDB ID。
 - `tool-executor.ts`：并行执行同轮工具并按原调用顺序返回结果。
 - `tools.ts`、`tool-types.ts`：工具组合入口和共享依赖。
 - `toolsets/`：基础目录、下载/OpenList、字幕、Jellyfin 和追更工具。
