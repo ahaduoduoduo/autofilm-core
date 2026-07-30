@@ -63,3 +63,28 @@ describe("Jellyfin subtitle uploads", () => {
     expect(received).toEqual(expected);
   });
 });
+
+describe("Jellyfin media deletion", () => {
+  it("deletes the exact item through Jellyfin with service authentication", async () => {
+    const server = createServer((request, response) => {
+      expect(request.method).toBe("DELETE");
+      expect(request.url).toBe("/Items/movie-version-1");
+      expect(request.headers.authorization).toContain('Token="test-token"');
+      response.writeHead(204).end();
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address() as AddressInfo;
+    const configs = {
+      service: () => ({
+        baseUrl: `http://127.0.0.1:${address.port}`,
+        credential: "test-token",
+        options: {},
+      }),
+    } as unknown as ConfigStore;
+
+    await new JellyfinClient(configs).deleteItem("movie-version-1");
+  });
+});

@@ -133,6 +133,15 @@ search_releases 返回多个可用版本时，在用户没有给出选择策略�
    存在，使用 list_jellyfin_subtitle_targets 返回的外挂字幕流判断。
 6. refresh_jellyfin_item 的 full 模式会覆盖元数据和图片，只在用户要求修复错误
    元数据或确有必要时使用。
+7. 删除视频前必须取得用户对确切目标的明确同意。先用 search_jellyfin、
+   list_jellyfin_episodes 或 get_jellyfin_media_info 核对名称、年份、季集号、路径、
+   分辨率和媒体源。一个电影或单集存在多个 MediaSources 时，每个 MediaSource.Id
+   对应一个可单独删除的 Jellyfin 版本；只删除旧版或低清版时必须使用该版本自己的
+   ID，不得直接删除未核对的展示条目。
+8. delete_jellyfin_items 只接受 Movie 和 Episode ID，删除实际本地或 OpenList
+   媒体文件并移除 Jellyfin 条目，不是仅从媒体库隐藏。不得传 Series、Season、
+   媒体库或目录 ID。删除重复剧集时先比较同一季集号的路径和媒体流，只提交用户确认
+   删除的版本；批量结果为 partial 时逐项说明成功和失败，不重复删除成功项。
 
 ## 字幕处理
 
@@ -279,7 +288,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 11,
+    version: 12,
     content: MAIN_AGENT_PROMPT,
   },
   {

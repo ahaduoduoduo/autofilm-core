@@ -37,6 +37,7 @@ describe("agent tool registry", () => {
         "browse_remote_images",
         "browse_trending",
         "create_subtitle_workspace",
+        "delete_jellyfin_items",
         "delete_jellyfin_subtitles",
         "fetch_subtitle_archive",
         "get_current_time",

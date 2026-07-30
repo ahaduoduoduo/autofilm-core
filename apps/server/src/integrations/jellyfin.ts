@@ -326,6 +326,17 @@ export class JellyfinClient {
     );
   }
 
+  async deleteItem(itemId: string): Promise<void> {
+    const config = this.requireConfig();
+    await requestOk(
+      `${config.baseUrl}/Items/${encodeURIComponent(itemId)}`,
+      {
+        method: "DELETE",
+        headers: this.headers(config.credential),
+      },
+    );
+  }
+
   async subtitle(
     itemId: string,
     streamIndex: number,

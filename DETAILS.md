@@ -6,7 +6,8 @@ Updated: 2026-07-30
 
 - `package.json`：npm workspace 命令。
 - `tsconfig.base.json`：共享 TypeScript 严格配置。
-- `Dockerfile`：构建共享类型、React 前端和 Fastify 后端的单镜像。
+- `Dockerfile`：在 GitHub Actions 中运行服务端测试，再构建共享类型、React
+  前端和 Fastify 后端的单镜像。
 - `Dockerfile.telegram`：构建独立 Telegram Adapter 镜像。
 - `compose.yaml`：从 GHCR 运行 Core 与可选 Adapter/搜索服务。
 - `compose.full.yaml`：从 GHCR 运行完整媒体系统；数据目录通过环境变量指定，
@@ -84,9 +85,9 @@ Updated: 2026-07-30
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
   内存任务状态、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
-  `RemoteRefresh`、字幕读取和删除；所有字幕格式均以保留原始长度的二进制请求
-  上传到 AutoFilm 流式端点，不生成 Base64 副本；请求体使用 Node 读取流，不复制
-  大型图形字幕。
+  `RemoteRefresh`、Movie/Episode 精确删除、字幕读取和删除；所有字幕格式均以
+  保留原始长度的二进制请求上传到 AutoFilm 流式端点，不生成 Base64 副本；
+  请求体使用 Node 读取流，不复制大型图形字幕。
 - `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
   并提供季、分集日期和受限大小的封面读取。

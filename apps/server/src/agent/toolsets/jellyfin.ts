@@ -2,6 +2,7 @@ import type { AgentTool, ToolDependencies } from "../tool-types.js";
 import { createSubtitleReference } from "../../subtitles/references.js";
 import {
   objectSchema,
+  requireArray,
   requireString,
   stringProperty,
 } from "./schema.js";
@@ -208,6 +209,35 @@ export function createJellyfinTools(deps: ToolDependencies): AgentTool[] {
     },
     {
       definition: {
+        name: "delete_jellyfin_items",
+        description:
+          "批量删除指定的 Jellyfin 电影或单集及其实际媒体文件。OpenList 文件由 Jellyfin 删除，远端删除失败时保留 Jellyfin 条目；调用前必须取得用户对确切条目的明确同意。",
+        parameters: objectSchema(
+          {
+            targets: {
+              type: "array",
+              minItems: 1,
+              maxItems: 50,
+              items: {
+                type: "object",
+                properties: {
+                  jellyfin_item_id: stringProperty(
+                    "要删除的精确 Movie 或 Episode 条目/版本 ID",
+                  ),
+                },
+                required: ["jellyfin_item_id"],
+                additionalProperties: false,
+              },
+            },
+          },
+          ["targets"],
+        ),
+      },
+      execute: async (args) =>
+        deleteJellyfinItems(deps, requireArray(args, "targets")),
+    },
+    {
+      definition: {
         name: "list_jellyfin_episodes",
         description:
           "列出 Jellyfin 剧集下的单集 ID、季集号、路径和媒体流；获取单集画质或字幕前使用。",
@@ -285,6 +315,67 @@ export function createJellyfinTools(deps: ToolDependencies): AgentTool[] {
       },
     },
   ];
+}
+
+async function deleteJellyfinItems(
+  deps: ToolDependencies,
+  targets: unknown[],
+): Promise<Record<string, unknown>> {
+  if (targets.length > 50) throw new Error("单次最多删除 50 个 Jellyfin 条目");
+  const itemIds = targets.map((value, index) => {
+    if (!value || typeof value !== "object") {
+      throw new Error(`第 ${index + 1} 个删除目标格式无效`);
+    }
+    return requireString(
+      value as Record<string, unknown>,
+      "jellyfin_item_id",
+    );
+  });
+  if (new Set(itemIds).size !== itemIds.length) {
+    throw new Error("删除目标包含重复的 Jellyfin 条目 ID");
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  for (const itemId of itemIds) {
+    try {
+      const item = await deps.jellyfin.item(itemId);
+      if (item.Type !== "Movie" && item.Type !== "Episode") {
+        throw new Error(
+          `Jellyfin 条目 ${item.Id} 是 ${item.Type}，只允许删除 Movie 或 Episode`,
+        );
+      }
+      if (!item.Path) {
+        throw new Error(`Jellyfin 条目 ${item.Id} 没有实际媒体路径`);
+      }
+      await deps.jellyfin.deleteItem(item.Id);
+      results.push({
+        ok: true,
+        itemId: item.Id,
+        name: item.Name,
+        type: item.Type,
+        path: item.Path,
+        seriesName: item.SeriesName,
+        season: item.ParentIndexNumber,
+        episode: item.IndexNumber,
+      });
+    } catch (error) {
+      results.push({
+        ok: false,
+        itemId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const succeeded = results.filter((result) => result.ok === true).length;
+  const failed = results.length - succeeded;
+  return {
+    status:
+      failed === 0 ? "success" : succeeded === 0 ? "failed" : "partial",
+    succeeded,
+    failed,
+    results,
+  };
 }
 
 function requireImageType(args: Record<string, unknown>): string {

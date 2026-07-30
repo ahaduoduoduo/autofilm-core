@@ -19,7 +19,7 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - New API 可作为任意供应方配置，不是特殊代码路径。
 - 主 Agent、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
   管理界面修改并恢复当前版本的系统默认内容；修改在下一次模型请求时生效。
-- 30 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
+- 32 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
   ASS 样式和按成员追更；管理员聊天另有 OpenList 扫码工具。
 - TMDB 作品身份唯一确定后自动发送封面，渠道中的图片先于资源说明文字，便于成员
   直接核对作品。
@@ -38,6 +38,8 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   写入本地目录，远端媒体由 Jellyfin 上传 OpenList。
 - 文本字幕逐文件使用独立 AI 请求分析全部事件并清理广告；SUP/PGS 原样上传。
 - Jellyfin 当前图片、远程图片、图片设置、条目刷新、分集和媒体流查询。
+- Jellyfin Movie/Episode 精确版本删除；Core 先核对条目、路径和媒体流，再通过
+  Jellyfin 删除本地或 OpenList 实际文件。字幕删除继续使用不可变摘要引用。
 - 每个 SubHD 下载使用独立 session、Cookie Jar 和视觉模型请求；请求开始受间隔限制
   但可并发等待响应。自动识别五次后，使用独立任务码请求人工输入。
 - 按成员保存追更条件，定时读取 TMDB 并使用只读 Agent 检查发布版本和字幕。

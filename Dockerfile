@@ -12,6 +12,7 @@ COPY packages/contracts ./packages/contracts
 COPY apps/server ./apps/server
 COPY apps/web ./apps/web
 COPY apps/telegram-adapter ./apps/telegram-adapter
+RUN npm run test -w @autofilm/server -- --run
 RUN npm run build
 RUN npm prune --omit=dev
 

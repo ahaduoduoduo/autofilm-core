@@ -68,3 +68,21 @@ Agent 不把 OpenList 路径作为字幕目标。Core 先从 Jellyfin 取得 Mov
 
 因此字幕新增、替换和删除后不调用 `RemoteRefresh`。下载完成后的媒体目录导入仍使用
 `RemoteRefresh`，两种操作互不替代。
+
+## 媒体删除
+
+Core 的 `delete_jellyfin_items` 只接受 Jellyfin `Movie` 或 `Episode` ID：
+
+- 本地媒体由 Jellyfin 删除实际文件并移除条目。
+- `openlist:///` 媒体由 Jellyfin 先删除 OpenList 路径；OpenList 返回失败时保留
+  Jellyfin 条目。
+- 电影或单集存在多个版本时，`get_jellyfin_media_info` 返回的每个
+  `MediaSources[].Id` 是该版本的精确删除目标。删除旧版时不能使用未经核对的展示
+  条目 ID。
+- 重复剧集通过 `list_jellyfin_episodes` 比较季集号、路径和媒体流后，批量提交需要
+  删除的 Episode ID；一个目标失败不阻止其余目标。
+- Series、Season、媒体库和目录删除不向 Agent 开放，避免自然语言歧义删除整个
+  远端目录。
+
+媒体删除会改变实际存储，Agent 必须先向成员列明目标并取得明确同意。删除外挂字幕
+不使用该工具，继续通过 `subtitle_ref` 调用 `delete_jellyfin_subtitles`。
