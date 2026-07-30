@@ -54,7 +54,8 @@ OpenList -> Jellyfin        http://jellyfin:8096
 4. Core 调用选定模型。模型可在同一轮并行搜索 TMDB、Jackett 和 SubHD。
 5. Jackett 返回完整结果；Core 只按文件大小降序分页，不写死质量评分和过滤规则。
 6. Agent 选择资源后，Core 根据 TMDB ID、媒体类型和季号计算 OpenList 目标目录。
-7. OpenList 创建离线任务；Core 每 2 秒读取 OpenList 内存任务状态。
+7. OpenList 创建离线任务；Core 每 2 秒读取 OpenList 内存任务状态。任务结束后，
+   快照同时返回 115 实际生成的结果路径，Core 用该路径精确通知 Jellyfin。
 8. 115 秒传超过短时限时，OpenList 删除失败任务，Core 尝试下一个候选磁力。
 9. 完成后 Core 显式调用 Jellyfin `RemoteRefresh`，并通过原 Adapter 通知成员。
 

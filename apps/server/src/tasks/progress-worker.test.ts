@@ -163,6 +163,64 @@ describe("OpenList task progress worker", () => {
     database.close();
   });
 
+  it("refreshes the exact provider result path after completion", async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const tasks = new TaskStore(database);
+    const destination = "/115/nvideo/movie/2026-07";
+    const resultPath =
+      "/115/nvideo/movie/2026-07/Colony (2026) WEB-DL 1080p.mkv";
+    const local = tasks.create({
+      type: "offline-download",
+      title: "Colony",
+      state: "running",
+      externalId: "remote-colony",
+      metadata: {
+        destination,
+        jellyfinRefreshPath: destination,
+      },
+    });
+    const refreshes: string[] = [];
+    const worker = new ProgressWorker(
+      {
+        async listOfflineTasks() {
+          return [
+            {
+              id: "remote-colony",
+              name: "Colony",
+              state: 2,
+              status: "succeeded",
+              progress: 100,
+              total_bytes: 2048,
+              error: "",
+              result_path: resultPath,
+              end_time: new Date().toISOString(),
+            },
+          ];
+        },
+        async deleteOfflineTask() {},
+        async startOfflineDownload() {
+          return [];
+        },
+      },
+      tasks,
+      15_000,
+      undefined,
+      {
+        async remoteRefresh(input) {
+          refreshes.push(input.path);
+        },
+      },
+    );
+
+    await worker.tick();
+
+    expect(refreshes).toEqual([resultPath]);
+    expect(tasks.get(local.id)?.metadata.remoteResultPath).toBe(resultPath);
+    database.close();
+  });
+
   it("does not regress a completed task when a stale running snapshot arrives", async () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
     directories.push(directory);

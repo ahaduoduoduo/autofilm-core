@@ -59,6 +59,8 @@ Core 按 OpenList 服务中配置的电影/电视剧根目录计算路径：电�
 受限的 `/api/autofilm/offline-tasks`。该端点读取 OpenList 进程内任务对象，
 不会调用 115 列目录接口。115 秒传任务失败或超过默认 20 秒时，Core
 通过受限删除接口让 OpenList 删除 115 离线任务，然后提交同一内容的下一个候选磁力。
+任务真实结束后，OpenList 同一快照返回 115 最终生成的 `result_path`；Core 只将
+这个精确路径交给 Jellyfin。旧版 OpenList 未提供该字段时才使用原有刷新目标。
 
 任务完成后，Core 按 Jellyfin 刷新目录合并同一批次的请求，调用
 `RemoteRefresh`。电视剧统一刷新剧集根目录并携带 TMDB ID；失败状态保存在

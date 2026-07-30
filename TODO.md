@@ -4,6 +4,8 @@ Updated: 2026-07-30
 
 ## 已完成（2026-07-28）
 
+- [x] 2026-07-30：离线任务完成后使用 OpenList 返回的最终结果路径精确刷新
+  Jellyfin，并拒绝目标目录以外的结果路径。
 - [x] 建立独立 `ahaduoduoduo/autofilm-core` 仓库和 npm workspace。
 - [x] 实现 SQLite 数据库、首次所有者初始化、会话认证和角色模型。
 - [x] 实现 AI 供应方/协议分离和四种协议 Adapter。

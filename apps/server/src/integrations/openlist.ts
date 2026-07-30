@@ -10,6 +10,7 @@ export interface OpenListTask {
   progress: number;
   total_bytes: number;
   error: string;
+  result_path?: string;
   start_time?: string;
   end_time?: string;
 }

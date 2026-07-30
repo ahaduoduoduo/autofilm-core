@@ -118,9 +118,10 @@ export class ProgressWorker {
       metadata: {
         ...local.metadata,
         remoteName: remote.name,
+        remoteResultPath: remote.result_path,
         totalBytes: remote.total_bytes,
         ...(completedNow
-          ? this.initialJellyfinRefresh(local)
+          ? this.initialJellyfinRefresh(local, remote.result_path)
           : {}),
       },
     });
@@ -134,10 +135,13 @@ export class ProgressWorker {
 
   private initialJellyfinRefresh(
     task: TaskSummary,
+    resultPath?: string,
   ): Record<string, unknown> {
     const destination = String(task.metadata.destination ?? "");
     const refreshPath = String(
-      task.metadata.jellyfinRefreshPath ?? destination,
+      validResultPath(destination, resultPath)
+        ? resultPath
+        : task.metadata.jellyfinRefreshPath ?? destination,
     );
     if (!this.jellyfin || !refreshPath.startsWith("/")) return {};
     const providerIds = parseProviderIds(
@@ -337,6 +341,19 @@ function inferState(
   if (status.includes("cancel")) return "cancelled";
   if (task.end_time) return "completed";
   return "running";
+}
+
+function validResultPath(
+  destination: string,
+  resultPath: string | undefined,
+): resultPath is string {
+  if (!destination.startsWith("/") || !resultPath?.startsWith("/")) {
+    return false;
+  }
+  const normalizedDestination = destination.replace(/\/+$/, "") || "/";
+  return normalizedDestination === "/"
+    ? resultPath !== "/"
+    : resultPath.startsWith(`${normalizedDestination}/`);
 }
 
 function parseProviderIds(value: unknown): Record<string, string> | undefined {
