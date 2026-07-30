@@ -1,0 +1,33 @@
+services:
+  autofilm-core:
+    pull_policy: never
+    build:
+      context: .
+
+  openlist:
+    pull_policy: never
+    build:
+      context: ../autofilm-openlist
+      dockerfile: Dockerfile.autofilm
+      additional_contexts:
+        autofilm_frontend: ../autofilm-openlist-frontend
+
+  jellyfin:
+    pull_policy: never
+    build:
+      context: ../autofilm-jellyfin
+      dockerfile: Dockerfile.autofilm
+      additional_contexts:
+        autofilm_web: ../autofilm-jellyfin-web
+
+  weclaw:
+    pull_policy: never
+    build:
+      context: ../autofilm-weclaw
+
+  telegram-adapter:
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram
+

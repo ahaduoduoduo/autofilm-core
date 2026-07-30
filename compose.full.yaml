@@ -1,7 +1,7 @@
 services:
   autofilm-core:
-    build:
-      context: .
+    image: "${AUTOFILM_CORE_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-core:latest}"
+    pull_policy: always
     restart: unless-stopped
     group_add:
       - "0"
@@ -35,11 +35,8 @@ services:
       - autofilm
 
   openlist:
-    build:
-      context: ../autofilm-openlist
-      dockerfile: Dockerfile.autofilm
-      additional_contexts:
-        autofilm_frontend: ../autofilm-openlist-frontend
+    image: "${AUTOFILM_OPENLIST_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-openlist:latest}"
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "${OPENLIST_PORT:-15244}:5244"
@@ -53,11 +50,8 @@ services:
       - autofilm
 
   jellyfin:
-    build:
-      context: ../autofilm-jellyfin
-      dockerfile: Dockerfile.autofilm
-      additional_contexts:
-        autofilm_web: ../autofilm-jellyfin-web
+    image: "${AUTOFILM_JELLYFIN_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-jellyfin:personal}"
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       - openlist
@@ -84,8 +78,8 @@ services:
   weclaw:
     profiles:
       - wechat
-    build:
-      context: ../autofilm-weclaw
+    image: "${AUTOFILM_WECLAW_IMAGE:-ghcr.io/ahaduoduoduo/weclaw:latest}"
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       autofilm-core:
@@ -101,9 +95,8 @@ services:
       - autofilm
 
   telegram-adapter:
-    build:
-      context: .
-      dockerfile: Dockerfile.telegram
+    image: "${AUTOFILM_TELEGRAM_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-telegram-adapter:latest}"
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       autofilm-core:

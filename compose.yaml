@@ -1,8 +1,7 @@
 services:
   autofilm-core:
-    build:
-      context: .
     image: ghcr.io/ahaduoduoduo/autofilm-core:latest
+    pull_policy: always
     restart: unless-stopped
     group_add:
       - "0"
@@ -41,6 +40,7 @@ services:
     profiles:
       - wechat
     image: ghcr.io/ahaduoduoduo/weclaw:latest
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       autofilm-core:
@@ -56,10 +56,8 @@ services:
       - autofilm
 
   telegram-adapter:
-    build:
-      context: .
-      dockerfile: Dockerfile.telegram
     image: ghcr.io/ahaduoduoduo/autofilm-telegram-adapter:latest
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       autofilm-core:

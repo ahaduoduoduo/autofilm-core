@@ -1,0 +1,353 @@
+name: Build container images
+
+on:
+  push:
+    branches:
+      - agent/initial-core
+    paths:
+      - ".github/workflows/build-images.yml"
+      - "apps/**"
+      - "packages/**"
+      - "Dockerfile"
+      - "Dockerfile.telegram"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Images to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - core
+          - openlist
+          - jellyfin-public
+          - jellyfin-personal
+          - weclaw
+      openlist_ref:
+        description: OpenList backend ref
+        required: true
+        default: feature/autofilm-remote-media
+      openlist_frontend_ref:
+        description: OpenList frontend ref
+        required: true
+        default: feature/autofilm-remote-media
+      jellyfin_ref:
+        description: Public Jellyfin backend ref
+        required: true
+        default: master
+      jellyfin_web_ref:
+        description: Public Jellyfin Web ref
+        required: true
+        default: codex/autofilm-integrated-web
+      jellyfin_personal_ref:
+        description: Personal Jellyfin backend ref
+        required: true
+        default: codex/personal-legacy-compat
+      jellyfin_web_personal_ref:
+        description: Personal Jellyfin Web ref
+        required: true
+        default: codex/personal-legacy-compat
+      weclaw_ref:
+        description: WeClaw ref
+        required: true
+        default: agent/generic-native-services
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: container-images-${{ github.ref }}-${{ inputs.component || 'core' }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ahaduoduoduo
+
+jobs:
+  core:
+    if: >-
+      github.event_name == 'push' ||
+      inputs.component == 'all' ||
+      inputs.component == 'core'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: autofilm-core
+            dockerfile: Dockerfile
+            cache_scope: autofilm-core
+          - image: autofilm-telegram-adapter
+            dockerfile: Dockerfile.telegram
+            cache_scope: autofilm-telegram
+    steps:
+      - name: Check out AutoFilm Core
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish ${{ matrix.image }}
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ matrix.image }}:build-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
+
+      - name: Write image digest
+        run: |
+          echo "### ${{ matrix.image }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  openlist:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.component == 'all' || inputs.component == 'openlist')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out OpenList
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/autofilm-openlist
+          ref: ${{ inputs.openlist_ref }}
+          path: openlist
+
+      - name: Check out OpenList Frontend
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/autofilm-openlist-frontend
+          ref: ${{ inputs.openlist_frontend_ref }}
+          path: openlist-frontend
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish OpenList
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./openlist
+          file: ./openlist/Dockerfile.autofilm
+          build-contexts: |
+            autofilm_frontend=${{ github.workspace }}/openlist-frontend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/autofilm-openlist:latest
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/autofilm-openlist:build-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.autofilm.openlist.ref=${{ inputs.openlist_ref }}
+            io.autofilm.openlist-frontend.ref=${{ inputs.openlist_frontend_ref }}
+          cache-from: type=gha,scope=autofilm-openlist
+          cache-to: type=gha,mode=max,scope=autofilm-openlist
+
+      - name: Write image digest
+        run: |
+          echo "### autofilm-openlist" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  jellyfin-public:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.component == 'all' || inputs.component == 'jellyfin-public')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/swift
+          df -h /
+
+      - name: Check out Jellyfin
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/autofilm-jellyfin
+          ref: ${{ inputs.jellyfin_ref }}
+          path: jellyfin
+
+      - name: Check out Jellyfin Web
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/autofilm-jellyfin-web
+          ref: ${{ inputs.jellyfin_web_ref }}
+          path: jellyfin-web
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish public Jellyfin
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./jellyfin
+          file: ./jellyfin/Dockerfile.autofilm
+          build-contexts: |
+            autofilm_web=${{ github.workspace }}/jellyfin-web
+          build-args: |
+            TARGET_RUNTIME=linux-x64
+            JELLYFIN_VERSION=12.0.0-AutoFilm
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/autofilm-jellyfin:latest
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/autofilm-jellyfin:public-build-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.autofilm.jellyfin.ref=${{ inputs.jellyfin_ref }}
+            io.autofilm.jellyfin-web.ref=${{ inputs.jellyfin_web_ref }}
+          cache-from: type=gha,scope=autofilm-jellyfin-public
+          cache-to: type=gha,mode=max,scope=autofilm-jellyfin-public
+
+      - name: Write image digest
+        run: |
+          echo "### autofilm-jellyfin public" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  jellyfin-personal:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.component == 'all' || inputs.component == 'jellyfin-personal')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/swift
+          df -h /
+
+      - name: Check out personal Jellyfin
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/autofilm-jellyfin
+          ref: ${{ inputs.jellyfin_personal_ref }}
+          path: jellyfin
+
+      - name: Check out personal Jellyfin Web
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/autofilm-jellyfin-web
+          ref: ${{ inputs.jellyfin_web_personal_ref }}
+          path: jellyfin-web
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish personal Jellyfin
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./jellyfin
+          file: ./jellyfin/Dockerfile.autofilm
+          build-contexts: |
+            autofilm_web=${{ github.workspace }}/jellyfin-web
+          build-args: |
+            TARGET_RUNTIME=linux-x64
+            JELLYFIN_VERSION=12.0.0-AutoFilm
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/autofilm-jellyfin:personal
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/autofilm-jellyfin:personal-build-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.autofilm.jellyfin.ref=${{ inputs.jellyfin_personal_ref }}
+            io.autofilm.jellyfin-web.ref=${{ inputs.jellyfin_web_personal_ref }}
+          cache-from: type=gha,scope=autofilm-jellyfin-personal
+          cache-to: type=gha,mode=max,scope=autofilm-jellyfin-personal
+
+      - name: Write image digest
+        run: |
+          echo "### autofilm-jellyfin personal" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  weclaw:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.component == 'all' || inputs.component == 'weclaw')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out WeClaw
+        uses: actions/checkout@v4
+        with:
+          repository: ahaduoduoduo/weclaw
+          ref: ${{ inputs.weclaw_ref }}
+          path: weclaw
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish WeClaw
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./weclaw
+          file: ./weclaw/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/weclaw:latest
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/weclaw:build-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.autofilm.weclaw.ref=${{ inputs.weclaw_ref }}
+          cache-from: type=gha,scope=autofilm-weclaw
+          cache-to: type=gha,mode=max,scope=autofilm-weclaw
+
+      - name: Write image digest
+        run: |
+          echo "### weclaw" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+

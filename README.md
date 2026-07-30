@@ -81,17 +81,19 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 ```bash
 cp .env.example .env
 # 设置 AUTOFILM_MASTER_KEY
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 访问 `http://主机地址:3100`，按初始化页面创建所有者，再配置 AI 与媒体服务。
 
-同时从相邻源码目录构建修改版 OpenList、Jellyfin、Jellyfin Web 和 WeClaw：
+使用 GitHub Actions 发布的完整系统镜像：
 
 ```bash
 cp .env.full.example .env
 # 填写三个互不相同的随机令牌
-docker compose -f compose.full.yaml --profile wechat --profile search up -d --build
+docker compose -f compose.full.yaml --profile wechat pull
+docker compose -f compose.full.yaml --profile wechat up -d
 ```
 
 Telegram Adapter 默认随 Core 启动；在管理界面粘贴 BotFather Token 即可完成连接。
@@ -99,7 +101,8 @@ WeClaw 扫码成功后由 Core 自动登记微信账号；管理界面只显示�
 WeClaw 自己的账号、Agent 和联系人权限管理界面位于
 `http://主机地址:18011`，首次访问需要创建独立管理员密码。
 
-完整编排要求这些目录并列存在：
+正式部署只需要 `autofilm-core` 仓库、`.env` 和持久化目录。本地重新构建组合镜像时
+才要求这些目录并列存在：
 
 ```text
 autofilm-core/
@@ -113,6 +116,10 @@ autofilm-weclaw/
 部署参数见 [docs/deployment.md](docs/deployment.md)，WeClaw 配置见
 [docs/native-adapters.md](docs/native-adapters.md)，Telegram 配置见
 [docs/telegram-adapter.md](docs/telegram-adapter.md)。
+
+`.github/workflows/build-images.yml` 负责发布 Core、Telegram、OpenList、
+Jellyfin 公共版/个人版和 WeClaw 的 `linux/amd64` GHCR 镜像。Core 源码变化自动
+构建 Core 与 Telegram；其他组合镜像从 Actions 页面按组件和分支手动构建。
 
 ## 开发
 

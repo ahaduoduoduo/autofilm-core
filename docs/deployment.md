@@ -27,7 +27,8 @@ openssl rand -base64 32
 使用 Compose profile，适合连接已有 Jellyfin/OpenList。
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 docker compose --profile wechat --profile search up -d
 ```
 
@@ -45,23 +46,47 @@ Telegram 容器只在内部网络监听 `18012`，不映射宿主机端口。Bot
 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CORE_TOKEN` 和
 `TELEGRAM_OUTBOUND_TOKEN` 环境变量。
 
-## 完整源码构建
+## GitHub Actions 和 GHCR
 
-`compose.full.yaml` 使用六个相邻源码目录：
+`.github/workflows/build-images.yml` 使用仓库 `GITHUB_TOKEN` 登录 GHCR，
+不需要保存个人访问令牌。工作流发布：
 
-```text
-autofilm-suite/
-├── autofilm-core/
-├── autofilm-openlist/
-├── autofilm-openlist-frontend/
-├── autofilm-jellyfin/
-├── autofilm-jellyfin-web/
-└── autofilm-weclaw/
+| 镜像 | 标签 | 来源 |
+| --- | --- | --- |
+| `ghcr.io/ahaduoduoduo/autofilm-core` | `latest`、`build-N` | Core 当前工作流提交 |
+| `ghcr.io/ahaduoduoduo/autofilm-telegram-adapter` | `latest`、`build-N` | Core 当前工作流提交 |
+| `ghcr.io/ahaduoduoduo/autofilm-openlist` | `latest`、`build-N` | OpenList 后端和前端指定分支 |
+| `ghcr.io/ahaduoduoduo/autofilm-jellyfin` | `latest`、`public-build-N` | Jellyfin 公共分支 |
+| `ghcr.io/ahaduoduoduo/autofilm-jellyfin` | `personal`、`personal-build-N` | Jellyfin 个人迁移分支 |
+| `ghcr.io/ahaduoduoduo/weclaw` | `latest`、`build-N` | WeClaw 指定分支 |
+
+推送 Core 的应用、Dockerfile 或工作流变更时，Actions 自动构建 Core 和 Telegram。
+其他镜像使用 Actions 页面的 `Build container images` 手动任务，可选择组件和每个
+fork 的 ref。选择 `all` 会并行构建全部镜像，包括 Jellyfin 公共版和个人版。
+
+命令行触发完整构建：
+
+```bash
+gh workflow run build-images.yml \
+  --repo ahaduoduoduo/autofilm-core \
+  --ref agent/initial-core \
+  -f component=all
 ```
 
-OpenList 通过 `additional_contexts.autofilm_frontend` 编译修改版前端；
-Jellyfin 通过 `additional_contexts.autofilm_web` 编译修改版 Jellyfin Web。
-因此不能只下载后端 fork 后使用完整源码构建。
+工作流当前发布 `linux/amd64`，与本项目群晖部署一致。镜像由公开仓库 Actions
+创建并关联到仓库，保持公开拉取权限。
+
+## 完整系统部署
+
+`compose.full.yaml` 默认只拉取 GHCR 镜像。正式部署不需要另外五个源码仓库：
+
+```text
+autofilm-core/
+├── compose.full.yaml
+├── .env
+├── data/
+└── weclaw/
+```
 
 首次部署：
 
@@ -70,10 +95,11 @@ cd autofilm-suite/autofilm-core
 cp .env.full.example .env
 # 填写随机令牌、公开地址和持久化目录
 docker compose -f compose.full.yaml config
-docker compose -f compose.full.yaml build
 docker compose -f compose.full.yaml \
   --profile wechat \
-  --profile search \
+  pull
+docker compose -f compose.full.yaml \
+  --profile wechat \
   up -d
 docker compose -f compose.full.yaml ps
 ```
@@ -130,9 +156,43 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 
 `.env`、数据库、Cookie、扫码状态和真实服务密钥不能加入 Git。
 
-## 单仓库编译
+### 镜像变量
 
-完整 Compose 是正式构建的首选方式。下面命令用于开发检查和定位单个镜像问题。
+生产标签可通过 `.env` 替换为某次不可变构建标签或 digest：
+
+| 变量 | 默认值 |
+| --- | --- |
+| `AUTOFILM_CORE_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-core:latest` |
+| `AUTOFILM_TELEGRAM_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-telegram-adapter:latest` |
+| `AUTOFILM_OPENLIST_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-openlist:latest` |
+| `AUTOFILM_JELLYFIN_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-jellyfin:personal` |
+| `AUTOFILM_WECLAW_IMAGE` | `ghcr.io/ahaduoduoduo/weclaw:latest` |
+
+公开部署不需要个人迁移能力时，将 Jellyfin 改为 `:latest`。
+
+## 可选本地构建
+
+正式部署不执行本地编译。开发人员需要验证未发布源码时，六个仓库保持同级，并同时
+使用运行文件与构建覆盖：
+
+```bash
+docker compose \
+  -f compose.full.yaml \
+  -f compose.build.yaml \
+  build
+docker compose \
+  -f compose.full.yaml \
+  -f compose.build.yaml \
+  --profile wechat \
+  up -d
+```
+
+`compose.build.yaml` 把 `pull_policy` 改为 `never`，避免本地镜像被 GHCR 标签替换。
+OpenList 通过额外上下文编译修改版前端；Jellyfin 同样编译修改版 Jellyfin Web。
+
+## 单仓库编译参考
+
+下面命令只用于开发检查和定位单个镜像问题。
 
 ### Core 和 Telegram Adapter
 
@@ -201,7 +261,7 @@ docker build -t autofilm-weclaw:local .
 ```bash
 cd autofilm-suite/autofilm-core
 docker compose -f compose.full.yaml config
-docker compose -f compose.full.yaml build
+docker compose -f compose.full.yaml --profile wechat pull
 docker compose -f compose.full.yaml --profile wechat up -d
 docker compose -f compose.full.yaml ps
 ```
@@ -209,7 +269,7 @@ docker compose -f compose.full.yaml ps
 不使用的 `search` profile 不应在升级命令中加入。只需要替换某个服务时可使用：
 
 ```bash
-docker compose -f compose.full.yaml build jellyfin
+docker compose -f compose.full.yaml pull jellyfin
 docker compose -f compose.full.yaml up -d jellyfin
 ```
 

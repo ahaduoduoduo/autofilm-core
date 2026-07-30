@@ -8,9 +8,12 @@ Updated: 2026-07-30
 - `tsconfig.base.json`：共享 TypeScript 严格配置。
 - `Dockerfile`：构建共享类型、React 前端和 Fastify 后端的单镜像。
 - `Dockerfile.telegram`：构建独立 Telegram Adapter 镜像。
-- `compose.yaml`：Core 与可选 Adapter/搜索服务。
-- `compose.full.yaml`：从相邻 fork 源码构建整个媒体系统；数据目录通过环境变量
-  指定，可接管现有 OpenList/Jellyfin 持久化目录。
+- `compose.yaml`：从 GHCR 运行 Core 与可选 Adapter/搜索服务。
+- `compose.full.yaml`：从 GHCR 运行完整媒体系统；数据目录通过环境变量指定，
+  可接管现有 OpenList/Jellyfin 持久化目录。
+- `compose.build.yaml`：仅在开发时加入相邻 fork 的本地构建上下文。
+- `.github/workflows/build-images.yml`：在 GitHub Actions 构建并发布五类 GHCR
+  镜像，Jellyfin 同时提供公共版和个人版标签。
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
 - `docs/system-repositories.md`：六个源码仓库、上游、分支和修改边界。
 - `docs/communication.md`：容器通信、认证方式和用户交互流程。
