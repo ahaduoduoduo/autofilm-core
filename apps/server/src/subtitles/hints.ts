@@ -17,29 +17,46 @@ export function languageHint(filename: string, relativePath = ""): string {
   const value = `${relativePath}/${filename}`.toLowerCase();
   const includes = (candidates: string[]) =>
     candidates.some((candidate) => value.includes(candidate));
+  const hasToken = (candidates: string[]) =>
+    candidates.some((candidate) => tokenPattern(candidate).test(value));
   const simplified =
-    includes(["chs", "简体", "简中", "sc.", "gb.", "zh-cn"]) ||
+    includes(["简体", "简中"]) ||
+    hasToken(["chs", "sc", "gb", "zh-cn", "zh_cn", "zh-hans", "zh_hans"]) ||
     /简[.\-_]/.test(value);
   const traditional =
-    includes(["cht", "繁体", "繁中", "tc.", "tw.", "hk.", "big5", "zh-tw"]) ||
+    includes(["繁体", "繁中"]) ||
+    hasToken([
+      "cht",
+      "tc",
+      "tw",
+      "hk",
+      "big5",
+      "zh-tw",
+      "zh_tw",
+      "zh-hant",
+      "zh_hant",
+    ]) ||
     /繁[.\-_]/.test(value);
-  const english = includes(["eng", "english", "英文", "英语", ".en."]);
-  const bilingual = includes([
-    "双语",
-    "chs&eng",
-    "chs.eng",
-    "eng&chs",
-    "bilingual",
-    "中英",
-  ]);
+  const english =
+    includes(["英文", "英语"]) || hasToken(["eng", "english", "en"]);
+  const chinese = includes(["中文"]) || hasToken(["chinese"]);
+  const bilingual =
+    includes(["双语", "中英"]) ||
+    hasToken(["bilingual"]) ||
+    (chinese && english);
 
   if (bilingual || (simplified && english)) return "chs+eng";
   if (simplified && traditional) return "chs+cht";
   if (simplified) return "chs";
   if (traditional) return "cht";
+  if (chinese) return "chs";
   if (english) return "eng";
-  if (/中文|chinese/.test(value)) return "chs";
   return "unknown";
+}
+
+function tokenPattern(value: string): RegExp {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i");
 }
 
 export function jellyfinLanguage(hint: string): string {

@@ -1,6 +1,6 @@
 # 字幕、验证码与追更
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## 字幕搜索与评价
 
@@ -27,6 +27,10 @@ Updated: 2026-07-30
    计划，并返回包含文件名、完整相对路径和目标名称的最终映射表。
 7. Agent 核对映射表后，仅使用 `workspace_id + placement_plan_id` 调用
    `place_subtitles`。执行阶段不重新接受文件列表。
+
+语言提示从文件名和完整相对路径提取。`eng`、`en`、`chs`、`cht` 等短代码必须是
+由点、横线、下划线、空格或路径边界分隔的完整标记；作品名称内部的相同字符不会
+被当作语言。无法识别语言的字幕继续使用中文作为 Jellyfin 默认语言。
 
 workspace 不写 SQLite。文件位于 `/data/tmp/subtitles`，保留 24 小时；全部映射成功
 后删除，部分失败时继续保留以便重试，服务重启后删除。
@@ -74,7 +78,8 @@ AI 请求失败或返回无法解析的数据时保留原字幕。SUP/PGS 和其
 现有外挂字幕流。每条外挂字幕使用基于条目和文件摘要的 `subtitle_ref`，Agent 不接收
 Jellyfin 字幕流数字序号，也不填写 OpenList 视频路径。
 
-`place_subtitles` 逐项调用 AutoFilm Jellyfin 的鉴权二进制流式字幕上传接口：
+`place_subtitles` 使用最多 8 个工作协程调用 AutoFilm Jellyfin 的鉴权二进制
+流式字幕上传接口：
 
 - 本地媒体由 Jellyfin 保存到媒体目录或内部元数据目录，并使用原生命名规则。
 - `openlist:///` 媒体由 Jellyfin AutoFilm 字幕服务上传 OpenList，并立即保存新的
@@ -83,6 +88,8 @@ Jellyfin 字幕流数字序号，也不填写 OpenList 视频路径。
   编码，也不受 ASP.NET Core 默认 30 MB JSON 请求限制。
 - SUP/PGS 从 workspace 临时文件直接按流发送，不再整体读入 Core 内存；文本字幕
   在独立 AI 清理完成后，将清理结果作为读取流发送。
+- 每个工作协程完整处理一个不可变映射，文本清理和上传均可同时执行；返回结果仍按
+  原映射顺序排列。单项失败不会取消其他并发项，同一计划重试时跳过已经成功的项。
 - Jellyfin 原生 JSON 字幕上传接口仅为 Jellyfin Web、第三方客户端和插件保留，
   AutoFilm Core 不再调用。
 - 新字幕上传成功后才按可选 `replace_subtitle_ref` 删除旧字幕。

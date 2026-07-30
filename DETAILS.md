@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## 根目录
 
@@ -56,6 +56,8 @@ Updated: 2026-07-30
 - `toolsets/`：基础目录、下载/OpenList、字幕、Jellyfin 和追更工具。
 - `toolsets/subtitle-placement.ts`：用文件 UUID 生成不可变字幕映射计划，校验摘要、
   重复使用和 Jellyfin 目标，并处理部分失败重试。
+- `toolsets/subtitle-placement-executor.ts`：以最多 8 个工作协程并发执行字幕清理、
+  流式上传和可选旧字幕删除；每个映射独立记录完成或失败状态。
 - `prompt.ts`：可迁移的旧版 Agent 行为、当前远端媒体规则，以及各独立 AI
   上下文的默认提示词和版本。
 
@@ -131,7 +133,8 @@ Updated: 2026-07-30
   字幕格式限制。
 - `cleaner.ts`：每个文本字幕使用独立 AI 请求分析全部事件，不做正则预筛选。
 - `ass-style.ts`：旧版 ASS 样式分析、行内标签和黑边特效坐标处理。
-- `hints.ts`：从解压相对路径推断集号、语言和 Jellyfin 语言标签。
+- `hints.ts`：从解压相对路径推断集号、语言和 Jellyfin 语言标签；短语言代码只按
+  完整文件名标记识别，避免作品名称中的普通字符被误判为语言。
 - `workspace-store.ts`：一个任务累计多个字幕包、文件和验证码的成员级临时工作区；
   文件只使用 UUID，并保存不可变放置计划和逐项执行状态；摘要按固定大小分块计算，
   SUP/PGS 可直接打开文件读取流。

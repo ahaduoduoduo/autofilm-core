@@ -8,6 +8,7 @@ import { analyzeAss, modifyAss } from "./ass-style.js";
 import type { CaptchaRecognizer } from "./captcha-recognizer.js";
 import { SubtitleDownloadService } from "./download-service.js";
 import { decodeSubtitleText } from "./extract.js";
+import { jellyfinLanguage, languageHint } from "./hints.js";
 import {
   createSubtitleReference,
   resolveSubtitleReference,
@@ -20,6 +21,24 @@ afterEach(() => {
   for (const directory of directories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+describe("subtitle language hints", () => {
+  it("does not treat eng inside Penguin as an English marker", () => {
+    expect(languageHint("The Penguin S01E1.ass")).toBe("unknown");
+    expect(jellyfinLanguage(languageHint("The Penguin S01E1.ass"))).toBe("zh");
+  });
+
+  it("recognizes standalone language markers and bilingual names", () => {
+    expect(languageHint("The.Penguin.S01E01.eng.ass")).toBe("eng");
+    expect(languageHint("The.Penguin.S01E01.en.srt")).toBe("eng");
+    expect(languageHint("The.Penguin.S01E01.chs.ass")).toBe("chs");
+    expect(languageHint("The.Penguin.S01E01.chs&eng.ass")).toBe("chs+eng");
+    expect(languageHint("The.Penguin.S01E01.Chinese-English.ass")).toBe(
+      "chs+eng",
+    );
+    expect(languageHint("The.Penguin.S01E01.zh-hant.ass")).toBe("cht");
+  });
 });
 
 describe("subtitle workspaces", () => {
