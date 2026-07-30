@@ -70,6 +70,10 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 
 完整说明见 [docs/architecture.md](docs/architecture.md)。
 
+六个源码仓库的上游、分支和修改边界见
+[docs/system-repositories.md](docs/system-repositories.md)；容器、服务和用户操作之间
+的通信方式见 [docs/communication.md](docs/communication.md)。
+
 ## 快速启动
 
 仅启动 Core：
@@ -100,6 +104,7 @@ WeClaw 自己的账号、Agent 和联系人权限管理界面位于
 ```text
 autofilm-core/
 autofilm-openlist/
+autofilm-openlist-frontend/
 autofilm-jellyfin/
 autofilm-jellyfin-web/
 autofilm-weclaw/
@@ -127,6 +132,8 @@ npm run build
 
 - [DETAILS.md](DETAILS.md)：目录与模块职责。
 - [TODO.md](TODO.md)：真实开发状态和未完成事项。
+- [docs/system-repositories.md](docs/system-repositories.md)：六个仓库、上游和修改边界。
+- [docs/communication.md](docs/communication.md)：服务通信矩阵与用户交互流程。
 - [docs/ai-providers.md](docs/ai-providers.md)：供应方与协议模型。
 - [docs/prompts.md](docs/prompts.md)：数据库提示词、默认版本和管理规则。
 - [docs/native-adapters.md](docs/native-adapters.md)：聊天 Adapter 契约。

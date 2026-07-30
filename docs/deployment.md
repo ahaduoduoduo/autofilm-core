@@ -47,14 +47,35 @@ Telegram 容器只在内部网络监听 `18012`，不映射宿主机端口。Bot
 
 ## 完整源码构建
 
-`compose.full.yaml` 使用相邻 fork 目录。Jellyfin 构建通过
-`additional_contexts.autofilm_web` 编译修改版前端。
+`compose.full.yaml` 使用六个相邻源码目录：
+
+```text
+autofilm-suite/
+├── autofilm-core/
+├── autofilm-openlist/
+├── autofilm-openlist-frontend/
+├── autofilm-jellyfin/
+├── autofilm-jellyfin-web/
+└── autofilm-weclaw/
+```
+
+OpenList 通过 `additional_contexts.autofilm_frontend` 编译修改版前端；
+Jellyfin 通过 `additional_contexts.autofilm_web` 编译修改版 Jellyfin Web。
+因此不能只下载后端 fork 后使用完整源码构建。
+
+首次部署：
 
 ```bash
+cd autofilm-suite/autofilm-core
+cp .env.full.example .env
+# 填写随机令牌、公开地址和持久化目录
+docker compose -f compose.full.yaml config
+docker compose -f compose.full.yaml build
 docker compose -f compose.full.yaml \
   --profile wechat \
   --profile search \
-  up -d --build
+  up -d
+docker compose -f compose.full.yaml ps
 ```
 
 默认端口：
@@ -76,6 +97,124 @@ docker compose -f compose.full.yaml \
 
 绑定域名后修改 `AUTOFILM_PUBLIC_URL` 和 `OPENLIST_PUBLIC_URL`。
 Jellyfin 返回给播放客户端的是后者，所以必须是 Infuse 能访问的地址。
+
+### Compose 服务和 profile
+
+| 服务 | 默认状态 | 宿主机端口 | 数据 |
+| --- | --- | --- | --- |
+| `autofilm-core` | 启动 | `AUTOFILM_PORT` → `3100` | `./data` |
+| `openlist` | 启动 | `OPENLIST_PORT` → `5244` | `OPENLIST_DATA_DIR` |
+| `jellyfin` | 启动 | `JELLYFIN_PORT` → `8096` | Jellyfin 配置、缓存和媒体目录 |
+| `telegram-adapter` | 启动 | 不发布 | `telegram-data` 命名卷 |
+| `weclaw` | `wechat` profile | `WECLAW_PORT` → `18011` | `./weclaw` |
+| `jackett` | `search` profile | 默认不发布 | `./data/jackett` |
+| `flaresolverr` | `search` profile | 默认不发布 | 无业务数据库 |
+
+已有 Jackett/FlareSolverr 时不启用 `search` profile，在 Core 管理界面配置现有
+Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
+
+### 主要环境变量
+
+| 变量 | 含义 |
+| --- | --- |
+| `AUTOFILM_PUBLIC_URL` | 浏览器和 Adapter 可访问的 Core 地址 |
+| `OPENLIST_PUBLIC_URL` | Infuse 可访问的 OpenList 地址，用于 Jellyfin 302 |
+| `AUTOFILM_MASTER_KEY` | Core 数据库中敏感配置的加密主密钥 |
+| `OPENLIST_JELLYFIN_TOKEN` | OpenList 与 Jellyfin 受限服务令牌 |
+| `JELLYFIN_API_KEY` | Core/OpenList 调用 Jellyfin 的 API Key |
+| `OPENLIST_DATA_DIR` | OpenList 持久化目录 |
+| `JELLYFIN_CONFIG_DIR` | Jellyfin 配置和数据库目录 |
+| `JELLYFIN_CACHE_DIR` | Jellyfin 缓存目录 |
+| `JELLYFIN_MEDIA_DIR` | 本地媒体根目录 |
+| `JELLYFIN_LEGACY_SUBTITLE_DIR` | 个人迁移分支读取旧字幕的只读目录 |
+
+`.env`、数据库、Cookie、扫码状态和真实服务密钥不能加入 Git。
+
+## 单仓库编译
+
+完整 Compose 是正式构建的首选方式。下面命令用于开发检查和定位单个镜像问题。
+
+### Core 和 Telegram Adapter
+
+```bash
+cd autofilm-core
+npm ci
+npm run typecheck
+npm test
+npm run build
+docker build -t autofilm-core:local .
+docker build -f Dockerfile.telegram -t autofilm-telegram-adapter:local .
+```
+
+### OpenList 前端和组合镜像
+
+```bash
+cd autofilm-openlist-frontend
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run lint
+pnpm run build
+
+cd ..
+docker build \
+  -f autofilm-openlist/Dockerfile.autofilm \
+  --build-context autofilm_frontend=./autofilm-openlist-frontend \
+  -t autofilm-openlist:local \
+  ./autofilm-openlist
+```
+
+组合镜像使用 Go 1.26 和 Node 24 构建，并把前端 `dist` 放入 OpenList 可执行文件
+使用的静态资源目录。
+
+### Jellyfin Web 和组合镜像
+
+```bash
+cd autofilm-jellyfin-web
+npm ci
+npm run build:check
+npm test
+npm run build:production
+
+cd ..
+docker build \
+  -f autofilm-jellyfin/Dockerfile.autofilm \
+  --build-context autofilm_web=./autofilm-jellyfin-web \
+  --build-arg TARGET_RUNTIME=linux-x64 \
+  -t autofilm-jellyfin:local \
+  ./autofilm-jellyfin
+```
+
+组合镜像使用 .NET 10 自包含发布，并把修改版 Jellyfin Web 复制到最终镜像。
+其他 CPU 架构需要把 `TARGET_RUNTIME` 改为对应 .NET Runtime Identifier。
+
+### WeClaw
+
+```bash
+cd autofilm-weclaw
+go test ./...
+go build -o weclaw .
+docker build -t autofilm-weclaw:local .
+```
+
+## 升级与重新部署
+
+```bash
+cd autofilm-suite/autofilm-core
+docker compose -f compose.full.yaml config
+docker compose -f compose.full.yaml build
+docker compose -f compose.full.yaml --profile wechat up -d
+docker compose -f compose.full.yaml ps
+```
+
+不使用的 `search` profile 不应在升级命令中加入。只需要替换某个服务时可使用：
+
+```bash
+docker compose -f compose.full.yaml build jellyfin
+docker compose -f compose.full.yaml up -d jellyfin
+```
+
+更新 Jellyfin/OpenList 前必须分别备份它们的持久化目录。更新 Core 前备份
+Core SQLite；仅复制主数据库而遗漏 WAL 不是有效在线备份。
 
 ### 现有数据目录
 

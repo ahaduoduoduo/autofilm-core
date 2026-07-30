@@ -12,6 +12,8 @@ Updated: 2026-07-30
 - `compose.full.yaml`：从相邻 fork 源码构建整个媒体系统；数据目录通过环境变量
   指定，可接管现有 OpenList/Jellyfin 持久化目录。
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
+- `docs/system-repositories.md`：六个源码仓库、上游、分支和修改边界。
+- `docs/communication.md`：容器通信、认证方式和用户交互流程。
 
 ## `packages/contracts`
 
@@ -135,7 +137,8 @@ Updated: 2026-07-30
 - `adapter.ts`：内部初始化接口、long polling、Native 入站事件和
   `/v1/messages` 出站服务。
 
-复杂流程分别记录在 `docs/architecture.md`、`docs/ai-providers.md`、
+系统仓库关系和通信方式分别记录在 `docs/system-repositories.md`、
+`docs/communication.md`。复杂流程分别记录在 `docs/architecture.md`、`docs/ai-providers.md`、
 `docs/prompts.md`、`docs/native-adapters.md`、`docs/openlist-jellyfin.md` 和
 `docs/security.md`；字幕与追更见 `docs/subtitles-watchlists.md`，管理界面规范见
 `docs/admin-ui.md`；115 重试和 Telegram 分别见
