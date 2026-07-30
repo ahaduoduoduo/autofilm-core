@@ -9,10 +9,6 @@ import type { TaskSummary } from "@autofilm/contracts";
 interface OpenListTaskSource {
   listOfflineTasks(): Promise<OpenListTask[]>;
   deleteOfflineTask(taskId: string): Promise<void>;
-  startOfflineDownload(input: {
-    path: string;
-    url: string;
-  }): Promise<OpenListTask[]>;
 }
 
 interface JellyfinRefreshTarget {
@@ -75,10 +71,14 @@ export class ProgressWorker {
             (task) =>
               task.type === "offline-download" &&
               ["queued", "running", "waiting"].includes(task.state) &&
+              task.metadata.awaitingFallbackSelection !== true &&
               (!task.externalId || !remoteIds.has(task.externalId)),
           )) {
           if (this.isExpired(local)) {
-            await this.retryOrFail(local, "OpenList 中未找到仍在执行的任务");
+            await this.awaitFallbackSelection(
+              local,
+              "OpenList 中未找到仍在执行的任务",
+            );
           }
         }
       } catch (error) {
@@ -101,14 +101,14 @@ export class ProgressWorker {
       ["failed", "cancelled"].includes(state) &&
       this.hasInstantPolicy(local)
     ) {
-      await this.retryOrFail(
+      await this.awaitFallbackSelection(
         local,
         remote.error || remote.status || "115 离线任务失败",
       );
       return;
     }
     if (state === "running" && this.isExpired(local)) {
-      await this.retryOrFail(local, this.timeoutMessage(local));
+      await this.awaitFallbackSelection(local, this.timeoutMessage(local));
       return;
     }
     const completedNow =
@@ -134,7 +134,9 @@ export class ProgressWorker {
       !["completed", "failed", "cancelled"].includes(local.state) &&
       ["completed", "failed", "cancelled"].includes(updated.state)
     ) {
-      this.outbox?.enqueueTaskResult(updated);
+      if (updated.state !== "completed") {
+        this.outbox?.enqueueTaskResult(updated);
+      }
     }
   }
 
@@ -237,7 +239,10 @@ export class ProgressWorker {
     }
   }
 
-  private async retryOrFail(local: TaskSummary, reason: string): Promise<void> {
+  private async awaitFallbackSelection(
+    local: TaskSummary,
+    reason: string,
+  ): Promise<void> {
     const candidates = candidateUrls(local);
     const currentIndex = attemptIndex(local);
     const nextIndex = currentIndex + 1;
@@ -257,12 +262,12 @@ export class ProgressWorker {
       }
     }
 
-    const nextUrl = candidates[nextIndex];
-    if (!nextUrl) {
+    const remaining = candidates.slice(nextIndex);
+    if (remaining.length === 0) {
       const failed = this.tasks.update(local.id, {
         state: "failed",
         progress: null,
-        statusText: `${reason}；没有可用的备用磁力链接`,
+        statusText: `${reason}；没有尚未尝试的备用资源`,
         externalId: null,
         metadata: {
           ...local.metadata,
@@ -273,55 +278,42 @@ export class ProgressWorker {
       this.outbox?.enqueueTaskResult(failed);
       return;
     }
+    const waiting = this.tasks.update(local.id, {
+      state: "waiting",
+      progress: null,
+      statusText: `${reason}；等待用户选择备用资源`,
+      externalId: null,
+      metadata: {
+        ...local.metadata,
+        attempts,
+        awaitingFallbackSelection: true,
+      },
+    });
+    this.enqueueFallbackPrompt(waiting, remaining);
+  }
 
-    const destination = String(local.metadata.destination ?? "");
-    if (!destination.startsWith("/")) {
-      const failed = this.tasks.update(local.id, {
-        state: "failed",
-        statusText: "离线任务缺少有效的 OpenList 目标目录",
-        externalId: null,
-        metadata: { ...local.metadata, attempts },
-      });
-      this.outbox?.enqueueTaskResult(failed);
-      return;
-    }
-
-    try {
-      const remoteTasks = await this.openList.startOfflineDownload({
-        path: destination,
-        url: nextUrl,
-      });
-      const remote = remoteTasks[0];
-      if (!remote) throw new Error("OpenList did not return a task id");
-      this.tasks.update(local.id, {
-        state: "running",
-        progress: 0,
-        statusText: `第 ${nextIndex + 1} 个磁力链接已提交`,
-        externalId: remote.id,
-        metadata: {
-          ...local.metadata,
-          sourceUrl: nextUrl,
-          remoteName: remote.name,
-          attemptIndex: nextIndex,
-          attemptStartedAt: new Date().toISOString(),
-          attempts,
-        },
-      });
-    } catch (error) {
-      this.tasks.update(local.id, {
-        state: "running",
-        progress: null,
-        statusText: `备用磁力链接提交失败：${error instanceof Error ? error.message : String(error)}`,
-        externalId: null,
-        metadata: {
-          ...local.metadata,
-          sourceUrl: nextUrl,
-          attemptIndex: nextIndex,
-          attemptStartedAt: new Date(0).toISOString(),
-          attempts,
-        },
-      });
-    }
+  private enqueueFallbackPrompt(
+    task: TaskSummary,
+    candidates: string[],
+  ): void {
+    if (!this.outbox || !task.userId) return;
+    const target = notificationTarget(task.metadata.notificationTarget);
+    const options = candidates
+      .map((candidate, index) => `${index + 1}. ${candidateLabel(candidate)}`)
+      .join("\n");
+    const seconds = Math.round(
+      (instantPolicy(task)?.timeoutMs ?? 40_000) / 1000,
+    );
+    this.outbox.enqueue({
+      userId: task.userId,
+      channel: target?.channel,
+      providerInstanceId: target?.providerInstanceId,
+      targetId: target?.targetId,
+      text:
+        `《${task.title}》刚刚选择的资源在 ${seconds} 秒内没有完成 115 离线转存，` +
+        `本次尝试已判定失败并停止。\n是否改用以下备用资源？\n${options}\n` +
+        "请回复要使用的资源名称或序号；未确认前不会下载备用资源。",
+    });
   }
 
   private hasInstantPolicy(task: TaskSummary): boolean {
@@ -340,7 +332,7 @@ export class ProgressWorker {
 
   private timeoutMessage(task: TaskSummary): string {
     const timeoutSeconds = Math.round(
-      (instantPolicy(task)?.timeoutMs ?? 20_000) / 1000,
+      (instantPolicy(task)?.timeoutMs ?? 40_000) / 1000,
     );
     return `115 离线任务在 ${timeoutSeconds} 秒内未完成，已删除原任务`;
   }
@@ -428,6 +420,35 @@ function attemptHistory(
   return Array.isArray(task.metadata.attempts)
     ? [...(task.metadata.attempts as Array<Record<string, unknown>>)]
     : [];
+}
+
+function notificationTarget(value: unknown):
+  | { channel: string; providerInstanceId: string; targetId: string }
+  | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const target = value as Record<string, unknown>;
+  return typeof target.channel === "string" &&
+    typeof target.providerInstanceId === "string" &&
+    typeof target.targetId === "string"
+    ? {
+        channel: target.channel,
+        providerInstanceId: target.providerInstanceId,
+        targetId: target.targetId,
+      }
+    : undefined;
+}
+
+function candidateLabel(value: string): string {
+  try {
+    const url = new URL(value);
+    const displayName = url.searchParams.get("dn");
+    if (displayName) return displayName;
+  } catch {
+    // Non-URL download values are represented by a short safe prefix.
+  }
+  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
 }
 
 function jellyfinRefreshState(

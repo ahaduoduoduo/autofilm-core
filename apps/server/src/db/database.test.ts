@@ -51,6 +51,18 @@ describe("database migrations", () => {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE channel_configs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        provider_instance_id TEXT NOT NULL,
+        base_url TEXT NOT NULL DEFAULT '',
+        inbound_token_hash TEXT,
+        outbound_token_encrypted TEXT,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
     legacy.close();
 

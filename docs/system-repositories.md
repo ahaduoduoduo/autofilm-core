@@ -30,7 +30,7 @@ Core 不 fork 旧 AutoFilm，而是重新实现仍有价值的业务能力：
   Anthropic Messages 和 Gemini GenerateContent。
 - 数据库提示词、最近 80 条会话上下文和 Agent 工具调用。
 - TMDB、Jackett、SubHD、OpenList、Jellyfin 的业务组合。
-- 115 离线下载短时失败判断、备用磁力和完成通知。
+- 115 离线下载短时失败判断、备用资源人工选择、Jellyfin 导入及完成通知。
 - 并行字幕下载、独立验证码会话、临时 workspace、AI 广告清理和批量字幕放置。
 - 独立 Telegram Adapter 与 WeClaw Native Message Service。
 - 固定深色管理界面和完整源码 Compose。

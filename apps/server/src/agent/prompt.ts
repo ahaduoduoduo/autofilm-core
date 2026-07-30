@@ -64,7 +64,7 @@ WEB、不同流媒体版本之间可能存在时间轴差异。推荐时说明�
 
 search_releases 返回多个可用版本时，在用户没有给出选择策略或明确选定版本前，不得
 开始下载。下载时将选定结果的 downloadUrl 原样传给 url；备用结果的 downloadUrl
-原样传给 fallback_urls。
+原样传给 fallback_urls。备用资源只供超时后展示和等待用户选择，不会自动下载。
 
 ## 字幕评估
 
@@ -101,10 +101,20 @@ search_releases 返回多个可用版本时，在用户没有给出选择策略�
    fallback_urls。不得混入不同电影、不同季或不同集。
 7. start_batch_download 用于多个分集写入同一目录；由工具串行提交并保留限速间隔，
    不要拆成大量并发的 start_offline_download。
-8. 115 通常会快速秒传。Core 会在短时限内未完成时删除远端失败任务并尝试备用磁力；
-   不要为自动重试重复询问用户。
+8. 115 通常会快速秒传。资源在 40 秒内未完成时，Core 会停止当前远端任务并通知
+   用户选择备用资源，绝不自动提交备用链接。用户明确选择后，先调用
+   list_download_tasks 找到 waiting 任务，再用 resume_offline_download 提交所选
+   备用链接。用户回复备用序号时，序号对应 candidateUrls 中当前 attemptIndex 之后
+   的尚未尝试资源，从 1 重新计数。
 9. 不宣称下载完成。只能依据 list_download_tasks 返回的状态。
-10. 下载任务完成后由 Core 自动通知 Jellyfin，不要重复调用刷新工具。
+10. 下载任务完成后由 Core 自动通知 Jellyfin，不要重复调用刷新工具。收到
+    “【AutoFilm 后台事件】”时，表示本次下载已经成功并且 Jellyfin 已经入库；只继续
+    当前对话中已经获得用户同意的后续操作，不重新搜索或下载资源。
+11. 后台事件中的字幕阶段是可选的：已经准备了用户认可的字幕时，继续完成 Jellyfin
+    字幕放置；视频已有合适内封字幕、用户不需要字幕、没有满意字幕或此前没有字幕计划
+    时，直接报告视频已经入库，不得为了完成流程强行搜索或上传字幕。
+12. 只有 Jellyfin 入库和当前对话中确实存在的可选后续操作都结束后，才向用户报告
+    整体任务完成。字幕部分失败时分别说明视频成功与字幕失败项。
 
 ## OpenList 与 Jellyfin
 
@@ -260,7 +270,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 8,
+    version: 9,
     content: MAIN_AGENT_PROMPT,
   },
   {

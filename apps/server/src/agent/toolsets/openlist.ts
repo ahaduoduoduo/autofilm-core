@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   resolveMediaDestination,
   type DownloadMediaType,
@@ -30,7 +31,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
               maxItems: 8,
               items: { type: "string" },
               description:
-                "同一内容的备用磁力链接，按优先级排列；115 秒传超时后自动尝试",
+                "同一内容的备用磁力链接，按优先级排列；超时后只展示给用户选择",
             },
             media_type: {
               type: "string",
@@ -68,6 +69,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
           fallbackUrls: optionalStringArray(args, "fallback_urls", 8),
           title: requireString(args, "title"),
           target,
+          workflowId: randomUUID(),
         });
       },
     },
@@ -123,6 +125,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
         const target = await resolveTarget(deps, args);
         const downloads = requireArray(args, "downloads");
         if (downloads.length > 50) throw new Error("批量下载最多提交 50 项");
+        const workflowId = randomUUID();
         const results: unknown[] = [];
         for (const [index, value] of downloads.entries()) {
           if (typeof value !== "object" || !value) {
@@ -135,6 +138,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
               fallbackUrls: optionalStringArray(item, "fallback_urls", 8),
               title: requireString(item, "title"),
               target,
+              workflowId,
             }),
           );
           if (index < downloads.length - 1) await delay(1_500);
@@ -147,6 +151,26 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
         };
       },
     },
+    {
+      definition: {
+        name: "resume_offline_download",
+        description:
+          "用户明确选择备用资源后，恢复一个正在等待选择的离线任务。url 必须是该任务保存的备用链接。",
+        parameters: objectSchema(
+          {
+            task_id: stringProperty("list_download_tasks 返回的 waiting 任务 ID"),
+            url: stringProperty("用户明确选中的备用磁力链接或下载链接"),
+          },
+          ["task_id", "url"],
+        ),
+      },
+      execute: async (args) =>
+        resumeDownload(
+          deps,
+          requireString(args, "task_id"),
+          requireString(args, "url"),
+        ),
+    },
   ];
 }
 
@@ -157,10 +181,12 @@ async function startDownload(
     fallbackUrls?: string[];
     title: string;
     target: MediaDestination;
+    workflowId: string;
   },
 ): Promise<unknown> {
   const candidates = uniqueUrls([input.url, ...(input.fallbackUrls ?? [])]);
   const policy = deps.openList.instantOfflinePolicy();
+  const metadata = downloadMetadata(deps, input, candidates, policy);
   await deps.openList.mkdir(input.target.destination);
   const remoteTasks = await deps.openList.startOfflineDownload({
     path: input.target.destination,
@@ -172,15 +198,7 @@ async function startDownload(
       type: "offline-download",
       title: input.title,
       state: "waiting",
-      metadata: {
-        ...taskMetadata(input.target),
-        sourceUrl: candidates[0],
-        candidateUrls: candidates,
-        attemptIndex: 0,
-        attemptStartedAt: new Date().toISOString(),
-        instantOfflinePolicy: policy,
-        notificationTarget: deps.notificationTarget,
-      },
+      metadata,
     });
   }
   return remoteTasks.map((remoteTask) =>
@@ -191,17 +209,95 @@ async function startDownload(
       state: "running",
       externalId: remoteTask.id,
       metadata: {
-        ...taskMetadata(input.target),
-        sourceUrl: candidates[0],
-        candidateUrls: candidates,
-        attemptIndex: 0,
-        attemptStartedAt: new Date().toISOString(),
-        instantOfflinePolicy: policy,
+        ...metadata,
         remoteName: remoteTask.name,
-        notificationTarget: deps.notificationTarget,
       },
     }),
   );
+}
+
+async function resumeDownload(
+  deps: ToolDependencies,
+  taskId: string,
+  url: string,
+): Promise<unknown> {
+  const task = deps.tasks.get(taskId);
+  if (!task || task.userId !== deps.userId) {
+    throw new Error("等待中的下载任务不存在");
+  }
+  if (
+    task.state !== "waiting" ||
+    task.metadata.awaitingFallbackSelection !== true
+  ) {
+    throw new Error("该任务当前不在等待备用资源选择");
+  }
+  const candidates = Array.isArray(task.metadata.candidateUrls)
+    ? task.metadata.candidateUrls.filter(
+        (candidate): candidate is string =>
+          typeof candidate === "string" && Boolean(candidate),
+      )
+    : [];
+  const selectedIndex = candidates.indexOf(url);
+  const currentIndex = Number(task.metadata.attemptIndex ?? 0);
+  if (selectedIndex <= currentIndex) {
+    throw new Error("所选链接不是该任务尚未尝试的备用资源");
+  }
+  const destination = String(task.metadata.destination ?? "");
+  if (!destination.startsWith("/")) {
+    throw new Error("等待中的任务缺少有效目标目录");
+  }
+  const remoteTasks = await deps.openList.startOfflineDownload({
+    path: destination,
+    url,
+  });
+  const remote = remoteTasks[0];
+  if (!remote) {
+    throw new Error("OpenList 没有返回新的离线任务");
+  }
+  return deps.tasks.update(task.id, {
+    state: "running",
+    progress: 0,
+    statusText: "用户已选择备用资源，正在等待 115 秒传",
+    externalId: remote.id,
+    metadata: {
+      ...task.metadata,
+      sourceUrl: url,
+      attemptIndex: selectedIndex,
+      attemptStartedAt: new Date().toISOString(),
+      remoteName: remote.name,
+      awaitingFallbackSelection: undefined,
+    },
+  });
+}
+
+function downloadMetadata(
+  deps: ToolDependencies,
+  input: {
+    url: string;
+    title: string;
+    target: MediaDestination;
+    workflowId: string;
+  },
+  candidates: string[],
+  policy: { enabled: boolean; timeoutMs: number },
+): Record<string, unknown> {
+  return {
+    ...taskMetadata(input.target),
+    sourceUrl: candidates[0],
+    candidateUrls: candidates,
+    attemptIndex: 0,
+    attemptStartedAt: new Date().toISOString(),
+    instantOfflinePolicy: policy,
+    notificationTarget: deps.notificationTarget,
+    completionContinuation: deps.notificationTarget
+      ? {
+          workflowId: input.workflowId,
+          state: "pending",
+          attempts: 0,
+          nextAttemptAt: new Date().toISOString(),
+        }
+      : undefined,
+  };
 }
 
 async function resolveTarget(

@@ -44,9 +44,6 @@ describe("OpenList task progress worker", () => {
           ];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
     );
@@ -56,7 +53,7 @@ describe("OpenList task progress worker", () => {
     database.close();
   });
 
-  it("queues one member notification when a task becomes terminal", async () => {
+  it("defers the success notification until Jellyfin completion processing", async () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
     directories.push(directory);
     const database = openDatabase(path.join(directory, "test.sqlite"));
@@ -92,9 +89,6 @@ describe("OpenList task progress worker", () => {
           ];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
       15_000,
@@ -102,9 +96,7 @@ describe("OpenList task progress worker", () => {
     );
     await worker.tick();
     expect(tasks.get(local.id)?.state).toBe("completed");
-    const messages = outbox.claimDue();
-    expect(messages).toHaveLength(1);
-    expect(messages[0]?.payload.messages[0]?.text).toContain("已完成");
+    expect(outbox.claimDue()).toHaveLength(0);
     database.close();
   });
 
@@ -150,9 +142,6 @@ describe("OpenList task progress worker", () => {
           ];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
     );
@@ -197,9 +186,6 @@ describe("OpenList task progress worker", () => {
           ];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
       15_000,
@@ -259,9 +245,6 @@ describe("OpenList task progress worker", () => {
           ];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
       15_000,
@@ -314,9 +297,6 @@ describe("OpenList task progress worker", () => {
           ];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
     );
@@ -370,9 +350,6 @@ describe("OpenList task progress worker", () => {
           }));
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
       2_000,
@@ -432,9 +409,6 @@ describe("OpenList task progress worker", () => {
           throw new Error("OpenList unavailable");
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
       2_000,
@@ -455,14 +429,21 @@ describe("OpenList task progress worker", () => {
     database.close();
   });
 
-  it("deletes a timed-out 115 task and submits the next magnet candidate", async () => {
+  it("deletes a timed-out task and waits for the user to choose a fallback", async () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
     directories.push(directory);
     const database = openDatabase(path.join(directory, "test.sqlite"));
     const tasks = new TaskStore(database);
+    const outbox = new OutboxStore(database);
+    const users = new UserStore(database);
+    const member = users.create({
+      username: "fallback-member",
+      displayName: "Fallback Member",
+      role: "member",
+    });
     const deleted: string[] = [];
-    const submitted: string[] = [];
     const local = tasks.create({
+      userId: member.id,
       type: "offline-download",
       title: "Instant transfer",
       state: "running",
@@ -477,6 +458,11 @@ describe("OpenList task progress worker", () => {
         attemptIndex: 0,
         attemptStartedAt: new Date(0).toISOString(),
         instantOfflinePolicy: { enabled: true, timeoutMs: 1_000 },
+        notificationTarget: {
+          channel: "wechat",
+          providerInstanceId: "wechat-main",
+          targetId: "member@wechat",
+        },
       },
     });
     const worker = new ProgressWorker(
@@ -497,29 +483,22 @@ describe("OpenList task progress worker", () => {
         async deleteOfflineTask(taskId) {
           deleted.push(taskId);
         },
-        async startOfflineDownload(input) {
-          submitted.push(input.url);
-          return [
-            {
-              id: "remote-next",
-              name: "Second",
-              state: 1,
-              status: "pending",
-              progress: 0,
-              total_bytes: 0,
-              error: "",
-            },
-          ];
-        },
       },
       tasks,
+      2_000,
+      outbox,
     );
     await worker.tick();
     expect(deleted).toEqual(["remote-old"]);
-    expect(submitted).toEqual(["magnet:?xt=urn:btih:second"]);
-    expect(tasks.get(local.id)?.externalId).toBe("remote-next");
-    expect(tasks.get(local.id)?.metadata.attemptIndex).toBe(1);
-    expect(tasks.get(local.id)?.state).toBe("running");
+    expect(tasks.get(local.id)?.externalId).toBeNull();
+    expect(tasks.get(local.id)?.metadata.attemptIndex).toBe(0);
+    expect(tasks.get(local.id)?.metadata.awaitingFallbackSelection).toBe(true);
+    expect(tasks.get(local.id)?.state).toBe("waiting");
+    const messages = outbox.claimDue();
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.payload.messages[0]?.text).toContain(
+      "未确认前不会下载备用资源",
+    );
     database.close();
   });
 
@@ -556,9 +535,6 @@ describe("OpenList task progress worker", () => {
           return [];
         },
         async deleteOfflineTask() {},
-        async startOfflineDownload() {
-          return [];
-        },
       },
       tasks,
       2_000,
@@ -566,7 +542,9 @@ describe("OpenList task progress worker", () => {
     );
     await worker.tick();
     expect(tasks.get(local.id)?.state).toBe("failed");
-    expect(tasks.get(local.id)?.statusText).toContain("没有可用的备用磁力");
+    expect(tasks.get(local.id)?.statusText).toContain(
+      "没有尚未尝试的备用资源",
+    );
     expect(outbox.claimDue()).toHaveLength(1);
     database.close();
   });

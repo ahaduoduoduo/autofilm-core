@@ -52,6 +52,7 @@ describe("agent tool registry", () => {
         "refresh_jellyfin_item",
         "refresh_jellyfin_remote_path",
         "remove_watchlist",
+        "resume_offline_download",
         "search_catalog",
         "search_jellyfin",
         "search_releases",

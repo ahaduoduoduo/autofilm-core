@@ -9,6 +9,11 @@ describe("OpenList download tools", () => {
     const createdTasks: Array<Record<string, unknown>> = [];
     const deps = {
       userId: "user-1",
+      notificationTarget: {
+        channel: "wechat",
+        providerInstanceId: "wechat-main",
+        targetId: "user-1@wechat",
+      },
       openList: {
         mediaLibraryRoots() {
           return {
@@ -17,7 +22,7 @@ describe("OpenList download tools", () => {
           };
         },
         instantOfflinePolicy() {
-          return { enabled: true, timeoutMs: 20_000 };
+          return { enabled: true, timeoutMs: 40_000 };
         },
         async mkdir(path: string) {
           createdDirectories.push(path);
@@ -84,8 +89,109 @@ describe("OpenList download tools", () => {
         seasons: [1, 2, 3],
         isMultiSeason: true,
       },
+      instantOfflinePolicy: {
+        enabled: true,
+        timeoutMs: 40_000,
+      },
+      notificationTarget: {
+        channel: "wechat",
+        providerInstanceId: "wechat-main",
+        targetId: "user-1@wechat",
+      },
+      completionContinuation: {
+        state: "pending",
+        attempts: 0,
+      },
+    });
+    expect(
+      (
+        createdTasks[0]?.metadata as Record<string, unknown>
+      ).completionContinuation,
+    ).toMatchObject({
+      workflowId: expect.any(String),
+      nextAttemptAt: expect.any(String),
     });
     expect(result).toBeTruthy();
+  });
+
+  it("submits a fallback only after the user selects a saved candidate", async () => {
+    const submissions: Array<{ path: string; url: string }> = [];
+    let updated: Record<string, unknown> | undefined;
+    const task = {
+      id: "local-waiting",
+      userId: "user-1",
+      type: "offline-download",
+      title: "Example",
+      state: "waiting",
+      progress: null,
+      statusText: "等待用户选择备用资源",
+      externalId: null,
+      metadata: {
+        destination: "/115/nvideo/movie/2026-07",
+        candidateUrls: [
+          "magnet:?xt=urn:btih:first",
+          "magnet:?xt=urn:btih:second",
+        ],
+        attemptIndex: 0,
+        awaitingFallbackSelection: true,
+      },
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+      completedAt: null,
+    };
+    const deps = {
+      userId: "user-1",
+      openList: {
+        async startOfflineDownload(input: { path: string; url: string }) {
+          submissions.push(input);
+          return [{
+            id: "remote-second",
+            name: "Second",
+            state: 1,
+            status: "running",
+            progress: 0,
+            total_bytes: 100,
+            error: "",
+          }];
+        },
+      },
+      tasks: {
+        get(id: string) {
+          return id === task.id ? task : undefined;
+        },
+        update(id: string, input: Record<string, unknown>) {
+          updated = { id, ...input };
+          return { ...task, ...input };
+        },
+      },
+    } as unknown as ToolDependencies;
+    const tool = createOpenListTools(deps).find(
+      (item) => item.definition.name === "resume_offline_download",
+    )!;
+
+    await tool.execute({
+      task_id: task.id,
+      url: "magnet:?xt=urn:btih:second",
+    });
+
+    expect(submissions).toEqual([{
+      path: "/115/nvideo/movie/2026-07",
+      url: "magnet:?xt=urn:btih:second",
+    }]);
+    expect(updated).toMatchObject({
+      id: task.id,
+      state: "running",
+      externalId: "remote-second",
+      metadata: {
+        sourceUrl: "magnet:?xt=urn:btih:second",
+        attemptIndex: 1,
+        remoteName: "Second",
+      },
+    });
+    expect(
+      (updated?.metadata as Record<string, unknown>)
+        .awaitingFallbackSelection,
+    ).toBeUndefined();
   });
 
   it("does not expose a model-controlled destination parameter", () => {

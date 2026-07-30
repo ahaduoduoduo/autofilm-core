@@ -408,31 +408,34 @@ function ServiceModal({
             <div className="form-grid">
               <Field
                 label="115 秒传时限（秒）"
-                hint="超过时限即删除任务并尝试备用磁力；建议 20 秒"
+                hint="超过时限即停止当前任务并询问是否使用备用资源；建议 40 秒"
               >
                 <Input
                   type="number"
                   min="10"
                   max="120"
-                  value={String(options.instantOfflineTimeoutSeconds ?? 20)}
+                  value={String(options.instantOfflineTimeoutSeconds ?? 40)}
                   onChange={(e) =>
                     setOptions((current) => ({
                       ...current,
                       instantOfflineTimeoutSeconds:
-                        Number(e.target.value) || 20,
+                        Number(e.target.value) || 40,
                     }))
                   }
                 />
               </Field>
               <Toggle
-                checked={options.instantOfflineRetryEnabled !== false}
+                checked={
+                  (options.instantOfflineTimeoutEnabled ??
+                    options.instantOfflineRetryEnabled) !== false
+                }
                 onChange={(checked) =>
                   setOptions((current) => ({
                     ...current,
-                    instantOfflineRetryEnabled: checked,
+                    instantOfflineTimeoutEnabled: checked,
                   }))
                 }
-                label="启用秒传失败自动换磁力"
+                label="启用秒传时限判断"
               />
             </div>
           </>
@@ -496,8 +499,8 @@ function defaultOptions(type: ServiceType): Record<string, unknown> {
   if (type === "openlist")
     return {
       offlineDownloadTool: "115 Cloud",
-      instantOfflineRetryEnabled: true,
-      instantOfflineTimeoutSeconds: 20,
+      instantOfflineTimeoutEnabled: true,
+      instantOfflineTimeoutSeconds: 40,
       movieLibraryRoot: DEFAULT_MEDIA_LIBRARY_ROOTS.movie,
       tvLibraryRoot: DEFAULT_MEDIA_LIBRARY_ROOTS.tv,
     };

@@ -83,14 +83,17 @@ export class OpenListClient {
     const config = this.requireConfig();
     const tool = String(config.options.offlineDownloadTool ?? "115 Cloud");
     const configured = Number(
-      config.options.instantOfflineTimeoutSeconds ?? 20,
+      config.options.instantOfflineTimeoutSeconds ?? 40,
     );
     const timeoutSeconds = Number.isFinite(configured)
       ? Math.max(10, Math.min(120, configured))
-      : 20;
+      : 40;
+    const timeoutEnabled =
+      config.options.instantOfflineTimeoutEnabled ??
+      config.options.instantOfflineRetryEnabled;
     return {
       enabled:
-        config.options.instantOfflineRetryEnabled !== false &&
+        timeoutEnabled !== false &&
         ["115 Cloud", "115 Open"].includes(tool),
       timeoutMs: timeoutSeconds * 1000,
     };

@@ -92,11 +92,15 @@ Updated: 2026-07-30
   共享状态。
 - `integrations/weclaw-registration.ts`：读取同一 Compose 的 WeClaw 配置与登录账号，
   自动建立 Core 渠道记录且不向浏览器返回令牌。
-- `tasks/progress-worker.ts`：每 15 秒读取 OpenList 内存任务状态，处理 115
-  短时失败、远端任务删除和备用磁力；只把 OpenList `StateSucceeded` 认定为完成，
-  `StateCanceled` 和 `StateFailed` 分别映射为取消和失败。
+- `tasks/progress-worker.ts`：每 2 秒读取 OpenList 内存任务状态，处理 115
+  短时失败、远端任务删除和备用资源等待；只把 OpenList `StateSucceeded` 认定为
+  完成，`StateCanceled` 和 `StateFailed` 分别映射为取消和失败。超时后只发送
+  备用资源选择提示，不自动提交。
   完成后优先使用云端最终结果路径精确刷新 Jellyfin，且该路径必须位于任务目标
   目录内；旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
+- `tasks/download-completion-worker.ts`：按同一次下载请求的工作流 ID 等待所有
+  OpenList 任务成功且 Jellyfin 导入完成，然后恢复原聊天会话。只执行此前已经约定
+  的可选字幕操作；没有字幕计划时直接报告视频入库结果。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。

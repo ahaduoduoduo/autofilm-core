@@ -5,6 +5,7 @@ import { ProgressWorker } from "./tasks/progress-worker.js";
 import { OutboundMessageWorker } from "./channels/outbound.js";
 import { WatchlistWorker } from "./tasks/watchlist-worker.js";
 import { OpenListAuthWorker } from "./tasks/openlist-auth-worker.js";
+import { DownloadCompletionWorker } from "./tasks/download-completion-worker.js";
 
 const config = loadConfig();
 const { app, context } = await buildApp(config);
@@ -35,10 +36,17 @@ const openListAuthWorker = new OpenListAuthWorker(
   context.users,
   context.outbox,
 );
+const downloadCompletionWorker = new DownloadCompletionWorker(
+  context.tasks,
+  context.agent,
+  context.outbox,
+  config.mediaBaseUrl,
+);
 progressWorker.start();
 outboundWorker.start();
 watchlistWorker.start();
 openListAuthWorker.start();
+downloadCompletionWorker.start();
 const mediaCleanupTimer = setInterval(
   () => {
     context.media.deleteExpired();
@@ -59,6 +67,7 @@ app.addHook("onClose", async () => {
   outboundWorker.stop();
   watchlistWorker.stop();
   openListAuthWorker.stop();
+  downloadCompletionWorker.stop();
   clearInterval(mediaCleanupTimer);
 });
 
