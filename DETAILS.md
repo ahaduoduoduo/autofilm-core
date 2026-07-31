@@ -56,6 +56,8 @@ Updated: 2026-07-31
 - `tool-executor.ts`：并行执行同轮工具并按原调用顺序返回结果。
 - `tools.ts`、`tool-types.ts`：工具组合入口和共享依赖。
 - `toolsets/`：基础目录、下载/OpenList、字幕、Jellyfin 和追更工具。
+- `toolsets/media-upgrades.ts`：为一个或多个现有 Jellyfin 条目创建稳定升级项，
+  并发搜索候选、提交隔离下载、查询状态和执行确认后的旧版本恢复。
 - `toolsets/subtitle-placement.ts`：用文件 UUID 生成不可变字幕映射计划，校验摘要、
   重复使用和 Jellyfin 目标，并处理部分失败重试。
 - `toolsets/subtitle-placement-executor.ts`：以最多 8 个工作协程并发执行字幕清理、
@@ -76,6 +78,8 @@ Updated: 2026-07-31
 - `config-store.ts`：AI、模型、渠道和媒体服务配置。
 - `conversation-store.ts`：会话消息、Native 事件去重、当前影视主题和历史主题摘要。
 - `task-store.ts`：任务生命周期。
+- `media-upgrade-store.ts`：升级批次、逐条状态、候选、下载任务、替换路径、备份和
+  恢复信息。
 - `outbox-store.ts`：主动聊天通知和指数退避。
 - `media-store.ts`：短期、限次读取的二维码和影片封面媒体。
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
@@ -87,12 +91,13 @@ Updated: 2026-07-31
 ### `integrations`、`tasks`、`channels`
 
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
-  内存任务状态、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
+  内存任务状态、精确对象移动、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
   Movie/MediaSource 分页清单、`RemoteRefresh`、Movie/Episode 精确删除、字幕读取
   和删除；所有字幕格式均以
   保留原始长度的二进制请求上传到 AutoFilm 流式端点，不生成 Base64 副本；
-  请求体使用 Node 读取流，不复制大型图形字幕。
+  请求体使用 Node 读取流，不复制大型图形字幕；资源升级使用 Inspect、Preview、
+  Apply 和 Rollback 接口，并兼容 Jellyfin 两种 JSON 字段命名。
 - `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
   并提供电影、剧集、季、单集的评分与简介、季集日期和受限大小的封面读取。
@@ -111,6 +116,11 @@ Updated: 2026-07-31
 - `tasks/download-completion-worker.ts`：按同一次下载请求的工作流 ID 等待所有
   OpenList 任务成功且 Jellyfin 导入完成，然后恢复原聊天会话。只执行此前已经约定
   的可选字幕操作；没有字幕计划时直接报告视频入库结果。
+- `tasks/media-upgrade-worker.ts`：最多并行处理 4 个已下载升级项；逐项识别视频、
+  拒绝分辨率下降、更新原 Jellyfin Item ID、自动检查条目路径和视频流，再移动旧文件
+  并发送独立结果通知。
+- `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
+  公共函数。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。
@@ -176,4 +186,4 @@ Updated: 2026-07-31
 `docs/security.md`；字幕与追更见 `docs/subtitles-watchlists.md`，管理界面规范见
 `docs/admin-ui.md`；115 重试和 Telegram 分别见
 `docs/instant-offline-retry.md`、`docs/telegram-adapter.md`；自动下载目录见
-`docs/media-download-paths.md`。
+`docs/media-download-paths.md`；现有媒体升级见 `docs/media-upgrades.md`。

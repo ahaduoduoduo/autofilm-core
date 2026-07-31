@@ -144,6 +144,9 @@ export class ProgressWorker {
     task: TaskSummary,
     resultPath?: string,
   ): Record<string, unknown> {
+    if (isRecord(task.metadata.mediaUpgrade)) {
+      return {};
+    }
     const destination = String(task.metadata.destination ?? "");
     const refreshPath = String(
       validResultPath(destination, resultPath)
@@ -336,6 +339,10 @@ export class ProgressWorker {
     );
     return `115 离线任务在 ${timeoutSeconds} 秒内未完成，已删除原任务`;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function inferState(

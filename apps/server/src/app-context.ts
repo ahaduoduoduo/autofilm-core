@@ -18,6 +18,7 @@ import type { SubtitleDownloadService } from "./subtitles/download-service.js";
 import type { SubtitleCleaner } from "./subtitles/cleaner.js";
 import type { WeClawRegistration } from "./integrations/weclaw-registration.js";
 import type { PromptStore } from "./db/prompt-store.js";
+import type { MediaUpgradeStore } from "./db/media-upgrade-store.js";
 
 export interface AppContext {
   config: AppConfig;
@@ -27,6 +28,7 @@ export interface AppContext {
   prompts: PromptStore;
   conversations: ConversationStore;
   tasks: TaskStore;
+  mediaUpgrades: MediaUpgradeStore;
   outbox: OutboxStore;
   media: EphemeralMediaStore;
   watchlists: WatchlistStore;

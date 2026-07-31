@@ -15,6 +15,7 @@ import type {
   CanonicalMessage,
 } from "../ai/types.js";
 import type { JackettClient } from "../integrations/jackett.js";
+import type { MediaUpgradeStore } from "../db/media-upgrade-store.js";
 import type { JellyfinClient } from "../integrations/jellyfin.js";
 import type { OpenListClient } from "../integrations/openlist.js";
 import type { CatalogItem, TmdbClient } from "../integrations/tmdb.js";
@@ -36,6 +37,7 @@ export interface AgentDependencies {
   prompts: PromptStore;
   conversations: ConversationStore;
   tasks: TaskStore;
+  mediaUpgrades: MediaUpgradeStore;
   tmdb: TmdbClient;
   jackett: JackettClient;
   openList: OpenListClient;
@@ -397,6 +399,7 @@ export class AgentService {
       userId,
       notificationTarget,
       tasks: this.deps.tasks,
+      mediaUpgrades: this.deps.mediaUpgrades,
       tmdb: this.deps.tmdb,
       jackett: this.deps.jackett,
       openList: this.deps.openList,

@@ -84,6 +84,28 @@ search_releases 返回多个可用版本时，在用户没有给出选择策略�
 开始下载。下载时将选定结果的 downloadUrl 原样传给 url；备用结果的 downloadUrl
 原样传给 fallback_urls。备用资源只供超时后展示和等待用户选择，不会自动下载。
 
+## 已有媒体升级
+
+1. 用户要求把 Jellyfin 已有电影或单集升级为更高清版本时，先用 search_jellyfin、
+   query_jellyfin_movies、list_jellyfin_episodes 和 get_jellyfin_media_info 取得
+   现有 Movie/Episode ID、真实路径和媒体流，不按标题猜测目标。
+2. 使用 search_media_upgrade_candidates 搜索一个或多个现有条目的替换资源。一次
+   最多提交 8 个目标；多个目标在同一次工具调用中提交，不逐个串行搜索。
+3. 展示现有分辨率、编码、HDR、音轨与候选资源标题、大小后，由用户明确选择。确认后
+   只使用工具返回的 upgrade_item_id 和 release_candidate_id 调用
+   start_media_upgrades，不把列表位置、电影名称或普通 search_releases 序号当作 ID。
+4. 已有媒体升级不得调用 start_offline_download、start_batch_download、
+   refresh_jellyfin_remote_path 或 delete_jellyfin_items。Core 会为每个条目建立独立
+   下载目录，在该条目的下载完成后单独探测和替换，不等待同批其他条目。
+5. 替换继续使用原 Jellyfin Item ID、用户观看记录、收藏、Provider ID、图片和元数据；
+   新文件实际分辨率低于旧文件时会拒绝替换。成功后旧文件进入独立备份目录，不直接
+   删除，也不要求用户手工试播。
+6. 使用 get_media_upgrade_job 查询每个升级项的独立状态。某一项下载超时或失败时，
+   只处理该项的备用资源或放弃该项，不重新提交已经成功的其他条目。
+7. 用户明确要求恢复旧版本时，先用 get_media_upgrade_job 核对确切升级项和当前备份
+   路径，再取得明确同意并调用 rollback_media_upgrades。恢复操作继续保留同一个
+   Jellyfin Item ID，刚替换的新文件会进入该升级项的备份目录。
+
 ## 字幕评估
 
 推荐字幕前，对 2 到 3 个主要候选调用 get_subtitle_detail，结合描述、评论、评分和
@@ -322,7 +344,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 13,
+    version: 14,
     content: MAIN_AGENT_PROMPT,
   },
   {

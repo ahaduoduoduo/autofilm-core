@@ -19,7 +19,7 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - New API 可作为任意供应方配置，不是特殊代码路径。
 - 主 Agent、影视主题摘要、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
   管理界面修改并恢复当前版本的系统默认内容；修改在下一次模型请求时生效。
-- 36 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
+- 39 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
   ASS 样式和按成员追更；管理员聊天另有 OpenList 扫码工具。
 - Jellyfin 电影按实际视频流分辨率分页查询，不访问 OpenList；重复电影分为
   Provider ID 确定重复和标题年份疑似重复，并返回每个实际版本的画质、音轨与路径。
@@ -47,6 +47,10 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - Jellyfin 当前图片、远程图片、图片设置、条目刷新、分集和媒体流查询。
 - Jellyfin Movie/Episode 精确版本删除；Core 先核对条目、路径和媒体流，再通过
   Jellyfin 删除本地或 OpenList 实际文件。字幕删除继续使用不可变摘要引用。
+- 现有 OpenList Movie/Episode 资源升级：最多 8 个目标一次提交，Jackett 查询、
+  下载和替换按条目隔离并有限并发；每项下载完成后立即使用 Jellyfin 自身命名规则和
+  ffprobe 结果替换原 Item ID，不执行普通媒体库导入。观看记录、收藏、Provider ID、
+  图片和元数据保持不变，旧文件进入按升级项隔离的备份目录，并支持确认后恢复。
 - 每个 SubHD 下载使用独立 session、Cookie Jar 和视觉模型请求；请求开始受间隔限制
   但可并发等待响应。自动识别五次后，使用独立任务码请求人工输入。
 - 按成员保存追更条件，定时读取 TMDB 并使用只读 Agent 检查发布版本和字幕。
@@ -77,7 +81,7 @@ flowchart LR
     C -->|所选 AI 协议| P[任意 AI 供应方]
     C --> J[Jackett / TMDB]
     C --> O[OpenList]
-    C -->|下载完成后显式刷新| F[Jellyfin]
+    C -->|普通下载显式刷新 / 资源升级原位替换| F[Jellyfin]
     F -->|302 直播放| O
 ```
 
@@ -86,6 +90,12 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 通知 Jellyfin 刷新。只有 Jellyfin 返回导入成功后，Core 才恢复原 Agent 会话并
 发送最终结果。
 该请求不列目录、不访问 115 文件对象，也不触发网盘刷新。
+
+资源升级属于独立流程：升级任务下载到 `/115/autofilm-staging/upgrades/<item-id>`，
+不会执行上述普通刷新。Core 在每项完成后读取实际视频文件，调用 Jellyfin 的替换
+预检与应用接口更新原条目，再将旧文件移动到
+`/115/autofilm-backups/upgrades/<item-id>`。详细说明见
+[docs/media-upgrades.md](docs/media-upgrades.md)。
 
 完整说明见 [docs/architecture.md](docs/architecture.md)。
 
@@ -165,6 +175,8 @@ npm run build
   供应方错误恢复。
 - [docs/media-inventory-and-memory.md](docs/media-inventory-and-memory.md)：
   分辨率、重复电影、TMDB 分层详情、运行时间和影视主题摘要。
+- [docs/media-upgrades.md](docs/media-upgrades.md)：现有条目资源查询、并发下载、
+  原 Item ID 替换、备份与恢复。
 - [docs/prompts.md](docs/prompts.md)：数据库提示词、默认版本和管理规则。
 - [docs/native-adapters.md](docs/native-adapters.md)：聊天 Adapter 契约。
 - [docs/openlist-jellyfin.md](docs/openlist-jellyfin.md)：媒体与任务交互。

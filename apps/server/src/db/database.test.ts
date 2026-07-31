@@ -89,6 +89,11 @@ describe("database migrations", () => {
         "SELECT name FROM sqlite_master WHERE type='table' AND name='prompt_configs'",
       ).get(),
     ).toBeTruthy();
+    expect(
+      db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='media_upgrade_items'",
+      ).get(),
+    ).toBeTruthy();
     db.close();
   });
 });

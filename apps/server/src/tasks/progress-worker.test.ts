@@ -269,6 +269,65 @@ describe("OpenList task progress worker", () => {
     database.close();
   });
 
+  it("leaves media upgrades for the replacement worker without a library refresh", async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const tasks = new TaskStore(database);
+    const resultPath = "/115/autofilm-staging/upgrades/item-1/new.mkv";
+    const local = tasks.create({
+      type: "offline-download",
+      title: "Upgrade",
+      state: "running",
+      externalId: "remote-upgrade",
+      metadata: {
+        destination: "/115/autofilm-staging/upgrades/item-1",
+        mediaUpgrade: {
+          jobId: "job-1",
+          upgradeItemId: "item-1",
+          jellyfinItemId: "movie-1",
+        },
+      },
+    });
+    const refreshes: string[] = [];
+    const worker = new ProgressWorker(
+      {
+        async listOfflineTasks() {
+          return [
+            {
+              id: "remote-upgrade",
+              name: "Upgrade",
+              state: 2,
+              status: "succeeded",
+              progress: 100,
+              total_bytes: 2048,
+              error: "",
+              result_path: resultPath,
+              end_time: new Date().toISOString(),
+            },
+          ];
+        },
+        async deleteOfflineTask() {},
+      },
+      tasks,
+      15_000,
+      undefined,
+      {
+        async remoteRefresh(input) {
+          refreshes.push(input.path);
+        },
+      },
+    );
+
+    await worker.tick();
+
+    expect(tasks.get(local.id)?.state).toBe("completed");
+    expect(tasks.get(local.id)?.metadata.remoteResultPath).toBe(resultPath);
+    expect(tasks.get(local.id)?.metadata.jellyfinRefresh).toBeUndefined();
+    expect(refreshes).toEqual([]);
+    database.close();
+  });
+
   it("does not regress a completed task when a stale running snapshot arrives", async () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-task-"));
     directories.push(directory);

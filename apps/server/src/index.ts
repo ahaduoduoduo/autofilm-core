@@ -6,6 +6,7 @@ import { OutboundMessageWorker } from "./channels/outbound.js";
 import { WatchlistWorker } from "./tasks/watchlist-worker.js";
 import { OpenListAuthWorker } from "./tasks/openlist-auth-worker.js";
 import { DownloadCompletionWorker } from "./tasks/download-completion-worker.js";
+import { MediaUpgradeWorker } from "./tasks/media-upgrade-worker.js";
 
 const config = loadConfig();
 const { app, context } = await buildApp(config);
@@ -42,11 +43,19 @@ const downloadCompletionWorker = new DownloadCompletionWorker(
   context.outbox,
   config.mediaBaseUrl,
 );
+const mediaUpgradeWorker = new MediaUpgradeWorker(
+  context.mediaUpgrades,
+  context.tasks,
+  context.openList,
+  context.jellyfin,
+  context.outbox,
+);
 progressWorker.start();
 outboundWorker.start();
 watchlistWorker.start();
 openListAuthWorker.start();
 downloadCompletionWorker.start();
+mediaUpgradeWorker.start();
 const mediaCleanupTimer = setInterval(
   () => {
     context.media.deleteExpired();
@@ -68,6 +77,7 @@ app.addHook("onClose", async () => {
   watchlistWorker.stop();
   openListAuthWorker.stop();
   downloadCompletionWorker.stop();
+  mediaUpgradeWorker.stop();
   clearInterval(mediaCleanupTimer);
 });
 

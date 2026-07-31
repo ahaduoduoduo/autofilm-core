@@ -5,6 +5,7 @@ import { jsonHeaders, requestJson, requestOk, withQuery } from "./http.js";
 export interface JellyfinItem {
   Id: string;
   Name: string;
+  OriginalTitle?: string;
   Type: string;
   ProductionYear?: number;
   Path?: string;
@@ -49,6 +50,31 @@ export interface JellyfinRemoteImage {
   Type?: string;
 }
 
+export interface JellyfinReplacementCandidate {
+  path: string;
+  name: string;
+  container?: string;
+  size: number;
+  extraType?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  endingEpisodeNumber?: number;
+}
+
+export interface JellyfinReplacementFacts {
+  path: string;
+  size?: number;
+  width?: number;
+  height?: number;
+  streams: Array<Record<string, unknown>>;
+}
+
+export interface JellyfinReplacementPreview {
+  previewToken: string;
+  current: JellyfinReplacementFacts;
+  replacement: JellyfinReplacementFacts;
+}
+
 export class JellyfinClient {
   constructor(private readonly configs: ConfigStore) {}
 
@@ -58,7 +84,7 @@ export class JellyfinClient {
       SearchTerm: query,
       Recursive: "true",
       IncludeItemTypes: "Movie,Series,Episode",
-      Fields: "ProviderIds,ProductionYear,Path",
+      Fields: "ProviderIds,ProductionYear,Path,OriginalTitle",
       Limit: "20",
     });
     const result = await requestJson<{ Items?: JellyfinItem[] }>(url, {
@@ -77,7 +103,7 @@ export class JellyfinClient {
         Recursive: "true",
         IncludeItemTypes: "Movie",
         Fields:
-          "Path,ProviderIds,ProductionYear,MediaSources,MediaStreams",
+          "Path,ProviderIds,ProductionYear,OriginalTitle,MediaSources,MediaStreams",
         EnableImages: "false",
         StartIndex: String(Math.max(0, startIndex)),
         Limit: String(Math.max(1, Math.min(limit, 500))),
@@ -145,13 +171,79 @@ export class JellyfinClient {
       withQuery(config.baseUrl, "/Items", {
         Ids: id,
         Recursive: "true",
-        Fields: "Path,ProviderIds,MediaSources,MediaStreams",
+        Fields:
+          "Path,ProviderIds,ProductionYear,OriginalTitle,MediaSources,MediaStreams",
       }),
       { headers: this.headers(config.credential) },
     );
     const item = result.Items?.[0];
     if (!item) throw new Error("Jellyfin item was not found");
     return item;
+  }
+
+  async inspectReplacement(
+    path: string,
+  ): Promise<{
+    requestedPath: string;
+    candidates: JellyfinReplacementCandidate[];
+  }> {
+    const raw = await this.autoFilmPost<Record<string, unknown>>(
+      "/AutoFilm/MediaReplacement/Inspect",
+      {
+        path,
+        recursive: true,
+      },
+    );
+    const candidates = arrayField(raw, "candidates", "Candidates").map(
+      normalizeReplacementCandidate,
+    );
+    return {
+      requestedPath:
+        optionalStringField(raw, "requestedPath", "RequestedPath") ?? path,
+      candidates,
+    };
+  }
+
+  async previewReplacement(
+    itemId: string,
+    newPath: string,
+  ): Promise<JellyfinReplacementPreview> {
+    const raw = await this.autoFilmPost<Record<string, unknown>>(
+      "/AutoFilm/MediaReplacement/Preview",
+      {
+        itemId,
+        newPath,
+      },
+    );
+    return {
+      previewToken: requiredStringField(
+        raw,
+        "previewToken",
+        "PreviewToken",
+      ),
+      current: normalizeReplacementFacts(
+        objectField(raw, "current", "Current"),
+      ),
+      replacement: normalizeReplacementFacts(
+        objectField(raw, "replacement", "Replacement"),
+      ),
+    };
+  }
+
+  async applyReplacement(
+    previewToken: string,
+  ): Promise<Record<string, unknown>> {
+    return this.autoFilmPost("/AutoFilm/MediaReplacement/Apply", {
+      previewToken,
+    });
+  }
+
+  async rollbackReplacement(
+    rollbackToken: string,
+  ): Promise<Record<string, unknown>> {
+    return this.autoFilmPost("/AutoFilm/MediaReplacement/Rollback", {
+      rollbackToken,
+    });
   }
 
   async images(id: string): Promise<JellyfinImageInfo[]> {
@@ -404,6 +496,19 @@ export class JellyfinClient {
     return Buffer.from(await response.arrayBuffer());
   }
 
+  private async autoFilmPost<T>(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
+    const config = this.requireConfig();
+    return requestJson<T>(`${config.baseUrl}${path}`, {
+      method: "POST",
+      headers: this.headers(config.credential),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10 * 60_000),
+    });
+  }
+
   private headers(credential: string): Record<string, string> {
     return jsonHeaders(
       "",
@@ -423,4 +528,104 @@ export class JellyfinClient {
     if (!config) throw new Error("Jellyfin service is not configured");
     return config;
   }
+}
+
+function normalizeReplacementCandidate(
+  value: unknown,
+): JellyfinReplacementCandidate {
+  const candidate = asRecord(value);
+  return {
+    path: requiredStringField(candidate, "path", "Path"),
+    name: requiredStringField(candidate, "name", "Name"),
+    container: optionalStringField(candidate, "container", "Container"),
+    size: optionalNumberField(candidate, "size", "Size") ?? 0,
+    extraType: optionalStringField(candidate, "extraType", "ExtraType"),
+    seasonNumber: optionalNumberField(
+      candidate,
+      "seasonNumber",
+      "SeasonNumber",
+    ),
+    episodeNumber: optionalNumberField(
+      candidate,
+      "episodeNumber",
+      "EpisodeNumber",
+    ),
+    endingEpisodeNumber: optionalNumberField(
+      candidate,
+      "endingEpisodeNumber",
+      "EndingEpisodeNumber",
+    ),
+  };
+}
+
+function normalizeReplacementFacts(value: Record<string, unknown>) {
+  return {
+    path: requiredStringField(value, "path", "Path"),
+    size: optionalNumberField(value, "size", "Size"),
+    width: optionalNumberField(value, "width", "Width"),
+    height: optionalNumberField(value, "height", "Height"),
+    streams: arrayField(value, "streams", "Streams").map(asRecord),
+  };
+}
+
+function objectField(
+  value: Record<string, unknown>,
+  ...keys: string[]
+): Record<string, unknown> {
+  for (const key of keys) {
+    const result = value[key];
+    if (result && typeof result === "object" && !Array.isArray(result)) {
+      return result as Record<string, unknown>;
+    }
+  }
+  throw new Error(`Jellyfin response is missing ${keys[0]}`);
+}
+
+function arrayField(
+  value: Record<string, unknown>,
+  ...keys: string[]
+): unknown[] {
+  for (const key of keys) {
+    if (Array.isArray(value[key])) return value[key] as unknown[];
+  }
+  return [];
+}
+
+function requiredStringField(
+  value: Record<string, unknown>,
+  ...keys: string[]
+): string {
+  const result = optionalStringField(value, ...keys);
+  if (!result) throw new Error(`Jellyfin response is missing ${keys[0]}`);
+  return result;
+}
+
+function optionalStringField(
+  value: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    if (typeof value[key] === "string" && value[key]) {
+      return value[key] as string;
+    }
+  }
+  return undefined;
+}
+
+function optionalNumberField(
+  value: Record<string, unknown>,
+  ...keys: string[]
+): number | undefined {
+  for (const key of keys) {
+    const result = value[key];
+    if (typeof result === "number" && Number.isFinite(result)) return result;
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Jellyfin response contains an invalid object");
+  }
+  return value as Record<string, unknown>;
 }

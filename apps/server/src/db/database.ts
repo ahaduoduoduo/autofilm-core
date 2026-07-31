@@ -292,6 +292,38 @@ const migrations = [
   CREATE INDEX conversation_topic_summaries_recent_idx
     ON conversation_topic_summaries(conversation_id, updated_at DESC);
   `,
+  `
+  CREATE TABLE media_upgrade_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE media_upgrade_items (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES media_upgrade_jobs(id) ON DELETE CASCADE,
+    jellyfin_item_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    query TEXT NOT NULL,
+    state TEXT NOT NULL,
+    current_json TEXT NOT NULL DEFAULT '{}',
+    candidates_json TEXT NOT NULL DEFAULT '[]',
+    selected_candidate_id TEXT,
+    download_task_id TEXT,
+    new_path TEXT,
+    backup_path TEXT,
+    rollback_token TEXT,
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(job_id, jellyfin_item_id)
+  );
+  CREATE INDEX media_upgrade_items_job_idx
+    ON media_upgrade_items(job_id, created_at);
+  CREATE INDEX media_upgrade_items_state_idx
+    ON media_upgrade_items(state, updated_at);
+  `,
 ];
 
 export type AppDatabase = Database.Database;

@@ -38,6 +38,16 @@ export interface MediaLibraryRoots {
   tv: string;
 }
 
+export interface OpenListObject {
+  path: string;
+  name: string;
+  size: number;
+  is_dir: boolean;
+  modified: string;
+  created: string;
+  download_path?: string;
+}
+
 export class OpenListClient {
   constructor(private readonly configs: ConfigStore) {}
 
@@ -76,6 +86,42 @@ export class OpenListClient {
   async deleteOfflineTask(taskId: string): Promise<void> {
     await this.post("/api/autofilm/offline-tasks/delete", {
       task_id: taskId,
+    });
+  }
+
+  async getObject(path: string, refresh = false): Promise<OpenListObject> {
+    return this.post("/api/autofilm/objects/get", {
+      path: normalizePath(path),
+      refresh,
+    });
+  }
+
+  async listObjects(
+    path: string,
+    refresh = false,
+  ): Promise<OpenListObject[]> {
+    const result = await this.post<{ objects?: OpenListObject[] }>(
+      "/api/autofilm/objects/list",
+      { path: normalizePath(path), refresh },
+    );
+    return result.objects ?? [];
+  }
+
+  async moveObject(input: {
+    sourcePath: string;
+    destinationDirectory: string;
+    destinationName?: string;
+  }): Promise<OpenListObject> {
+    return this.post("/api/autofilm/objects/move", {
+      source_path: normalizePath(input.sourcePath),
+      destination_directory: normalizePath(input.destinationDirectory),
+      destination_name: input.destinationName,
+    });
+  }
+
+  async deleteObject(path: string): Promise<void> {
+    await this.post("/api/autofilm/objects/delete", {
+      path: normalizePath(path),
     });
   }
 

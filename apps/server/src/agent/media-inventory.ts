@@ -17,6 +17,7 @@ export interface MovieVersion {
   displayItemId: string;
   mediaSourceId: string;
   name: string;
+  originalTitle?: string;
   productionYear?: number;
   path?: string;
   source: "openlist" | "local" | "unknown";
@@ -98,6 +99,7 @@ export function movieVersions(item: JellyfinItem): MovieVersion[] {
       displayItemId: item.Id,
       mediaSourceId: sourceId || `${item.Id}:${index}`,
       name: item.Name,
+      originalTitle: item.OriginalTitle,
       productionYear: item.ProductionYear,
       path,
       source: path?.startsWith("openlist:///")

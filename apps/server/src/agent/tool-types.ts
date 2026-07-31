@@ -11,6 +11,7 @@ import type { SubHDClient } from "../integrations/subhd.js";
 import type { TmdbClient } from "../integrations/tmdb.js";
 import type { SubtitleDownloadService } from "../subtitles/download-service.js";
 import type { SubtitleCleaner } from "../subtitles/cleaner.js";
+import type { MediaUpgradeStore } from "../db/media-upgrade-store.js";
 
 export interface AgentTool {
   definition: ToolDefinition;
@@ -27,6 +28,7 @@ export interface ToolDependencies {
   userId: string;
   notificationTarget?: NotificationTarget;
   tasks: TaskStore;
+  mediaUpgrades: MediaUpgradeStore;
   tmdb: TmdbClient;
   jackett: JackettClient;
   openList: OpenListClient;

@@ -254,7 +254,7 @@ async function resumeDownload(
   if (!remote) {
     throw new Error("OpenList 没有返回新的离线任务");
   }
-  return deps.tasks.update(task.id, {
+  const updated = deps.tasks.update(task.id, {
     state: "running",
     progress: 0,
     statusText: "用户已选择备用资源，正在等待 115 秒传",
@@ -268,6 +268,18 @@ async function resumeDownload(
       awaitingFallbackSelection: undefined,
     },
   });
+  const upgrade = recordValue(task.metadata.mediaUpgrade);
+  const upgradeItemId =
+    typeof upgrade?.upgradeItemId === "string"
+      ? upgrade.upgradeItemId
+      : undefined;
+  if (upgradeItemId) {
+    deps.mediaUpgrades.update(upgradeItemId, {
+      state: "downloading",
+      error: "",
+    });
+  }
+  return updated;
 }
 
 function downloadMetadata(
@@ -353,4 +365,10 @@ function mediaSummary(target: MediaDestination): Record<string, unknown> {
 
 function uniqueUrls(urls: string[]): string[] {
   return [...new Set(urls.map((url) => url.trim()).filter(Boolean))].slice(0, 9);
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }

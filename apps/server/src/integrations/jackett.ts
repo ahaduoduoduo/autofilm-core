@@ -47,22 +47,11 @@ export class JackettClient {
   constructor(private readonly configs: ConfigStore) {}
 
   async search(query: string, page = 0): Promise<ReleaseSearchPage> {
-    const config = this.configs.service("jackett");
-    if (!config) throw new Error("Jackett service is not configured");
-    const normalizedQuery = query.trim();
-    if (!normalizedQuery) throw new Error("Jackett query cannot be empty");
+    const normalizedQuery = normalizeQuery(query);
+    const results = await this.searchAll(normalizedQuery);
     if (!Number.isInteger(page) || page < 0) {
       throw new Error("Jackett page must be a non-negative integer");
     }
-    const endpoint =
-      String(config.options.path ?? "") ||
-      "/api/v2.0/indexers/all/results";
-    const cacheKey = `${config.baseUrl}\n${endpoint}\n${normalizedQuery}`;
-    const results = await this.results(cacheKey, normalizedQuery, {
-      baseUrl: config.baseUrl,
-      endpoint,
-      credential: config.credential,
-    });
     const start = page * PAGE_SIZE;
     const pageResults = results.slice(start, start + PAGE_SIZE);
     return {
@@ -73,16 +62,35 @@ export class JackettClient {
       totalPages: Math.ceil(results.length / PAGE_SIZE),
       hasMore: start + pageResults.length < results.length,
       results: pageResults.map((item, offset) => ({
+        ...item,
         index: start + offset,
-        title: item.Title ?? "",
-        downloadUrl: item.MagnetUri || item.Link || item.Guid || "",
-        size: item.Size ?? 0,
-        seeders: item.Seeders ?? 0,
-        peers: item.Peers ?? 0,
-        tracker: item.Tracker ?? "",
-        publishDate: item.PublishDate ?? "",
       })),
     };
+  }
+
+  async searchAll(query: string): Promise<ReleaseResult[]> {
+    const config = this.configs.service("jackett");
+    if (!config) throw new Error("Jackett service is not configured");
+    const normalizedQuery = normalizeQuery(query);
+    const endpoint =
+      String(config.options.path ?? "") ||
+      "/api/v2.0/indexers/all/results";
+    const cacheKey = `${config.baseUrl}\n${endpoint}\n${normalizedQuery}`;
+    const results = await this.results(cacheKey, normalizedQuery, {
+      baseUrl: config.baseUrl,
+      endpoint,
+      credential: config.credential,
+    });
+    return results.map((item, index) => ({
+      index,
+      title: item.Title ?? "",
+      downloadUrl: item.MagnetUri || item.Link || item.Guid || "",
+      size: item.Size ?? 0,
+      seeders: item.Seeders ?? 0,
+      peers: item.Peers ?? 0,
+      tracker: item.Tracker ?? "",
+      publishDate: item.PublishDate ?? "",
+    }));
   }
 
   private async results(
@@ -125,4 +133,10 @@ export class JackettClient {
       if (entry.expiresAt <= now) this.cache.delete(key);
     }
   }
+}
+
+function normalizeQuery(query: string): string {
+  const normalized = query.trim();
+  if (!normalized) throw new Error("Jackett query cannot be empty");
+  return normalized;
 }
