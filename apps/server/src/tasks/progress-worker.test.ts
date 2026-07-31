@@ -40,6 +40,8 @@ describe("OpenList task progress worker", () => {
               progress: 48.5,
               total_bytes: 1024,
               error: "",
+              provider_task_id: "provider-1",
+              provider_submitted_at: new Date().toISOString(),
             },
           ];
         },
