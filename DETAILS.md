@@ -127,7 +127,7 @@ Updated: 2026-07-31
   拒绝分辨率下降、更新原 Jellyfin Item ID、自动检查条目路径和视频流，再移动旧文件
   并发送独立结果通知。
 - `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
-  公共函数。
+  公共函数；历史路径不存在时执行一层、唯一且受大小限制的分隔符差异匹配。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。

@@ -101,6 +101,8 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 预检与应用接口更新原条目，再将旧文件移动到
 `/115/autofilm-backups/upgrades/<item-id>`。详细说明见
 [docs/media-upgrades.md](docs/media-upgrades.md)。
+历史迁移路径仅允许在直接父目录内进行唯一的分隔符差异纠正，不递归查询网盘，也不在
+存在歧义时修改 Jellyfin。
 
 完整说明见 [docs/architecture.md](docs/architecture.md)。
 

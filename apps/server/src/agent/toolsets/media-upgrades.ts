@@ -12,6 +12,7 @@ import {
   stringProperty,
 } from "./schema.js";
 import {
+  effectiveOriginalOpenListPath,
   hasVideoStream,
   moveOpenListObjectIdempotently,
   openListPathFromUri,
@@ -282,7 +283,7 @@ async function rollbackUpgrade(
   if (!item.backupPath || !item.newPath) {
     throw new Error(`${item.title} 没有完整的旧文件备份记录`);
   }
-  const originalPath = openListPathFromUri(item.current.path);
+  const originalPath = effectiveOriginalOpenListPath(item.current);
   const expectedNewUri = toOpenListUri(item.newPath);
   const current = await deps.jellyfin.item(item.jellyfinItemId);
   if (current.Path !== expectedNewUri) {

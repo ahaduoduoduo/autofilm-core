@@ -95,8 +95,15 @@ describe("MediaUpgradeWorker", () => {
           created: "",
         };
       },
-      async getObject() {
-        throw new Error("not found");
+      async getObject(path: string) {
+        return {
+          path,
+          name: path.split("/").at(-1) ?? "",
+          size: 1,
+          is_dir: false,
+          modified: "",
+          created: "",
+        };
       },
       async mkdir() {},
       async deleteObject(path: string) {
@@ -212,6 +219,16 @@ describe("MediaUpgradeWorker", () => {
       downloadTaskId: download.id,
     });
     const openList = {
+      async getObject(path: string) {
+        return {
+          path,
+          name: "old.mkv",
+          size: 1,
+          is_dir: false,
+          modified: "",
+          created: "",
+        };
+      },
       async moveObject(input: {
         destinationDirectory: string;
         destinationName?: string;
@@ -274,4 +291,151 @@ describe("MediaUpgradeWorker", () => {
     });
     db.close();
   });
+
+  it("reuses a completed download after uniquely correcting a legacy path", async () => {
+    const db = openDatabase(":memory:");
+    const user = new UserStore(db).create({
+      username: "owner",
+      displayName: "Owner",
+      role: "owner",
+    });
+    const tasks = new TaskStore(db);
+    const upgrades = new MediaUpgradeStore(db);
+    const stalePath =
+      "/cloud/library/A2/Example Film 1988/Example Film 1988.mkv";
+    const actualDirectory = "/cloud/library/A2/Example.Film.1988";
+    const actualPath = `${actualDirectory}/Example.Film.1988.mkv`;
+    const item = upgrades.createItem({
+      jobId: upgrades.createJob(user.id),
+      jellyfinItemId: "legacy-movie",
+      title: "示例电影",
+      query: "Example Film 1988",
+      current: {
+        path: `openlist://${stalePath}`,
+        type: "Movie",
+        mediaSources: [{ Size: 8_529_735_680 }],
+      },
+    });
+    const download = tasks.create({
+      userId: user.id,
+      type: "offline-download",
+      title: "升级 示例电影",
+      state: "completed",
+      metadata: {
+        destination: `/115/autofilm-staging/upgrades/${item.id}`,
+        remoteResultPath: `/115/autofilm-staging/upgrades/${item.id}/result`,
+      },
+    });
+    upgrades.update(item.id, {
+      state: "inspecting",
+      downloadTaskId: download.id,
+    });
+
+    const moves: Array<{
+      sourcePath: string;
+      destinationDirectory: string;
+      destinationName?: string;
+    }> = [];
+    const openList = {
+      async getObject(path: string) {
+        if (path === stalePath) throw new Error("object not found");
+        throw new Error(`unexpected get ${path}`);
+      },
+      async listObjects(path: string) {
+        if (path === "/cloud/library/A2") {
+          return [remoteObject(actualDirectory, true, 0)];
+        }
+        if (path === actualDirectory) {
+          return [remoteObject(actualPath, false, 8_529_735_788)];
+        }
+        return [];
+      },
+      async moveObject(input: {
+        sourcePath: string;
+        destinationDirectory: string;
+        destinationName?: string;
+      }) {
+        moves.push(input);
+        const name = input.destinationName ?? input.sourcePath.split("/").at(-1)!;
+        return remoteObject(`${input.destinationDirectory}/${name}`, false, 1);
+      },
+      async mkdir() {},
+      async deleteObject() {},
+    } as unknown as OpenListClient;
+    let activated = false;
+    let previewResolvedPath: string | undefined;
+    const jellyfin = {
+      async inspectReplacement() {
+        return {
+          requestedPath: "result",
+          candidates: [{
+            path: `/115/autofilm-staging/upgrades/${item.id}/result/new.mkv`,
+            name: "new",
+            size: 20,
+          }],
+        };
+      },
+      async item(id: string): Promise<JellyfinItem> {
+        return {
+          Id: id,
+          Name: "示例电影",
+          Type: "Movie",
+          Path: activated
+            ? `openlist:///cloud/library/A2/Example.Film.1988/new.upgrade-${item.id.slice(0, 8)}.mkv`
+            : `openlist://${stalePath}`,
+          MediaStreams: activated ? [{ Type: "Video" }] : [],
+        };
+      },
+      async previewReplacement(
+        _itemId: string,
+        _newPath: string,
+        resolvedOriginalPath?: string,
+      ) {
+        previewResolvedPath = resolvedOriginalPath;
+        return {
+          previewToken: "preview",
+          current: { path: actualPath, width: 1280, height: 720, streams: [] },
+          replacement: { path: "new", width: 3840, height: 2160, streams: [] },
+        };
+      },
+      async applyReplacement() {
+        activated = true;
+        return { rollbackToken: "rollback" };
+      },
+      async rollbackReplacement() {},
+    } as unknown as JellyfinClient;
+
+    await new MediaUpgradeWorker(
+      upgrades,
+      tasks,
+      openList,
+      jellyfin,
+      new OutboxStore(db),
+    ).tick();
+
+    expect(previewResolvedPath).toBe(actualPath);
+    expect(upgrades.get(item.id)).toMatchObject({
+      state: "succeeded",
+      current: { resolvedOriginalPath: actualPath },
+      backupPath: `/115/autofilm-backups/upgrades/${item.id}/Example.Film.1988.mkv`,
+    });
+    expect(moves[0]).toMatchObject({
+      destinationDirectory: actualDirectory,
+    });
+    expect(moves[1]).toMatchObject({
+      sourcePath: actualPath,
+    });
+    db.close();
+  });
 });
+
+function remoteObject(path: string, isDirectory: boolean, size: number) {
+  return {
+    path,
+    name: path.split("/").at(-1) ?? "",
+    size,
+    is_dir: isDirectory,
+    modified: "",
+    created: "",
+  };
+}

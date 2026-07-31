@@ -81,14 +81,18 @@ API Key、内网下载 URL 或 magnet。普通搜索候选的内存有效期为 
 1. Jellyfin `MediaReplacement/Inspect` 使用自身 `VideoResolver` 和
    `EpisodeResolver` 读取结果目录；电影选择非附加视频中的主文件，单集还必须匹配
    原季号和集号。
-2. 文件移动到原视频所在目录，并使用包含升级项短 ID 的唯一名称，避免覆盖旧文件。
-3. `MediaReplacement/Preview` 通过 Jellyfin 的 `IMediaEncoder` 对 OpenList 内部
+2. Core 精确读取 Jellyfin 记录中的旧视频路径。该路径因历史迁移而不存在时，只列举
+   其直接上级目录，并把空格、点号、下划线和连字符视为等价分隔符。目录和视频都必须
+   唯一匹配，扩展名必须一致，文件大小误差不得超过 1 MiB；否则停止处理。
+3. 文件移动到解析后的真实旧视频目录，并使用包含升级项短 ID 的唯一名称，避免覆盖
+   旧文件。真实旧路径保存到升级项，不修改其他 Jellyfin 条目。
+4. `MediaReplacement/Preview` 通过 Jellyfin 的 `IMediaEncoder` 对 OpenList 内部
    下载地址执行 ffprobe，返回当前和新文件的真实宽高及媒体流。
-4. Core 拒绝像素数低于原文件的结果；同分辨率仍允许编码、HDR、码率或音轨升级。
-5. `MediaReplacement/Apply` 在单条目锁内重新核对原路径、新文件大小和修改时间，
+5. Core 拒绝像素数低于原文件的结果；同分辨率仍允许编码、HDR、码率或音轨升级。
+6. `MediaReplacement/Apply` 在单条目锁内重新核对原路径、新文件大小和修改时间，
    保存新媒体流并更新原 Video 记录。它不创建条目、不运行元数据供应方、不更新图片。
-6. Core 再读取相同 Item ID，检查路径和视频流。检查通过即标记 `succeeded`。
-7. 旧文件移动到：
+7. Core 再读取相同 Item ID，检查路径和视频流。检查通过即标记 `succeeded`。
+8. 旧文件从解析后的真实路径移动到：
 
 ```text
 /115/autofilm-backups/upgrades/<upgrade-item-id>
@@ -106,6 +110,8 @@ Core 同时核对源路径和目标路径，只有源已消失且目标存在才
 - 下载失败：只影响对应升级项。
 - 下载内容没有可识别视频：不修改 Jellyfin。
 - 单集季集号不匹配：不修改 Jellyfin。
+- 历史旧路径没有唯一的分隔符等价项：不移动文件、不修改 Jellyfin，下载结果继续保留
+  在升级临时目录。
 - 新文件分辨率下降：新文件移回该任务临时目录，原条目继续使用旧文件。
 - Apply 写入失败：Jellyfin 服务恢复原媒体流和条目字段。
 - Apply 响应丢失：Core 读取原 Item ID；新路径和视频流已经存在时继续成功处理。

@@ -207,12 +207,14 @@ export class JellyfinClient {
   async previewReplacement(
     itemId: string,
     newPath: string,
+    resolvedOriginalPath?: string,
   ): Promise<JellyfinReplacementPreview> {
     const raw = await this.autoFilmPost<Record<string, unknown>>(
       "/AutoFilm/MediaReplacement/Preview",
       {
         itemId,
         newPath,
+        resolvedOriginalPath,
       },
     );
     return {

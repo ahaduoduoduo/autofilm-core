@@ -8,9 +8,11 @@ import type { TaskStore } from "../db/task-store.js";
 import type { JellyfinClient } from "../integrations/jellyfin.js";
 import type { OpenListClient } from "../integrations/openlist.js";
 import {
+  effectiveOriginalOpenListPath,
   hasVideoStream,
   moveOpenListObjectIdempotently,
   openListPathFromUri,
+  resolveOriginalOpenListPath,
   toOpenListUri,
 } from "./media-upgrade-files.js";
 
@@ -88,9 +90,29 @@ export class MediaUpgradeWorker {
       : undefined;
     const resultPath = String(download?.metadata.remoteResultPath ?? "");
     if (!item.newPath) {
+      const recordedOriginalPath = openListPathFromUri(item.current.path);
+      const currentOriginalPath = effectiveOriginalOpenListPath(item.current);
+      const resolvedOriginalPath = await resolveOriginalOpenListPath(
+        this.openList,
+        {
+          recordedPath: currentOriginalPath,
+          expectedSize: currentMediaSize(item.current),
+        },
+      );
+      if (
+        resolvedOriginalPath !== recordedOriginalPath &&
+        item.current.resolvedOriginalPath !== resolvedOriginalPath
+      ) {
+        item = this.upgrades.update(item.id, {
+          current: {
+            ...item.current,
+            resolvedOriginalPath,
+          },
+          error: "",
+        });
+      }
       const selectedPath = await this.selectDownloadedVideo(item, resultPath);
-      const currentPath = openListPathFromUri(item.current.path);
-      const destinationDirectory = path.posix.dirname(currentPath);
+      const destinationDirectory = path.posix.dirname(resolvedOriginalPath);
       const destinationName = uniqueUpgradeName(
         path.posix.basename(selectedPath),
         item.id,
@@ -114,6 +136,9 @@ export class MediaUpgradeWorker {
       const preview = await this.jellyfin.previewReplacement(
         item.jellyfinItemId,
         item.newPath!,
+        typeof item.current.resolvedOriginalPath === "string"
+          ? item.current.resolvedOriginalPath
+          : undefined,
       );
       rejectResolutionRegression(preview.current, preview.replacement);
       let applied: Record<string, unknown> | undefined;
@@ -154,7 +179,7 @@ export class MediaUpgradeWorker {
     try {
       const backupDirectory = `/115/autofilm-backups/upgrades/${item.id}`;
       await this.openList.mkdir(backupDirectory);
-      const oldPath = openListPathFromUri(item.current.path);
+      const oldPath = effectiveOriginalOpenListPath(item.current);
       const moved = await moveOpenListObjectIdempotently(this.openList, {
         sourcePath: oldPath,
         destinationDirectory: backupDirectory,
@@ -250,7 +275,13 @@ export class MediaUpgradeWorker {
           await this.process(current);
           return;
         }
-        if (jellyfinItem.Path === String(current.current.path ?? "")) {
+        const effectiveOriginalUri = toOpenListUri(
+          effectiveOriginalOpenListPath(current.current),
+        );
+        if (
+          jellyfinItem.Path === String(current.current.path ?? "") ||
+          jellyfinItem.Path === effectiveOriginalUri
+        ) {
           const download = current.downloadTaskId
             ? this.tasks.get(current.downloadTaskId)
             : undefined;
@@ -303,6 +334,21 @@ function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+function currentMediaSize(
+  current: Record<string, unknown>,
+): number | undefined {
+  const sources = current.mediaSources;
+  if (!Array.isArray(sources)) return undefined;
+  for (const source of sources) {
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      continue;
+    }
+    const size = Number((source as Record<string, unknown>).Size);
+    if (Number.isFinite(size) && size > 0) return size;
+  }
+  return undefined;
 }
 
 function rejectResolutionRegression(
