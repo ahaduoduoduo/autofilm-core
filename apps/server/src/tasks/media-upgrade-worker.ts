@@ -6,10 +6,13 @@ import type {
 import type { OutboxStore } from "../db/outbox-store.js";
 import type { TaskStore } from "../db/task-store.js";
 import type { JellyfinClient } from "../integrations/jellyfin.js";
+import type { JellyfinReplacementCandidate } from "../integrations/jellyfin.js";
 import type { OpenListClient } from "../integrations/openlist.js";
 import {
   effectiveOriginalOpenListPath,
+  currentMediaSize,
   hasVideoStream,
+  isLikelySameMediaRelease,
   moveOpenListObjectIdempotently,
   openListPathFromUri,
   resolveOriginalOpenListPath,
@@ -111,16 +114,28 @@ export class MediaUpgradeWorker {
           error: "",
         });
       }
-      const selectedPath = await this.selectDownloadedVideo(item, resultPath);
+      const selected = await this.selectDownloadedVideo(item, resultPath);
+      const original = await this.openList.getObject(resolvedOriginalPath, true);
+      if (
+        isLikelySameMediaRelease({
+          currentPath: original.path,
+          currentSize: original.size,
+          candidateName: selected.name,
+          candidateSize: selected.size,
+        })
+      ) {
+        throw new Error("下载结果与当前视频是相同发布版本和相同大小，不属于资源升级");
+      }
       const destinationDirectory = path.posix.dirname(resolvedOriginalPath);
       const destinationName = uniqueUpgradeName(
-        path.posix.basename(selectedPath),
+        path.posix.basename(selected.path),
         item.id,
       );
       const moved = await moveOpenListObjectIdempotently(this.openList, {
-        sourcePath: selectedPath,
+        sourcePath: selected.path,
         destinationDirectory,
         destinationName,
+        expectedSize: selected.size,
       });
       item = this.upgrades.update(item.id, {
         state: "activating",
@@ -140,6 +155,16 @@ export class MediaUpgradeWorker {
           ? item.current.resolvedOriginalPath
           : undefined,
       );
+      if (
+        isLikelySameMediaRelease({
+          currentPath: preview.current.path,
+          currentSize: preview.current.size,
+          candidateName: preview.replacement.path,
+          candidateSize: preview.replacement.size,
+        })
+      ) {
+        throw new Error("新旧媒体的发布版本和文件大小相同，已拒绝替换");
+      }
       rejectResolutionRegression(preview.current, preview.replacement);
       let applied: Record<string, unknown> | undefined;
       try {
@@ -183,6 +208,7 @@ export class MediaUpgradeWorker {
       const moved = await moveOpenListObjectIdempotently(this.openList, {
         sourcePath: oldPath,
         destinationDirectory: backupDirectory,
+        expectedSize: currentMediaSize(item.current),
       });
       backupPath = moved.path;
       this.upgrades.update(item.id, {
@@ -211,7 +237,7 @@ export class MediaUpgradeWorker {
   private async selectDownloadedVideo(
     item: MediaUpgradeItem,
     resultPath: string,
-  ): Promise<string> {
+  ): Promise<JellyfinReplacementCandidate> {
     const inspected = await this.jellyfin.inspectReplacement(resultPath);
     const candidates = inspected.candidates.filter(
       (candidate) => !candidate.extraType,
@@ -236,7 +262,7 @@ export class MediaUpgradeWorker {
           : "下载结果中没有识别到主视频",
       );
     }
-    return selected.path;
+    return selected;
   }
 
   private async deleteStagingDirectory(item: MediaUpgradeItem): Promise<void> {
@@ -334,21 +360,6 @@ function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
-}
-
-function currentMediaSize(
-  current: Record<string, unknown>,
-): number | undefined {
-  const sources = current.mediaSources;
-  if (!Array.isArray(sources)) return undefined;
-  for (const source of sources) {
-    if (!source || typeof source !== "object" || Array.isArray(source)) {
-      continue;
-    }
-    const size = Number((source as Record<string, unknown>).Size);
-    if (Number.isFinite(size) && size > 0) return size;
-  }
-  return undefined;
 }
 
 function rejectResolutionRegression(

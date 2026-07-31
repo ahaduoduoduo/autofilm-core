@@ -41,6 +41,21 @@ export function effectiveOriginalOpenListPath(
   return openListPathFromUri(current.path);
 }
 
+export function currentMediaSize(
+  current: Record<string, unknown>,
+): number | undefined {
+  const sources = current.mediaSources;
+  if (!Array.isArray(sources)) return undefined;
+  for (const source of sources) {
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      continue;
+    }
+    const size = Number((source as Record<string, unknown>).Size);
+    if (Number.isFinite(size) && size > 0) return size;
+  }
+  return undefined;
+}
+
 export async function resolveOriginalOpenListPath(
   openList: OpenListClient,
   input: {
@@ -109,6 +124,7 @@ export async function moveOpenListObjectIdempotently(
     sourcePath: string;
     destinationDirectory: string;
     destinationName?: string;
+    expectedSize?: number;
   },
 ): Promise<OpenListObject> {
   try {
@@ -123,15 +139,102 @@ export async function moveOpenListObjectIdempotently(
       if (!existing.is_dir) {
         try {
           await openList.getObject(input.sourcePath, true);
-        } catch {
-          return existing;
+        } catch (sourceError) {
+          if (
+            isObjectNotFound(sourceError) &&
+            compatibleSize(existing.size, input.expectedSize)
+          ) {
+            return existing;
+          }
         }
       }
     } catch {
       // The destination does not prove that this exact move succeeded.
     }
+
+    // A failed two-step operation may leave either the destination name in the
+    // source directory (legacy rename-first behavior) or the source name in
+    // the destination directory (move-first behavior). Continue only when the
+    // original source is absent and the intermediate size still matches.
+    if (isObjectNotFound(error) && input.destinationName) {
+      const sourceMissing = await openList
+        .getObject(input.sourcePath, true)
+        .then(() => false)
+        .catch((sourceError) => {
+          if (isObjectNotFound(sourceError)) return true;
+          throw sourceError;
+        });
+      if (sourceMissing) {
+        const recoveryCandidates = [
+          {
+            path: path.posix.join(
+              path.posix.dirname(input.sourcePath),
+              input.destinationName,
+            ),
+            destinationDirectory: input.destinationDirectory,
+            destinationName: undefined,
+          },
+          {
+            path: path.posix.join(
+              input.destinationDirectory,
+              path.posix.basename(input.sourcePath),
+            ),
+            destinationDirectory: input.destinationDirectory,
+            destinationName: input.destinationName,
+          },
+        ].filter(
+          (candidate, index, all) =>
+            candidate.path !== input.sourcePath &&
+            candidate.path !== finalPath &&
+            all.findIndex((value) => value.path === candidate.path) === index,
+        );
+        for (const candidate of recoveryCandidates) {
+          const intermediate = await openList
+            .getObject(candidate.path, true)
+            .catch((candidateError) => {
+              if (isObjectNotFound(candidateError)) return undefined;
+              throw candidateError;
+            });
+          if (
+            intermediate &&
+            !intermediate.is_dir &&
+            compatibleSize(intermediate.size, input.expectedSize)
+          ) {
+            return openList.moveObject({
+              sourcePath: intermediate.path,
+              destinationDirectory: candidate.destinationDirectory,
+              destinationName: candidate.destinationName,
+            });
+          }
+        }
+      }
+    }
     throw error;
   }
+}
+
+export function isLikelySameMediaRelease(input: {
+  currentPath: string;
+  currentSize?: number;
+  candidateName: string;
+  candidateSize?: number;
+}): boolean {
+  const currentSize = input.currentSize;
+  const candidateSize = input.candidateSize;
+  if (
+    !currentSize ||
+    !candidateSize ||
+    !Number.isFinite(currentSize) ||
+    !Number.isFinite(candidateSize) ||
+    currentSize <= 0 ||
+    candidateSize <= 0
+  ) {
+    return false;
+  }
+  const tolerance = Math.max(16 * 1024 * 1024, currentSize * 0.002);
+  if (Math.abs(candidateSize - currentSize) > tolerance) return false;
+  return releaseFingerprint(input.currentPath) ===
+    releaseFingerprint(input.candidateName);
 }
 
 function comparableName(value: string): string {
@@ -151,4 +254,17 @@ function compatibleSize(actual: number, expected?: number): boolean {
 function isObjectNotFound(error: unknown): boolean {
   return error instanceof Error &&
     error.message.toLowerCase().includes("object not found");
+}
+
+function releaseFingerprint(value: string): string {
+  const baseName = path.posix.basename(value).replace(
+    /\.(?:mkv|mp4|m4v|avi|mov|ts|m2ts|wmv|webm)$/iu,
+    "",
+  );
+  return baseName
+    .replace(/\.upgrade-[a-f0-9]{8}$/iu, "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }

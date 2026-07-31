@@ -69,6 +69,16 @@ describe("Jellyfin movie inventory", () => {
     ]);
   });
 
+  it("does not count a BoxSet as a movie version", () => {
+    expect(
+      movieVersions({
+        Id: "collection-1",
+        Name: "示例合集",
+        Type: "BoxSet",
+      }),
+    ).toEqual([]);
+  });
+
   it("separates provider-confirmed and title-only duplicate groups", () => {
     const versions = [
       version("a", "同一电影", 2020, { Tmdb: "10" }, 3840, 1600),

@@ -13,7 +13,9 @@ import {
 } from "./schema.js";
 import {
   effectiveOriginalOpenListPath,
+  currentMediaSize,
   hasVideoStream,
+  isLikelySameMediaRelease,
   moveOpenListObjectIdempotently,
   openListPathFromUri,
   toOpenListUri,
@@ -294,6 +296,7 @@ async function rollbackUpgrade(
     sourcePath: item.backupPath,
     destinationDirectory: path.posix.dirname(originalPath),
     destinationName: path.posix.basename(originalPath),
+    expectedSize: currentMediaSize(item.current),
   });
   try {
     let restoredByToken = false;
@@ -380,6 +383,18 @@ async function startUpgradeDownload(
     throw new Error(`${item.title} 当前不能选择资源`);
   }
   const selected = requireCandidate(item, selection.candidateId);
+  if (
+    isLikelySameMediaRelease({
+      currentPath: openListPathFromUri(item.current.path),
+      currentSize: currentMediaSize(item.current),
+      candidateName: selected.title,
+      candidateSize: selected.size,
+    })
+  ) {
+    throw new Error(
+      `${item.title} 所选资源与当前视频是相同发布版本和相同大小，不属于资源升级`,
+    );
+  }
   const fallbacks = selection.fallbackCandidateIds.map((id) =>
     requireCandidate(item, id),
   );
@@ -454,7 +469,15 @@ function jobResult(deps: ToolDependencies, jobId: string) {
     items: items.map((item) => ({
       ...item,
       candidates: item.candidates.slice(0, 20).map(
-        ({ downloadUrl: _downloadUrl, ...candidate }) => candidate,
+        ({ downloadUrl: _downloadUrl, ...candidate }) => ({
+          ...candidate,
+          sameAsCurrent: isLikelySameMediaRelease({
+            currentPath: openListPathFromUri(item.current.path),
+            currentSize: currentMediaSize(item.current),
+            candidateName: candidate.title,
+            candidateSize: candidate.size,
+          }),
+        }),
       ),
       candidateCount: item.candidates.length,
     })),

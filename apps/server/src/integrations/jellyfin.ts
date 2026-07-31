@@ -83,7 +83,7 @@ export class JellyfinClient {
     const url = withQuery(config.baseUrl, "/Items", {
       SearchTerm: query,
       Recursive: "true",
-      IncludeItemTypes: "Movie,Series,Episode",
+      IncludeItemTypes: "Movie,Series,Episode,BoxSet",
       Fields: "ProviderIds,ProductionYear,Path,OriginalTitle",
       Limit: "20",
     });
@@ -124,6 +124,50 @@ export class JellyfinClient {
     let total = Number.POSITIVE_INFINITY;
     while (items.length < total) {
       const page = await this.movies(items.length, pageSize);
+      total = page.TotalRecordCount;
+      items.push(...page.Items);
+      if (page.Items.length === 0) break;
+    }
+    return items;
+  }
+
+  async boxSetItems(
+    boxSetId: string,
+    startIndex = 0,
+    limit = 200,
+  ): Promise<JellyfinItemsPage> {
+    const config = this.requireConfig();
+    const result = await requestJson<{
+      Items?: JellyfinItem[];
+      TotalRecordCount?: number;
+    }>(
+      withQuery(config.baseUrl, "/Items", {
+        ParentId: boxSetId,
+        Recursive: "false",
+        IncludeItemTypes: "Movie",
+        CollapseBoxSetItems: "false",
+        Fields:
+          "Path,ProviderIds,ProductionYear,OriginalTitle,MediaSources,MediaStreams",
+        EnableImages: "false",
+        StartIndex: String(Math.max(0, startIndex)),
+        Limit: String(Math.max(1, Math.min(limit, 500))),
+        SortBy: "ProductionYear,SortName",
+        SortOrder: "Ascending",
+      }),
+      { headers: this.headers(config.credential) },
+    );
+    return {
+      Items: result.Items ?? [],
+      TotalRecordCount: result.TotalRecordCount ?? 0,
+    };
+  }
+
+  async allBoxSetItems(boxSetId: string): Promise<JellyfinItem[]> {
+    const items: JellyfinItem[] = [];
+    const pageSize = 200;
+    let total = Number.POSITIVE_INFINITY;
+    while (items.length < total) {
+      const page = await this.boxSetItems(boxSetId, items.length, pageSize);
       total = page.TotalRecordCount;
       items.push(...page.Items);
       if (page.Items.length === 0) break;

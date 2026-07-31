@@ -88,3 +88,40 @@ describe("Jellyfin media deletion", () => {
     await new JellyfinClient(configs).deleteItem("movie-version-1");
   });
 });
+
+describe("Jellyfin BoxSet members", () => {
+  it("reads collection children with media fields", async () => {
+    const server = createServer((request, response) => {
+      const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      expect(url.pathname).toBe("/Items");
+      expect(url.searchParams.get("ParentId")).toBe("boxset-1");
+      expect(url.searchParams.get("IncludeItemTypes")).toBe("Movie");
+      expect(url.searchParams.get("CollapseBoxSetItems")).toBe("false");
+      expect(url.searchParams.get("Fields")).toContain("MediaStreams");
+      response
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({
+          Items: [{ Id: "movie-1", Name: "Movie", Type: "Movie" }],
+          TotalRecordCount: 1,
+        }));
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address() as AddressInfo;
+    const configs = {
+      service: () => ({
+        baseUrl: `http://127.0.0.1:${address.port}`,
+        credential: "test-token",
+        options: {},
+      }),
+    } as unknown as ConfigStore;
+
+    await expect(
+      new JellyfinClient(configs).allBoxSetItems("boxset-1"),
+    ).resolves.toEqual([
+      { Id: "movie-1", Name: "Movie", Type: "Movie" },
+    ]);
+  });
+});

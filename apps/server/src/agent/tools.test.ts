@@ -43,6 +43,7 @@ describe("agent tool registry", () => {
         "fetch_subtitle_archive",
         "find_duplicate_jellyfin_movies",
         "get_current_time",
+        "get_jellyfin_boxset_details",
         "get_jellyfin_media_info",
         "get_media_upgrade_job",
         "get_subtitle_detail",

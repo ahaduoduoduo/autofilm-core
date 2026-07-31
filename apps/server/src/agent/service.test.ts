@@ -45,6 +45,7 @@ describe("main agent subtitle batching rules", () => {
     expect(prompt?.content).toContain("get_tmdb_metadata");
     expect(prompt?.content).toContain("query_jellyfin_movies");
     expect(prompt?.content).toContain("find_duplicate_jellyfin_movies");
+    expect(prompt?.content).toContain("get_jellyfin_boxset_details");
     expect(prompt?.content).toContain("set_active_media_topic");
     expect(promptDefinition("conversation.summarizer")?.content).toContain(
       "已知信息、已完成、待处理",

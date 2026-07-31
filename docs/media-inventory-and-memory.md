@@ -27,6 +27,16 @@ MediaSources 和 MediaStreams。Core 将每个 MediaSource 展开为一个实际
 
 工具最多返回 25 个版本一页，通过 `page` 继续读取。
 
+## BoxSet 合集详情
+
+BoxSet 是 Jellyfin 的虚拟合集，不是电影文件，因此没有分辨率、码率或音轨，也不会
+计入 `query_jellyfin_movies` 的电影及未知分辨率统计。
+
+`search_jellyfin` 可以返回 BoxSet。取得 BoxSet ID 后，
+`get_jellyfin_boxset_details` 分页读取其成员电影，并对每个成员展开 MediaSource，
+返回路径、实际分辨率、HDR、编码、码率、大小和音轨，同时给出合集内各分辨率数量。
+该工具只读；资源升级和删除仍只接受具体 Movie 或 Episode ID。
+
 ## 重复电影
 
 `find_duplicate_jellyfin_movies` 与分辨率查询共用相同的版本展开和质量事实，不维护

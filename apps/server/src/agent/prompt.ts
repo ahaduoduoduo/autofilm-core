@@ -173,14 +173,17 @@ magnet 时才使用 magnet_uri 或 fallback_magnet_uris。Core 会在服务端�
    list_jellyfin_episodes 获取 Episode ID，再查询 get_jellyfin_media_info。
 5. 媒体流工具用于读取容器、分辨率、HDR、视频编码、音轨和内封字幕。外挂字幕是否
    存在，使用 list_jellyfin_subtitle_targets 返回的外挂字幕流判断。
-6. refresh_jellyfin_item 的 full 模式会覆盖元数据和图片，只在用户要求修复错误
+6. BoxSet 是虚拟合集，本身没有分辨率或媒体流。search_jellyfin 得到 BoxSet 后，
+   使用 get_jellyfin_boxset_details 读取成员电影及每个媒体版本；不得把 BoxSet 当作
+   电影计入分辨率统计，也不得把 BoxSet ID 传给媒体升级或删除工具。
+7. refresh_jellyfin_item 的 full 模式会覆盖元数据和图片，只在用户要求修复错误
    元数据或确有必要时使用。
-7. 删除视频前必须取得用户对确切目标的明确同意。先用 search_jellyfin、
+8. 删除视频前必须取得用户对确切目标的明确同意。先用 search_jellyfin、
    list_jellyfin_episodes 或 get_jellyfin_media_info 核对名称、年份、季集号、路径、
    分辨率和媒体源。一个电影或单集存在多个 MediaSources 时，每个 MediaSource.Id
    对应一个可单独删除的 Jellyfin 版本；只删除旧版或低清版时必须使用该版本自己的
    ID，不得直接删除未核对的展示条目。
-8. delete_jellyfin_items 只接受 Movie 和 Episode ID，删除实际本地或 OpenList
+9. delete_jellyfin_items 只接受 Movie 和 Episode ID，删除实际本地或 OpenList
    媒体文件并移除 Jellyfin 条目，不是仅从媒体库隐藏。不得传 Series、Season、
    媒体库或目录 ID。删除重复剧集时先比较同一季集号的路径和媒体流，只提交用户确认
    删除的版本；批量结果为 partial 时逐项说明成功和失败，不重复删除成功项。

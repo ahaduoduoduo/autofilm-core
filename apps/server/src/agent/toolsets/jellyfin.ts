@@ -2,6 +2,7 @@ import type { AgentTool, ToolDependencies } from "../tool-types.js";
 import { createSubtitleReference } from "../../subtitles/references.js";
 import {
   JellyfinMovieInventory,
+  movieVersions,
 } from "../media-inventory.js";
 import {
   objectSchema,
@@ -139,6 +140,60 @@ export function createJellyfinTools(deps: ToolDependencies): AgentTool[] {
           hasMore: start + limit < matched.length,
           nextPage: start + limit < matched.length ? page + 1 : undefined,
           groups: matched.slice(start, start + limit),
+        };
+      },
+    },
+    {
+      definition: {
+        name: "get_jellyfin_boxset_details",
+        description:
+          "读取 Jellyfin 合集（BoxSet）的成员电影，并返回每部电影各版本的路径、分辨率、HDR、编码、码率、大小和音轨。BoxSet 本身没有媒体流或分辨率。",
+        parameters: objectSchema(
+          { boxset_id: stringProperty("search_jellyfin 返回的 BoxSet ID") },
+          ["boxset_id"],
+        ),
+      },
+      execute: async (args) => {
+        const boxSetId = requireString(args, "boxset_id");
+        const boxSet = await deps.jellyfin.item(boxSetId);
+        if (boxSet.Type !== "BoxSet") {
+          throw new Error(
+            `Jellyfin 条目 ${boxSet.Id} 是 ${boxSet.Type}，不是 BoxSet`,
+          );
+        }
+        const members = (await deps.jellyfin.allBoxSetItems(boxSetId))
+          .filter((item) => item.Type === "Movie")
+          .map((item) => ({
+            id: item.Id,
+            name: item.Name,
+            originalTitle: item.OriginalTitle,
+            productionYear: item.ProductionYear,
+            providerIds: item.ProviderIds ?? {},
+            versions: movieVersions(item),
+          }));
+        const versions = members.flatMap((member) => member.versions);
+        return {
+          boxSet: {
+            id: boxSet.Id,
+            name: boxSet.Name,
+            originalTitle: boxSet.OriginalTitle,
+            providerIds: boxSet.ProviderIds ?? {},
+          },
+          memberCount: members.length,
+          versionCount: versions.length,
+          unknownResolutionVersions: versions.filter(
+            (version) => version.resolution === "unknown",
+          ).length,
+          resolutionCounts: Object.fromEntries(
+            RESOLUTION_CLASSES.filter((value) => value !== "all").map(
+              (resolution) => [
+                resolution,
+                versions.filter((version) => version.resolution === resolution)
+                  .length,
+              ],
+            ),
+          ),
+          members,
         };
       },
     },

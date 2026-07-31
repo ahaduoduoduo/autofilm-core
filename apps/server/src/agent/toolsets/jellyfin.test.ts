@@ -105,3 +105,56 @@ describe("Jellyfin media deletion tool", () => {
     expect(deleteItem).not.toHaveBeenCalled();
   });
 });
+
+describe("Jellyfin BoxSet details tool", () => {
+  it("returns member media versions instead of assigning media facts to the BoxSet", async () => {
+    const deps = {
+      jellyfin: {
+        item: async () => ({
+          Id: "boxset-1",
+          Name: "示例合集",
+          Type: "BoxSet",
+          ProviderIds: { Tmdb: "99" },
+        }),
+        allBoxSetItems: async () => [
+          {
+            Id: "movie-1",
+            Name: "第一部",
+            Type: "Movie",
+            ProductionYear: 2020,
+            Path: "openlist:///115/movie/first.mkv",
+            MediaStreams: [
+              { Type: "Video", Width: 3840, Height: 1600, Codec: "hevc" },
+            ],
+          },
+          {
+            Id: "movie-2",
+            Name: "第二部",
+            Type: "Movie",
+            ProductionYear: 2022,
+            Path: "openlist:///115/movie/second.mkv",
+            MediaStreams: [
+              { Type: "Video", Width: 1920, Height: 800, Codec: "h264" },
+            ],
+          },
+        ],
+      },
+    } as unknown as ToolDependencies;
+    const tool = createJellyfinTools(deps).find(
+      (candidate) =>
+        candidate.definition.name === "get_jellyfin_boxset_details",
+    )!;
+
+    const result = (await tool.execute({
+      boxset_id: "boxset-1",
+    })) as Record<string, unknown>;
+
+    expect(result).toMatchObject({
+      boxSet: { id: "boxset-1", name: "示例合集" },
+      memberCount: 2,
+      versionCount: 2,
+      unknownResolutionVersions: 0,
+      resolutionCounts: { "2160p": 1, "1080p": 1 },
+    });
+  });
+});

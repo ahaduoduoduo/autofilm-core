@@ -103,6 +103,8 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 [docs/media-upgrades.md](docs/media-upgrades.md)。
 历史迁移路径仅允许在直接父目录内进行唯一的分隔符差异纠正，不递归查询网盘，也不在
 存在歧义时修改 Jellyfin。
+升级过程拒绝相同发布及近似相同大小的候选；BoxSet 作为虚拟合集单独读取成员媒体，
+不计入电影版本和未知分辨率数量。
 
 完整说明见 [docs/architecture.md](docs/architecture.md)。
 

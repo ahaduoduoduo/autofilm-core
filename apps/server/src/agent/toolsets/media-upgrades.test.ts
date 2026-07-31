@@ -35,7 +35,9 @@ describe("media upgrade download selection", () => {
       jellyfinItemId: "jellyfin-1",
       title: "测试电影",
       query: "Example 2026",
-      current: {},
+      current: {
+        path: "openlist:///115/movie/Example.2026.1080p.mkv",
+      },
     });
     const internalUrl =
       "http://jackett.internal.invalid:9117/dl/test?jackett_apikey=private-key";

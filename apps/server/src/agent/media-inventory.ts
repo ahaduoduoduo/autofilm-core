@@ -55,7 +55,9 @@ export class JellyfinMovieInventory {
   constructor(private readonly jellyfin: JellyfinClient) {}
 
   async versions(): Promise<MovieVersion[]> {
-    return (await this.jellyfin.allMovies()).flatMap(movieVersions);
+    return (await this.jellyfin.allMovies())
+      .filter((item) => item.Type === "Movie")
+      .flatMap(movieVersions);
   }
 
   async duplicates(): Promise<DuplicateMovieGroup[]> {
@@ -77,6 +79,7 @@ export function classifyResolution(
 }
 
 export function movieVersions(item: JellyfinItem): MovieVersion[] {
+  if (item.Type !== "Movie") return [];
   const sources =
     item.MediaSources && item.MediaSources.length > 0
       ? item.MediaSources

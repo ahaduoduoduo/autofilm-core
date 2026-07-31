@@ -51,13 +51,15 @@ Updated: 2026-07-31
   存在歧义的封面。
 - `media-destination.ts`：使用媒体库根目录、TMDB 英文名和季号生成电影、单季及
   多季合集下载目录，并返回正确的 Jellyfin 刷新目标与 TMDB ID。
-- `media-inventory.ts`：把 Jellyfin Movie 和 MediaSource 展开为实际版本，统一
-  识别裁切画面的 720p/1080p/1440p/2160p，并生成确定或疑似重复电影组。
+- `media-inventory.ts`：把 Jellyfin Movie 和 MediaSource 展开为实际版本，排除
+  BoxSet 虚拟合集，统一识别裁切画面的 720p/1080p/1440p/2160p，并生成确定或
+  疑似重复电影组。
 - `tool-executor.ts`：并行执行同轮工具并按原调用顺序返回结果。
 - `tools.ts`、`tool-types.ts`：工具组合入口和共享依赖。
 - `toolsets/`：基础目录、下载/OpenList、字幕、Jellyfin 和追更工具。
 - `toolsets/media-upgrades.ts`：为一个或多个现有 Jellyfin 条目创建稳定升级项，
-  并发搜索候选、提交隔离下载、查询状态和执行确认后的旧版本恢复。
+  并发搜索候选、标记并拒绝相同发布资源、提交隔离下载、查询状态和执行确认后的
+  旧版本恢复。
 - `toolsets/subtitle-placement.ts`：用文件 UUID 生成不可变字幕映射计划，校验摘要、
   重复使用和 Jellyfin 目标，并处理部分失败重试。
 - `toolsets/subtitle-placement-executor.ts`：以最多 8 个工作协程并发执行字幕清理、
@@ -93,7 +95,8 @@ Updated: 2026-07-31
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
   内存任务状态、精确对象移动、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
-  Movie/MediaSource 分页清单、`RemoteRefresh`、Movie/Episode 精确删除、字幕读取
+  Movie/MediaSource 分页清单、BoxSet 成员媒体详情、`RemoteRefresh`、Movie/Episode
+  精确删除、字幕读取
   和删除；所有字幕格式均以
   保留原始长度的二进制请求上传到 AutoFilm 流式端点，不生成 Base64 副本；
   请求体使用 Node 读取流，不复制大型图形字幕；资源升级使用 Inspect、Preview、
@@ -127,7 +130,8 @@ Updated: 2026-07-31
   拒绝分辨率下降、更新原 Jellyfin Item ID、自动检查条目路径和视频流，再移动旧文件
   并发送独立结果通知。
 - `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
-  公共函数；历史路径不存在时执行一层、唯一且受大小限制的分隔符差异匹配。
+  公共函数；能继续旧版改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
+  不存在时执行一层、唯一且受大小限制的分隔符差异匹配。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。

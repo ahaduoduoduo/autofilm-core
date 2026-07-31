@@ -339,6 +339,9 @@ describe("MediaUpgradeWorker", () => {
     const openList = {
       async getObject(path: string) {
         if (path === stalePath) throw new Error("object not found");
+        if (path === actualPath) {
+          return remoteObject(actualPath, false, 8_529_735_788);
+        }
         throw new Error(`unexpected get ${path}`);
       },
       async listObjects(path: string) {
