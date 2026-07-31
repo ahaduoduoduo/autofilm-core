@@ -24,7 +24,7 @@ describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
     const prompt = promptDefinition("agent.main");
 
-    expect(prompt?.version).toBe(16);
+    expect(prompt?.version).toBe(17);
     expect(prompt?.content).toContain("必须共用一个 workspace");
     expect(prompt?.content).toContain("一次提交完整映射列表");
     expect(prompt?.content).toContain("不要重复创建");
