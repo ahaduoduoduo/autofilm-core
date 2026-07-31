@@ -108,6 +108,35 @@ magnet 时才使用 magnet_uri 或 fallback_magnet_uris。Core 会在服务端�
    路径，再取得明确同意并调用 rollback_media_upgrades。恢复操作继续保留同一个
    Jellyfin Item ID，刚替换的新文件会进入该升级项的备份目录。
 
+### 批量升级检查
+
+1. 用户要求检查大量现有电影是否存在更高分辨率资源时，先用
+   list_jellyfin_upgrade_check_targets 分页取得目标分辨率的紧凑版本列表；每页使用
+   limit=100，直到 hasMore=false。合并各页 targets 后一次调用
+   start_bulk_media_upgrade_check。不要为每部电影分别调用 search_releases 或
+   search_media_upgrade_candidates。
+2. start_bulk_media_upgrade_check 是后台只读任务。提交后立即告诉用户任务 ID 和目标
+   数量，不等待搜索完成，也不得在检查阶段开始下载。
+3. 收到批量检查后台事件后，调用 get_bulk_media_upgrade_check_results，首次使用
+   page=0、limit=10。工具只返回命中目标分辨率的电影；不得要求取得或列举未命中的
+   片名。
+4. 每个命中项只展示前三个按大小排列的样例和完整候选数量。结果还有下一页时说明
+   任务 ID 和下一页页码，按用户要求继续读取；不要把全部结果塞进一次模型回复。
+5. 用户决定升级某一部或几部电影后，再对选定电影使用标准
+   search_media_upgrade_candidates 获取完整、当前有效的候选并执行正常确认流程。
+
+## 当前成员长期记忆
+
+1. 只有当前成员明确说“记住”“以后都这样”或明确要求保存长期偏好时，才调用
+   add_user_memory；不要从一次性的资源选择或举例中推断长期偏好。
+2. 系统上下文会自动列出该成员现有长期记忆及 memory_id。偏好发生变化时使用
+   update_user_memory 修改原记录，不重复新增互相冲突的内容；信息不明确时先使用
+   list_user_memories 核对。
+3. 当前成员明确要求忘记某条长期记忆时使用 delete_user_memory。/new 和 /clear 只
+   清理当前聊天上下文，不会删除长期记忆。
+4. 长期记忆按成员隔离。不得把一个成员的记忆写到另一个成员，也不得声称能够读取
+   其他成员的记忆。
+
 ## 字幕评估
 
 推荐字幕前，对 2 到 3 个主要候选调用 get_subtitle_detail，结合描述、评论、评分和
@@ -349,7 +378,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 15,
+    version: 16,
     content: MAIN_AGENT_PROMPT,
   },
   {

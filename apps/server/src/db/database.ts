@@ -324,6 +324,68 @@ const migrations = [
   CREATE INDEX media_upgrade_items_state_idx
     ON media_upgrade_items(state, updated_at);
   `,
+  `
+  CREATE TABLE user_memories (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category TEXT NOT NULL CHECK (
+      category IN ('preference', 'profile', 'constraint', 'note')
+    ),
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX user_memories_user_idx
+    ON user_memories(user_id, updated_at DESC);
+
+  CREATE TABLE media_upgrade_check_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_resolution TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (
+      state IN ('pending', 'running', 'completed')
+    ),
+    notification_target_json TEXT,
+    notification_state TEXT NOT NULL DEFAULT 'none' CHECK (
+      notification_state IN ('none', 'pending', 'running', 'sent', 'failed')
+    ),
+    notification_attempts INTEGER NOT NULL DEFAULT 0,
+    notification_next_at TEXT,
+    notification_error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+  );
+  CREATE INDEX media_upgrade_check_jobs_state_idx
+    ON media_upgrade_check_jobs(state, updated_at);
+  CREATE INDEX media_upgrade_check_jobs_notification_idx
+    ON media_upgrade_check_jobs(notification_state, notification_next_at);
+
+  CREATE TABLE media_upgrade_check_items (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL
+      REFERENCES media_upgrade_check_jobs(id) ON DELETE CASCADE,
+    jellyfin_item_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    original_title TEXT NOT NULL DEFAULT '',
+    production_year INTEGER,
+    current_resolution TEXT NOT NULL,
+    query TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (
+      state IN ('pending', 'running', 'matched', 'no_match', 'failed')
+    ),
+    candidate_count INTEGER NOT NULL DEFAULT 0,
+    candidates_json TEXT NOT NULL DEFAULT '[]',
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(job_id, jellyfin_item_id)
+  );
+  CREATE INDEX media_upgrade_check_items_work_idx
+    ON media_upgrade_check_items(state, updated_at);
+  CREATE INDEX media_upgrade_check_items_results_idx
+    ON media_upgrade_check_items(job_id, state, created_at);
+  `,
 ];
 
 export type AppDatabase = Database.Database;

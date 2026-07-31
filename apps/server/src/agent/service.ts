@@ -16,6 +16,8 @@ import type {
 } from "../ai/types.js";
 import type { JackettClient } from "../integrations/jackett.js";
 import type { MediaUpgradeStore } from "../db/media-upgrade-store.js";
+import type { MediaUpgradeCheckStore } from "../db/media-upgrade-check-store.js";
+import type { UserMemoryStore } from "../db/user-memory-store.js";
 import type { JellyfinClient } from "../integrations/jellyfin.js";
 import type { OpenListClient } from "../integrations/openlist.js";
 import type { CatalogItem, TmdbClient } from "../integrations/tmdb.js";
@@ -38,6 +40,8 @@ export interface AgentDependencies {
   conversations: ConversationStore;
   tasks: TaskStore;
   mediaUpgrades: MediaUpgradeStore;
+  mediaUpgradeChecks: MediaUpgradeCheckStore;
+  userMemories: UserMemoryStore;
   tmdb: TmdbClient;
   jackett: JackettClient;
   openList: OpenListClient;
@@ -180,7 +184,10 @@ export class AgentService {
             role: "system",
             content: runtimeSystemPrompt(
               this.deps.prompts.get("agent.main"),
-              context.memory,
+              combinedMemory(
+                this.deps.userMemories.prompt(input.userId),
+                context.memory,
+              ),
             ),
           },
           ...context.messages,
@@ -223,7 +230,10 @@ export class AgentService {
           content:
             `${runtimeSystemPrompt(
               this.deps.prompts.get("agent.main"),
-              context.memory,
+              combinedMemory(
+                this.deps.userMemories.prompt(input.userId),
+                context.memory,
+              ),
             )}\n\n` +
             "本次请求已经达到工具轮次边界。不得继续调用工具。根据已有工具结果说明" +
             "哪些项目已经成功、哪些失败、哪些尚未执行；不得把内部轮次边界或未执行项" +
@@ -400,6 +410,8 @@ export class AgentService {
       notificationTarget,
       tasks: this.deps.tasks,
       mediaUpgrades: this.deps.mediaUpgrades,
+      mediaUpgradeChecks: this.deps.mediaUpgradeChecks,
+      userMemories: this.deps.userMemories,
       tmdb: this.deps.tmdb,
       jackett: this.deps.jackett,
       openList: this.deps.openList,
@@ -550,6 +562,10 @@ function runtimeSystemPrompt(base: string, memory = ""): string {
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function combinedMemory(...values: string[]): string {
+  return values.filter(Boolean).join("\n\n");
 }
 
 function topicTranscript(messages: CanonicalMessage[]): string {

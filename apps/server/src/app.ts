@@ -31,6 +31,8 @@ import { SecretVault } from "./security/vault.js";
 import { WeClawRegistration } from "./integrations/weclaw-registration.js";
 import { PromptStore } from "./db/prompt-store.js";
 import { MediaUpgradeStore } from "./db/media-upgrade-store.js";
+import { MediaUpgradeCheckStore } from "./db/media-upgrade-check-store.js";
+import { UserMemoryStore } from "./db/user-memory-store.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -53,6 +55,8 @@ export async function buildApp(config: AppConfig) {
   const conversations = new ConversationStore(db);
   const tasks = new TaskStore(db);
   const mediaUpgrades = new MediaUpgradeStore(db);
+  const mediaUpgradeChecks = new MediaUpgradeCheckStore(db);
+  const userMemories = new UserMemoryStore(db);
   const outbox = new OutboxStore(db);
   const media = new EphemeralMediaStore(db);
   const watchlists = new WatchlistStore(db);
@@ -73,6 +77,8 @@ export async function buildApp(config: AppConfig) {
     conversations,
     tasks,
     mediaUpgrades,
+    mediaUpgradeChecks,
+    userMemories,
     tmdb,
     jackett,
     openList,
@@ -96,6 +102,8 @@ export async function buildApp(config: AppConfig) {
     conversations,
     tasks,
     mediaUpgrades,
+    mediaUpgradeChecks,
+    userMemories,
     outbox,
     media,
     watchlists,

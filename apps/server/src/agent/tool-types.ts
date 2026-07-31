@@ -12,6 +12,8 @@ import type { TmdbClient } from "../integrations/tmdb.js";
 import type { SubtitleDownloadService } from "../subtitles/download-service.js";
 import type { SubtitleCleaner } from "../subtitles/cleaner.js";
 import type { MediaUpgradeStore } from "../db/media-upgrade-store.js";
+import type { MediaUpgradeCheckStore } from "../db/media-upgrade-check-store.js";
+import type { UserMemoryStore } from "../db/user-memory-store.js";
 
 export interface AgentTool {
   definition: ToolDefinition;
@@ -29,6 +31,8 @@ export interface ToolDependencies {
   notificationTarget?: NotificationTarget;
   tasks: TaskStore;
   mediaUpgrades: MediaUpgradeStore;
+  mediaUpgradeChecks: MediaUpgradeCheckStore;
+  userMemories: UserMemoryStore;
   tmdb: TmdbClient;
   jackett: JackettClient;
   openList: OpenListClient;

@@ -60,6 +60,9 @@ Updated: 2026-07-31
 - `toolsets/media-upgrades.ts`：为一个或多个现有 Jellyfin 条目创建稳定升级项，
   并发搜索候选、标记并拒绝相同发布资源、提交隔离下载、查询状态和执行确认后的
   旧版本恢复。
+- `toolsets/media-upgrade-checks.ts`：一次接收大量 Jellyfin 电影版本并创建后台检查
+  任务；读取结果时只分页返回存在目标分辨率资源的条目。
+- `toolsets/user-memories.ts`：当前成员长期记忆的读取、新增、修改和明确删除工具。
 - `toolsets/subtitle-placement.ts`：用文件 UUID 生成不可变字幕映射计划，校验摘要、
   重复使用和 Jellyfin 目标，并处理部分失败重试。
 - `toolsets/subtitle-placement-executor.ts`：以最多 8 个工作协程并发执行字幕清理、
@@ -82,6 +85,10 @@ Updated: 2026-07-31
 - `task-store.ts`：任务生命周期。
 - `media-upgrade-store.ts`：升级批次、逐条状态、候选、下载任务、替换路径、备份和
   恢复信息。
+- `media-upgrade-check-store.ts`：批量画质检查任务、逐片状态、命中样例、统计和聊天
+  通知状态；支持 Core 重启后继续未完成项目。
+- `user-memory-store.ts`：按成员隔离的长期偏好、限制、资料和备注；生成受长度限制的
+  系统上下文，不属于会话重置范围。
 - `outbox-store.ts`：主动聊天通知和指数退避。
 - `media-store.ts`：短期、限次读取的二维码和影片封面媒体。
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
@@ -132,6 +139,8 @@ Updated: 2026-07-31
 - `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
   公共函数；能继续旧版改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
   不存在时执行一层、唯一且受大小限制的分隔符差异匹配。
+- `tasks/media-upgrade-check-worker.ts`：每批领取 8 个待检查电影，以标题和年份查询
+  Jackett；只保存目标分辨率命中结果，完成后恢复原聊天并发送分页结果通知。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
   115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
   同一次标记不重复发送。
@@ -140,6 +149,9 @@ Updated: 2026-07-31
   令牌返回 409 时延后投递，不消耗失败次数。
 - `channels/agent-messages.ts`：把 Agent 最终文本中的 Core 临时媒体 URL 提取为
   Native 图片消息，并保留其余文字。
+
+批量画质检查和成员长期记忆的状态边界见
+`docs/bulk-upgrade-checks-and-user-memory.md`。
 
 ### `ai`
 

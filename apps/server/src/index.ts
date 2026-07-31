@@ -7,6 +7,7 @@ import { WatchlistWorker } from "./tasks/watchlist-worker.js";
 import { OpenListAuthWorker } from "./tasks/openlist-auth-worker.js";
 import { DownloadCompletionWorker } from "./tasks/download-completion-worker.js";
 import { MediaUpgradeWorker } from "./tasks/media-upgrade-worker.js";
+import { MediaUpgradeCheckWorker } from "./tasks/media-upgrade-check-worker.js";
 
 const config = loadConfig();
 const { app, context } = await buildApp(config);
@@ -50,12 +51,20 @@ const mediaUpgradeWorker = new MediaUpgradeWorker(
   context.jellyfin,
   context.outbox,
 );
+const mediaUpgradeCheckWorker = new MediaUpgradeCheckWorker(
+  context.mediaUpgradeChecks,
+  context.jackett,
+  context.agent,
+  context.outbox,
+  config.mediaBaseUrl,
+);
 progressWorker.start();
 outboundWorker.start();
 watchlistWorker.start();
 openListAuthWorker.start();
 downloadCompletionWorker.start();
 mediaUpgradeWorker.start();
+mediaUpgradeCheckWorker.start();
 const mediaCleanupTimer = setInterval(
   () => {
     context.media.deleteExpired();
@@ -78,6 +87,7 @@ app.addHook("onClose", async () => {
   openListAuthWorker.stop();
   downloadCompletionWorker.stop();
   mediaUpgradeWorker.stop();
+  mediaUpgradeCheckWorker.stop();
   clearInterval(mediaCleanupTimer);
 });
 

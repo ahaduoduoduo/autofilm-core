@@ -106,6 +106,12 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 升级过程拒绝相同发布及近似相同大小的候选；BoxSet 作为虚拟合集单独读取成员媒体，
 不计入电影版本和未知分辨率数量。
 
+大规模画质检查使用持久化后台任务：Agent 一次提交 Jellyfin 电影版本清单，Core
+按标题和年份构造 Jackett 查询并以 8 项并发检查目标分辨率。未命中条目只保留统计，
+不会进入模型上下文；命中条目通过稳定任务 ID 分页读取。成员明确要求保存的长期偏好
+按用户写入 SQLite，不受 `/new`、`/clear` 或影视主题摘要影响。详细说明见
+[docs/bulk-upgrade-checks-and-user-memory.md](docs/bulk-upgrade-checks-and-user-memory.md)。
+
 完整说明见 [docs/architecture.md](docs/architecture.md)。
 
 六个源码仓库的上游、分支和修改边界见
@@ -186,6 +192,8 @@ npm run build
   分辨率、重复电影、TMDB 分层详情、运行时间和影视主题摘要。
 - [docs/media-upgrades.md](docs/media-upgrades.md)：现有条目资源查询、并发下载、
   原 Item ID 替换、备份与恢复。
+- [docs/bulk-upgrade-checks-and-user-memory.md](docs/bulk-upgrade-checks-and-user-memory.md)：
+  8 并发后台画质检查、分页结果和按成员长期记忆。
 - [docs/prompts.md](docs/prompts.md)：数据库提示词、默认版本和管理规则。
 - [docs/native-adapters.md](docs/native-adapters.md)：聊天 Adapter 契约。
 - [docs/openlist-jellyfin.md](docs/openlist-jellyfin.md)：媒体与任务交互。

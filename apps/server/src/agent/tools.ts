@@ -5,6 +5,8 @@ import { createOpenListTools } from "./toolsets/openlist.js";
 import { createSubtitleTools } from "./toolsets/subtitles.js";
 import { createWatchlistTools } from "./toolsets/watchlists.js";
 import { createMediaUpgradeTools } from "./toolsets/media-upgrades.js";
+import { createMediaUpgradeCheckTools } from "./toolsets/media-upgrade-checks.js";
+import { createUserMemoryTools } from "./toolsets/user-memories.js";
 
 export type { AgentTool, ToolDependencies } from "./tool-types.js";
 
@@ -15,6 +17,8 @@ export function createAgentTools(deps: ToolDependencies): AgentTool[] {
     ...createSubtitleTools(deps),
     ...createJellyfinTools(deps),
     ...createMediaUpgradeTools(deps),
+    ...createMediaUpgradeCheckTools(deps),
     ...createWatchlistTools(deps),
+    ...createUserMemoryTools(deps),
   ];
 }
