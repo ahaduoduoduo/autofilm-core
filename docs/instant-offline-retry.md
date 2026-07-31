@@ -14,9 +14,11 @@ OpenList 创建的本地任务可能先在内部队列等待。只有离线下�
 provider task ID（115 使用 infohash）后，才表示 115 已接受任务。Core 每 2 秒读取
 OpenList 的内存任务快照。默认规则是：
 
-1. 首选候选转换为 magnet 后，OpenList 创建本地提交任务；这个阶段不计算秒传时限。
+1. 首选候选转换为 magnet 后，OpenList 创建本地提交任务；Agent 工具继续等待，不把
+   这个中间状态作为工具结果返回。
 2. OpenList 成功取得 `provider_task_id` 和 `provider_submitted_at` 后，Core 才开始
-   计算 40 秒。
+   计算 40 秒，并向 Agent 返回离线下载提交成功。OpenList 在 60 秒内没有完成 provider
+   提交时取消本地任务，并返回提交失败。
 3. 只有 OpenList 返回 `StateSucceeded`，Core 才将任务标记为完成。进度达到
    100% 或出现结束时间，但状态仍在整理或转存时，继续视为运行中。
 4. 任务明确失败，或者从 115 接受时刻起超过时限仍未完成，Core 调用

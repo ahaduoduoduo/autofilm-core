@@ -59,7 +59,8 @@ OpenList -> Jellyfin        http://jellyfin:8096
 7. Agent 选择资源后，Core 根据 TMDB ID、媒体类型和季号计算 OpenList 目标目录。
 8. OpenList 先创建本地任务；调用 115 成功后，任务快照增加 provider task ID 和
    provider 接受时间。Core 每 2 秒读取该内存状态，默认 40 秒从 provider 接受时间
-   开始计算，而不是从 OpenList 本地任务创建时间开始计算。
+   开始计算，而不是从 OpenList 本地任务创建时间开始计算。Agent 工具等待到 provider
+   接受或明确失败后才返回，不向模型返回“正在提交”。
 9. 只有 `StateSucceeded` 才视为完成；快照同时返回 115 实际生成的结果路径，Core
    用该路径精确通知 Jellyfin。115 接受后超过默认 40 秒仍未完成时，OpenList 删除
    本次失败任务，Core 通知成员选择备用资源；成员未明确选择前不再创建离线任务。

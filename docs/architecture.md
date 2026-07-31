@@ -59,8 +59,10 @@ Core 按 OpenList 服务中配置的电影/电视剧根目录计算路径：电�
 下载创建后，Core 保存 OpenList 内存任务 ID。OpenList 成功调用 115 后，再公开
 provider task ID 和 provider 接受时间。进度 Worker 每 2 秒读取受限的
 `/api/autofilm/offline-tasks`。该端点读取 OpenList 进程内任务对象，不会调用 115
-列目录接口。默认 40 秒从 provider 接受时间开始计算；115 未接受前不会触发秒传
-超时。任务失败或 provider 接受后超过时限时，Core 通过受限删除接口让 OpenList
+列目录接口。Agent 工具同时等待 provider task ID，只有接受或明确失败两种返回结果；
+等待 60 秒仍未提交时取消本地任务。默认 40 秒从 provider 接受时间开始计算；115
+未接受前不会触发完成超时。任务失败或 provider 接受后超过时限时，Core 通过受限
+删除接口让 OpenList
 删除对应离线任务，然后通知成员选择尚未尝试的备用资源；收到成员明确选择前不会提交
 备用资源。Jackett 搜索只向 Agent 返回候选 ID
 和原始标题。Core 选中候选后在内网读取 `.torrent` 并转换为 v1 magnet，OpenList

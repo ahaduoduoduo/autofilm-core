@@ -60,6 +60,8 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - OpenList 离线任务进度、持久化任务记录和聊天完成通知；OpenList 本地任务与
   115 provider task 分开记录，默认 40 秒从 115 返回任务标识后开始计算。超时会
   停止并删除本次离线任务，等待成员明确选择备用资源，不自动下载。
+- Agent 下载工具会等待 115 明确接受或提交失败后再返回；成功结果统一表示“离线下载
+  提交成功”，不会把 OpenList 本地排队状态作为最终工具结果交给模型。
 - 主资源和备用资源以 `candidateId + Jackett title + magnet` 保存；通知始终显示
   Jackett 标题，成员选择候选 ID，服务端不从 magnet 的 `dn` 参数推断资源名。
 - 离线任务只有在 OpenList 返回 `StateSucceeded` 后才进入成功处理；Core 使用

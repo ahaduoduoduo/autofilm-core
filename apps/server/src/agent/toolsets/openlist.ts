@@ -14,6 +14,11 @@ import {
   type DownloadCandidate,
 } from "../../tasks/download-candidates.js";
 import {
+  providerSubmissionMetadata,
+  providerSubmissionReceipt,
+  waitForProviderSubmission,
+} from "../../tasks/openlist-provider-submission.js";
+import {
   delay,
   objectSchema,
   optionalStringArray,
@@ -29,7 +34,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "start_offline_download",
         description:
-          "在 OpenList 中创建离线提交任务。返回结果只表示 OpenList 已接收请求；115 是否接受及最终完成状态必须用 list_download_tasks 查询。仅在用户明确选定资源后调用。",
+          "向 115 提交一个离线下载。工具等待到 115 接受或明确失败后才返回；成功时向用户简短报告离线下载提交成功。仅在用户明确选定资源后调用。",
         parameters: objectSchema(
           {
             release_candidate_id: stringProperty(
@@ -96,7 +101,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "start_batch_download",
         description:
-          "向同一个 OpenList 目录串行创建多个离线提交任务。返回结果不表示 115 已接受或下载完成。用于分集资源；为降低网盘风控风险，任务之间保留间隔。",
+          "向同一个 OpenList 目录串行提交多个 115 离线下载。每项等待到 115 接受或明确失败后记录结果，单项失败不阻止其余项。用于分集资源；为降低网盘风控风险，任务之间保留间隔。",
         parameters: objectSchema(
           {
             media_type: {
@@ -172,20 +177,31 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
             item,
             title,
           );
-          results.push(
-            await startDownload(deps, {
-              ...resolution,
+          try {
+            results.push({
+              ok: true,
+              result: await startDownload(deps, {
+                ...resolution,
+                title,
+                target,
+                workflowId,
+              }),
+            });
+          } catch (error) {
+            results.push({
+              ok: false,
               title,
-              target,
-              workflowId,
-            }),
-          );
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
           if (index < downloads.length - 1) await delay(1_500);
         }
         return {
           destination: target.destination,
           media: mediaSummary(target),
-          submitted: results.length,
+          submitted: results.filter(isSuccessfulSubmission).length,
+          failed: results.filter((result) => !isSuccessfulSubmission(result))
+            .length,
           tasks: results,
         };
       },
@@ -194,7 +210,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "resume_offline_download",
         description:
-          "用户明确选择备用资源后，使用任务保存的 candidateId 创建新的 OpenList 提交任务；返回结果不表示 115 已接受或下载完成。",
+          "用户明确选择备用资源后，使用任务保存的 candidateId 向 115 重新提交离线下载；工具等待到 115 接受或明确失败后才返回。",
         parameters: objectSchema(
           {
             task_id: stringProperty("list_download_tasks 返回的 waiting 任务 ID"),
@@ -239,28 +255,28 @@ async function startDownload(
     url: primary.magnetUri,
   });
   if (remoteTasks.length === 0) {
-    return deps.tasks.create({
-      userId: deps.userId,
-      type: "offline-download",
-      title: input.title,
-      state: "waiting",
-      metadata,
-    });
+    throw new Error("OpenList 没有创建离线下载任务");
   }
-  return remoteTasks.map((remoteTask) =>
-    deps.tasks.create({
-      userId: deps.userId,
-      type: "offline-download",
-      title: input.title,
-      state: "running",
-      externalId: remoteTask.id,
-      metadata: {
-        ...metadata,
-        remoteName: remoteTask.name,
-        openListTaskId: remoteTask.id,
-      },
-    }),
-  );
+  const remoteTask = remoteTasks[0]!;
+  const localTask = deps.tasks.create({
+    userId: deps.userId,
+    type: "offline-download",
+    title: input.title,
+    state: "running",
+    externalId: remoteTask.id,
+    metadata: {
+      ...metadata,
+      remoteName: remoteTask.name,
+      openListTaskId: remoteTask.id,
+    },
+  });
+  try {
+    const accepted = await waitForProviderSubmission(deps.openList, remoteTask);
+    return recordProviderSubmission(deps, localTask.id, accepted);
+  } catch (error) {
+    recordProviderSubmissionFailure(deps, localTask.id, error);
+    throw error;
+  }
 }
 
 async function resumeDownload(
@@ -311,7 +327,7 @@ async function resumeDownload(
   const updated = deps.tasks.update(task.id, {
     state: "running",
     progress: 0,
-    statusText: "用户已选择备用资源，正在等待 115 秒传",
+    statusText: "用户已选择备用资源，正在等待 115 接受任务",
     externalId: remote.id,
     metadata: {
       ...task.metadata,
@@ -340,7 +356,98 @@ async function resumeDownload(
       error: "",
     });
   }
-  return updated;
+  try {
+    const accepted = await waitForProviderSubmission(deps.openList, remote);
+    return recordProviderSubmission(deps, updated.id, accepted);
+  } catch (error) {
+    recordProviderSubmissionFailure(deps, updated.id, error);
+    if (upgradeItemId) {
+      deps.mediaUpgrades.update(upgradeItemId, {
+        state: "awaiting_alternative",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    throw error;
+  }
+}
+
+function recordProviderSubmission(
+  deps: ToolDependencies,
+  taskId: string,
+  remote: {
+    id: string;
+    name: string;
+    state: number;
+    status: string;
+    provider_task_id: string;
+    provider_submitted_at: string;
+  },
+) {
+  const current = deps.tasks.get(taskId);
+  if (!current) throw new Error("离线下载任务记录不存在");
+  const updated = current.state === "running"
+    ? deps.tasks.update(taskId, {
+        statusText: "离线下载提交成功",
+        externalId: remote.id,
+        metadata: providerSubmissionMetadata(current.metadata, remote),
+      })
+    : current;
+  return providerSubmissionReceipt({
+    taskId: updated.id,
+    title: updated.title,
+    destination: updated.metadata.destination,
+    providerSubmittedAt: remote.provider_submitted_at,
+  });
+}
+
+function recordProviderSubmissionFailure(
+  deps: ToolDependencies,
+  taskId: string,
+  error: unknown,
+): void {
+  const current = deps.tasks.get(taskId);
+  if (
+    !current ||
+    ["completed", "failed", "cancelled"].includes(current.state) ||
+    (current.state === "waiting" &&
+      current.metadata.awaitingFallbackSelection === true)
+  ) {
+    return;
+  }
+  const reason = error instanceof Error ? error.message : String(error);
+  const candidates = taskDownloadCandidates(current);
+  const currentIndex = Number(current.metadata.attemptIndex ?? 0);
+  const hasFallback = candidates.length > currentIndex + 1;
+  const attempts = Array.isArray(current.metadata.attempts)
+    ? [...(current.metadata.attempts as Array<Record<string, unknown>>)]
+    : [];
+  attempts.push({
+    index: currentIndex,
+    candidateId: candidates[currentIndex]?.id,
+    title: candidates[currentIndex]?.title,
+    openListTaskId: current.metadata.openListTaskId ?? current.externalId,
+    endedAt: new Date().toISOString(),
+    reason,
+  });
+  deps.tasks.update(taskId, {
+    state: hasFallback ? "waiting" : "failed",
+    progress: null,
+    statusText: reason,
+    externalId: null,
+    metadata: {
+      ...current.metadata,
+      attempts,
+      awaitingFallbackSelection: hasFallback || undefined,
+    },
+  });
+}
+
+function isSuccessfulSubmission(value: unknown): boolean {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      (value as Record<string, unknown>).ok === true,
+  );
 }
 
 function downloadMetadata(

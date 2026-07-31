@@ -2,6 +2,38 @@ import { describe, expect, it } from "vitest";
 import type { ToolDependencies } from "../tool-types.js";
 import { createOpenListTools } from "./openlist.js";
 
+function taskStoreRecorder(created: Array<Record<string, unknown>>) {
+  let stored: Record<string, unknown> | undefined;
+  return {
+    create(input: Record<string, unknown>) {
+      created.push(input);
+      stored = {
+        id: "local-task",
+        userId: input.userId ?? null,
+        type: input.type,
+        title: input.title,
+        state: input.state ?? "queued",
+        progress: null,
+        statusText: "",
+        externalId: input.externalId ?? null,
+        metadata: input.metadata ?? {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: null,
+      };
+      return stored;
+    },
+    get(id: string) {
+      return id === stored?.id ? stored : undefined;
+    },
+    update(id: string, input: Record<string, unknown>) {
+      if (!stored || id !== stored.id) throw new Error("Task not found");
+      stored = { ...stored, ...input };
+      return stored;
+    },
+  };
+}
+
 describe("OpenList download tools", () => {
   it("computes a multi-season destination instead of accepting one from AI", async () => {
     const createdDirectories: string[] = [];
@@ -37,6 +69,8 @@ describe("OpenList download tools", () => {
             progress: 0,
             total_bytes: 100,
             error: "",
+            provider_task_id: "provider-1",
+            provider_submitted_at: new Date().toISOString(),
           }];
         },
       },
@@ -54,12 +88,7 @@ describe("OpenList download tools", () => {
           };
         },
       },
-      tasks: {
-        create(input: Record<string, unknown>) {
-          createdTasks.push(input);
-          return { id: "local-1", ...input };
-        },
-      },
+      tasks: taskStoreRecorder(createdTasks),
     } as unknown as ToolDependencies;
     const tool = createOpenListTools(deps).find(
       (item) => item.definition.name === "start_offline_download",
@@ -119,7 +148,14 @@ describe("OpenList download tools", () => {
       workflowId: expect.any(String),
       nextAttemptAt: expect.any(String),
     });
-    expect(result).toBeTruthy();
+    expect(result).toMatchObject({
+      submissionStatus: "succeeded",
+      message: "离线下载提交成功",
+      taskId: "local-task",
+      title: "Example S01-S03",
+      destination: "/115/nvideo/tv/Example.Show",
+    });
+    expect(result).not.toHaveProperty("state");
   });
 
   it("resolves Jackett candidate IDs and submits only their magnet", async () => {
@@ -159,6 +195,8 @@ describe("OpenList download tools", () => {
             progress: 0,
             total_bytes: 100,
             error: "",
+            provider_task_id: "provider-main",
+            provider_submitted_at: new Date().toISOString(),
           }];
         },
       },
@@ -176,18 +214,13 @@ describe("OpenList download tools", () => {
           };
         },
       },
-      tasks: {
-        create(input: Record<string, unknown>) {
-          createdTasks.push(input);
-          return { id: "local-main", ...input };
-        },
-      },
+      tasks: taskStoreRecorder(createdTasks),
     } as unknown as ToolDependencies;
     const tool = createOpenListTools(deps).find(
       (item) => item.definition.name === "start_offline_download",
     )!;
 
-    await tool.execute({
+    const result = await tool.execute({
       release_candidate_id: "release-main",
       fallback_candidate_ids: [],
       fallback_magnet_uris: [],
@@ -208,6 +241,11 @@ describe("OpenList download tools", () => {
         title: "Jackett.Original.Release.Title",
         magnetUri,
       }],
+    });
+    expect(result).toMatchObject({
+      submissionStatus: "succeeded",
+      message: "离线下载提交成功",
+      title: "Example Movie",
     });
   });
 
@@ -244,6 +282,7 @@ describe("OpenList download tools", () => {
       updatedAt: new Date(0).toISOString(),
       completedAt: null,
     };
+    let stored = task;
     const deps = {
       userId: "user-1",
       openList: {
@@ -257,16 +296,19 @@ describe("OpenList download tools", () => {
             progress: 0,
             total_bytes: 100,
             error: "",
+            provider_task_id: "provider-second",
+            provider_submitted_at: new Date().toISOString(),
           }];
         },
       },
       tasks: {
         get(id: string) {
-          return id === task.id ? task : undefined;
+          return id === stored.id ? stored : undefined;
         },
         update(id: string, input: Record<string, unknown>) {
           updated = { id, ...input };
-          return { ...task, ...input };
+          stored = { ...stored, ...input } as typeof task;
+          return stored;
         },
       },
     } as unknown as ToolDependencies;
@@ -274,7 +316,7 @@ describe("OpenList download tools", () => {
       (item) => item.definition.name === "resume_offline_download",
     )!;
 
-    await tool.execute({
+    const result = await tool.execute({
       task_id: task.id,
       candidate_id: "candidate-second",
     });
@@ -297,6 +339,12 @@ describe("OpenList download tools", () => {
       (updated?.metadata as Record<string, unknown>)
         .awaitingFallbackSelection,
     ).toBeUndefined();
+    expect(result).toMatchObject({
+      submissionStatus: "succeeded",
+      message: "离线下载提交成功",
+      title: "Example",
+    });
+    expect(result).not.toHaveProperty("state");
   });
 
   it("does not expose a model-controlled destination parameter", () => {

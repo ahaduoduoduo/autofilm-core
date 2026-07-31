@@ -93,6 +93,8 @@ describe("media upgrade download selection", () => {
             progress: 0,
             total_bytes: 100,
             error: "",
+            provider_task_id: "provider-1",
+            provider_submitted_at: new Date().toISOString(),
           }];
         },
       },
@@ -119,7 +121,13 @@ describe("media upgrade download selection", () => {
 
     expect(result).toMatchObject({ submitted: 1, failed: 0 });
     expect(result).toMatchObject({
-      items: [{ ok: true, result: { state: "submitting" } }],
+      items: [{
+        ok: true,
+        result: {
+          submissionStatus: "succeeded",
+          message: "离线下载提交成功",
+        },
+      }],
     });
     expect(submissions).toEqual([
       `magnet:?xt=urn:btih:${"a".repeat(40)}`,
@@ -127,7 +135,8 @@ describe("media upgrade download selection", () => {
     const metadata = tasks.list(1)[0]!.metadata;
     expect(metadata.openListTaskId).toBe("remote-1");
     expect(metadata.attemptQueuedAt).toEqual(expect.any(String));
-    expect(metadata.attemptStartedAt).toBeUndefined();
+    expect(metadata.attemptStartedAt).toEqual(expect.any(String));
+    expect(metadata.providerTaskId).toBe("provider-1");
     expect(metadata.downloadCandidates).toEqual([
       {
         id: "release-main",

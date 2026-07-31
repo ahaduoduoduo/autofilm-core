@@ -21,6 +21,11 @@ import {
   toOpenListUri,
 } from "../../tasks/media-upgrade-files.js";
 import {
+  providerSubmissionMetadata,
+  providerSubmissionReceipt,
+  waitForProviderSubmission,
+} from "../../tasks/openlist-provider-submission.js";
+import {
   uniqueDownloadCandidates,
   type DownloadCandidate,
 } from "../../tasks/download-candidates.js";
@@ -141,7 +146,7 @@ export function createMediaUpgradeTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "start_media_upgrades",
         description:
-          "用户确认候选资源后，为多个升级项并发创建相互隔离的 OpenList 离线提交任务。返回结果不表示 115 已接受或下载完成；每个选择必须使用稳定ID，任一项失败不影响其他项。",
+          "用户确认候选资源后，为多个升级项并发提交相互隔离的 115 离线下载。每项等待到 115 接受或明确失败后返回；成功时向用户简短报告离线下载提交成功。每个选择必须使用稳定ID，任一项失败不影响其他项。",
         parameters: objectSchema(
           {
             selections: {
@@ -427,33 +432,92 @@ async function startUpgradeDownload(
     },
   };
   const remote = remoteTasks[0];
+  if (!remote) {
+    deps.mediaUpgrades.update(item.id, {
+      state: "awaiting_alternative",
+      selectedCandidateId: selected.id,
+      error: "OpenList 没有创建离线下载任务",
+    });
+    throw new Error("OpenList 没有创建离线下载任务");
+  }
   const task = deps.tasks.create({
     userId: deps.userId,
     type: "offline-download",
     title: `升级 ${item.title}`,
-    state: remote ? "running" : "waiting",
-    externalId: remote?.id,
+    state: "running",
+    externalId: remote.id,
     metadata: {
       ...metadata,
-      remoteName: remote?.name,
-      openListTaskId: remote?.id,
+      remoteName: remote.name,
+      openListTaskId: remote.id,
     },
   });
-  deps.mediaUpgrades.update(item.id, {
-    state: remote ? "downloading" : "awaiting_alternative",
-    selectedCandidateId: selected.id,
-    downloadTaskId: task.id,
-    error: remote ? "" : "OpenList 没有返回离线任务",
-  });
-  return {
-    jobId: item.jobId,
-    upgradeItemId: item.id,
-    title: item.title,
-    state: remote ? "submitting" : "awaiting_alternative",
-    downloadTaskId: task.id,
-    stagingPath,
-    unavailableFallbacks: resolved.unavailableFallbacks,
-  };
+  try {
+    const accepted = await waitForProviderSubmission(deps.openList, remote);
+    const currentTask = deps.tasks.get(task.id) ?? task;
+    if (currentTask.state === "running") {
+      deps.tasks.update(task.id, {
+        statusText: "离线下载提交成功",
+        metadata: providerSubmissionMetadata(currentTask.metadata, accepted),
+      });
+    }
+    deps.mediaUpgrades.update(item.id, {
+      state: "downloading",
+      selectedCandidateId: selected.id,
+      downloadTaskId: task.id,
+      error: "",
+    });
+    return {
+      ...providerSubmissionReceipt({
+        taskId: task.id,
+        title: item.title,
+        destination: stagingPath,
+        providerSubmittedAt: accepted.provider_submitted_at,
+      }),
+      jobId: item.jobId,
+      upgradeItemId: item.id,
+      downloadTaskId: task.id,
+      stagingPath,
+      unavailableFallbacks: resolved.unavailableFallbacks,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const hasFallback = resolved.candidates.length > 1;
+    const currentTask = deps.tasks.get(task.id) ?? task;
+    if (
+      !["completed", "failed", "cancelled"].includes(currentTask.state) &&
+      !(
+        currentTask.state === "waiting" &&
+        currentTask.metadata.awaitingFallbackSelection === true
+      )
+    ) {
+      deps.tasks.update(task.id, {
+        state: hasFallback ? "waiting" : "failed",
+        progress: null,
+        statusText: message,
+        externalId: null,
+        metadata: {
+          ...currentTask.metadata,
+          awaitingFallbackSelection: hasFallback || undefined,
+          attempts: [{
+            index: 0,
+            candidateId: primary.id,
+            title: primary.title,
+            openListTaskId: remote.id,
+            endedAt: new Date().toISOString(),
+            reason: message,
+          }],
+        },
+      });
+    }
+    deps.mediaUpgrades.update(item.id, {
+      state: "awaiting_alternative",
+      selectedCandidateId: selected.id,
+      downloadTaskId: task.id,
+      error: message,
+    });
+    throw error;
+  }
 }
 
 function jobResult(deps: ToolDependencies, jobId: string) {
