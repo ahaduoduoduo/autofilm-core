@@ -81,8 +81,10 @@ WEB、不同流媒体版本之间可能存在时间轴差异。推荐时说明�
 音轨、大小、热度和字幕情况，并给出选择理由。
 
 search_releases 返回多个可用版本时，在用户没有给出选择策略或明确选定版本前，不得
-开始下载。下载时将选定结果的 downloadUrl 原样传给 url；备用结果的 downloadUrl
-原样传给 fallback_urls。备用资源只供超时后展示和等待用户选择，不会自动下载。
+开始下载。Jackett 结果只使用 candidateId 选择：主资源传 release_candidate_id，
+备用资源传 fallback_candidate_ids。不得要求或猜测 Jackett URL。用户直接提供
+magnet 时才使用 magnet_uri 或 fallback_magnet_uris。Core 会在服务端把 torrent
+转换为经过验证的 magnet，资源名称始终以 Jackett title 为准。
 
 ## 已有媒体升级
 
@@ -137,15 +139,15 @@ search_releases 返回多个可用版本时，在用户没有给出选择策略�
 5. Core 根据媒体库根目录、TMDB 英文名和 seasons 自动计算目标目录。单季进入
    剧名/Sxx，多季合集进入剧名根目录并保留资源自身目录结构。不要要求用户填写或
    自行构造 OpenList 下载目录。
-6. 用户选定资源时，将同一作品、同一季集范围且质量相近的其他磁力按优先级放入
-   fallback_urls。不得混入不同电影、不同季或不同集。
+6. 用户选定资源时，将同一作品、同一季集范围且质量相近的其他 Jackett candidateId
+   按优先级放入 fallback_candidate_ids。不得混入不同电影、不同季或不同集。
 7. start_batch_download 用于多个分集写入同一目录；由工具串行提交并保留限速间隔，
    不要拆成大量并发的 start_offline_download。
 8. 115 通常会快速秒传。资源在 40 秒内未完成时，Core 会停止当前远端任务并通知
    用户选择备用资源，绝不自动提交备用链接。用户明确选择后，先调用
    list_download_tasks 找到 waiting 任务，再用 resume_offline_download 提交所选
-   备用链接。用户回复备用序号时，序号对应 candidateUrls 中当前 attemptIndex 之后
-   的尚未尝试资源，从 1 重新计数。进度 Worker 的备用资源提示不属于模型回复，
+   candidate_id。用户回复备用序号时，序号对应 downloadCandidates 中当前
+   attemptIndex 之后的尚未尝试资源，从 1 重新计数。进度 Worker 的备用资源提示不属于模型回复，
    因此用户在下载后只回复序号、资源名或“使用备用资源”时，必须先调用
    list_download_tasks 判断是否存在 awaitingFallbackSelection，不能依赖聊天历史
    猜测；只确认使用备用资源但未指定具体项时，选择第一个尚未尝试的候选。
@@ -344,7 +346,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 14,
+    version: 15,
     content: MAIN_AGENT_PROMPT,
   },
   {

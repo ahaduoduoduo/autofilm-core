@@ -509,10 +509,17 @@ describe("OpenList task progress worker", () => {
       externalId: "remote-old",
       metadata: {
         destination: "/115/Movies/Example",
-        sourceUrl: "magnet:?xt=urn:btih:first",
-        candidateUrls: [
-          "magnet:?xt=urn:btih:first",
-          "magnet:?xt=urn:btih:second",
+        downloadCandidates: [
+          {
+            id: "first",
+            title: "Example.2160p.First",
+            magnetUri: `magnet:?xt=urn:btih:${"a".repeat(40)}`,
+          },
+          {
+            id: "second",
+            title: "Example.2160p.Second",
+            magnetUri: `magnet:?xt=urn:btih:${"b".repeat(40)}`,
+          },
         ],
         attemptIndex: 0,
         attemptStartedAt: new Date(0).toISOString(),
@@ -558,6 +565,10 @@ describe("OpenList task progress worker", () => {
     expect(messages[0]?.payload.messages[0]?.text).toContain(
       "未确认前不会下载备用资源",
     );
+    expect(messages[0]?.payload.messages[0]?.text).toContain(
+      "Example.2160p.Second",
+    );
+    expect(messages[0]?.payload.messages[0]?.text).not.toContain("magnet:");
     database.close();
   });
 
@@ -581,8 +592,11 @@ describe("OpenList task progress worker", () => {
       externalId: "remote-only",
       metadata: {
         destination: "/115/Movies/Example",
-        sourceUrl: "magnet:?xt=urn:btih:only",
-        candidateUrls: ["magnet:?xt=urn:btih:only"],
+        downloadCandidates: [{
+          id: "only",
+          title: "Only Release",
+          magnetUri: `magnet:?xt=urn:btih:${"c".repeat(40)}`,
+        }],
         attemptIndex: 0,
         attemptStartedAt: new Date(0).toISOString(),
         instantOfflinePolicy: { enabled: true, timeoutMs: 1_000 },

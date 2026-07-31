@@ -98,7 +98,11 @@ Updated: 2026-07-31
   保留原始长度的二进制请求上传到 AutoFilm 流式端点，不生成 Base64 副本；
   请求体使用 Node 读取流，不复制大型图形字幕；资源升级使用 Inspect、Preview、
   Apply 和 Rollback 接口，并兼容 Jellyfin 两种 JSON 字段命名。
-- `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存。
+- `integrations/jackett.ts`：完整结果按文件大小降序、每页 20 条及短期查询缓存；
+  对 Agent 隐藏 Jackett URL，选定候选后在最多 6 个并发槽中读取 torrent 并生成
+  v1 magnet。
+- `integrations/torrent-magnet.ts`：限制 torrent 响应大小、解析 bencode 原始
+  `info` 字典、计算 SHA-1 infohash、保留 tracker，并拒绝115不支持的纯 v2 torrent。
 - `integrations/tmdb.ts`：影片目录，同时兼容 Read Access Token 与 v3 API Key，
   并提供电影、剧集、季、单集的评分与简介、季集日期和受限大小的封面读取。
 - `integrations/subhd.ts`：识别关联影片页并返回完整字幕列表、评论回复，以及按任务
@@ -113,6 +117,9 @@ Updated: 2026-07-31
   备用资源选择提示，不自动提交。
   完成后优先使用云端最终结果路径精确刷新 Jellyfin，且该路径必须位于任务目标
   目录内；旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
+- `tasks/download-candidates.ts`：读取新旧任务的下载候选；新任务使用结构化
+  candidateId、Jackett 标题和 magnet，Agent 读取任务时删除历史 Jackett URL、
+  API Key、magnet 和尝试记录中的原始 URL。
 - `tasks/download-completion-worker.ts`：按同一次下载请求的工作流 ID 等待所有
   OpenList 任务成功且 Jellyfin 导入完成，然后恢复原聊天会话。只执行此前已经约定
   的可选字幕操作；没有字幕计划时直接报告视频入库结果。

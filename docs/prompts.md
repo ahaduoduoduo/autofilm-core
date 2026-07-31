@@ -36,7 +36,7 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 - TMDB 内容识别、Jackett 资源搜索和并行字幕搜索；
 - 片源、分辨率、编码、HDR、音轨、大小、热度与字幕匹配评估；
 - SubHD 详情、翻译质量、语言、格式和评论判断；
-- 单任务、分集批量任务、备用磁力和 115 短时失败规则；
+- 单任务、分集批量任务、Jackett 候选 ID、备用候选和 115 短时失败规则；
 - OpenList 绝对路径、Jellyfin 远端刷新、媒体流和图片管理；
 - SubHD 影片页完整列表、成员级多包 workspace、Jellyfin 字幕管理、独立验证码
   上下文、逐文件全量广告清理和 ASS 样式；

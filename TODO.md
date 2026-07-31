@@ -2,10 +2,12 @@
 
 Updated: 2026-07-31
 
-## 已完成（2026-07-28）
+## 已完成
 
 - [x] 2026-07-31：增加现有 OpenList Movie/Episode 资源升级；多个目标使用稳定
   子任务和候选 ID 并发查询与下载，每项完成后独立处理，不等待同批其他项目。
+- [x] 2026-07-31：Jackett HTTP torrent 在 Core 本地解析为 v1 magnet；离线接口
+  只接受已验证 magnet，资源通知使用 Jackett 标题且不暴露内网 URL/API Key。
 - [x] 2026-07-31：资源升级下载使用独立临时目录且不执行普通 Jellyfin 刷新；
   Jellyfin 原位更新 Item 路径和媒体流，保留用户数据、Provider ID、图片及元数据。
 - [x] 2026-07-31：替换前使用 Jellyfin 命名规则识别视频并执行实际 ffprobe；

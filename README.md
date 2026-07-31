@@ -35,6 +35,9 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   调用时间工具。作品焦点切换时，上一作品的完整历史转换为可恢复摘要，原始消息保留。
 - Jackett 完整结果按文件大小降序分页，同一搜索词复用短期缓存；同轮只读工具
   并行执行。
+- Jackett 搜索只向 Agent 返回候选 ID 和原始资源标题，不返回下载 URL；Core 在成员
+  选定资源后本地读取 `.torrent`、计算 v1 infohash，并只向 OpenList/115 提交经过
+  验证的 magnet。Jackett API Key 不进入聊天消息或 Agent 工具结果。
 - SubHD 影片页完整字幕列表、详情评论、成员级多包临时工作区，以及 ZIP/RAR/7z
   多解压器和 GB18030/GBK/GB2312 编码归一化。
 - 工作区字幕文件只使用不可变 UUID；Agent 先创建带文件摘要的最终映射计划，再执行
@@ -56,6 +59,8 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - 按成员保存追更条件，定时读取 TMDB 并使用只读 Agent 检查发布版本和字幕。
 - OpenList 离线任务进度、持久化任务记录和聊天完成通知；115 秒传超过
   默认 40 秒会停止并删除本次离线任务，等待成员明确选择备用资源，不自动下载。
+- 主资源和备用资源以 `candidateId + Jackett title + magnet` 保存；通知始终显示
+  Jackett 标题，成员选择候选 ID，服务端不从 magnet 的 `dn` 参数推断资源名。
 - 离线任务只有在 OpenList 返回 `StateSucceeded` 后才进入成功路径；Core 使用
   最终结果路径导入 Jellyfin，再由原聊天会话继续已经约定的可选字幕处理。没有
   字幕计划、已有合适内封字幕或成员不需要字幕时，直接完成视频入库。
@@ -180,7 +185,8 @@ npm run build
 - [docs/prompts.md](docs/prompts.md)：数据库提示词、默认版本和管理规则。
 - [docs/native-adapters.md](docs/native-adapters.md)：聊天 Adapter 契约。
 - [docs/openlist-jellyfin.md](docs/openlist-jellyfin.md)：媒体与任务交互。
-- [docs/instant-offline-retry.md](docs/instant-offline-retry.md)：115 秒传短时失败和备用磁力。
+- [docs/instant-offline-retry.md](docs/instant-offline-retry.md)：115 秒传、torrent
+  转换和备用资源选择。
 - [docs/media-download-paths.md](docs/media-download-paths.md)：电影、单季与多季合集目录规则。
 - [docs/telegram-adapter.md](docs/telegram-adapter.md)：Telegram 独立容器。
 - [docs/subtitles-watchlists.md](docs/subtitles-watchlists.md)：字幕、验证码与追更。

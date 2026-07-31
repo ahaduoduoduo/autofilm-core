@@ -17,6 +17,10 @@ import {
   openListPathFromUri,
   toOpenListUri,
 } from "../../tasks/media-upgrade-files.js";
+import {
+  uniqueDownloadCandidates,
+  type DownloadCandidate,
+} from "../../tasks/download-candidates.js";
 
 const MAX_TARGETS = 8;
 const SEARCH_CONCURRENCY = 4;
@@ -378,20 +382,23 @@ async function startUpgradeDownload(
   const fallbacks = selection.fallbackCandidateIds.map((id) =>
     requireCandidate(item, id),
   );
+  const resolved = await resolveUpgradeCandidates(
+    deps,
+    selected,
+    fallbacks,
+  );
+  const primary = resolved.candidates[0]!;
   const stagingPath = `/115/autofilm-staging/upgrades/${item.id}`;
   await deps.openList.mkdir(stagingPath);
   const remoteTasks = await deps.openList.startOfflineDownload({
     path: stagingPath,
-    url: selected.downloadUrl,
+    url: primary.magnetUri,
   });
   const policy = deps.openList.instantOfflinePolicy();
   const metadata = {
     destination: stagingPath,
-    sourceUrl: selected.downloadUrl,
-    candidateUrls: [
-      selected.downloadUrl,
-      ...fallbacks.map((candidate) => candidate.downloadUrl),
-    ],
+    sourceCandidateId: primary.id,
+    downloadCandidates: resolved.candidates,
     attemptIndex: 0,
     attemptStartedAt: new Date().toISOString(),
     instantOfflinePolicy: policy,
@@ -428,6 +435,7 @@ async function startUpgradeDownload(
     state: remote ? "downloading" : "awaiting_alternative",
     downloadTaskId: task.id,
     stagingPath,
+    unavailableFallbacks: resolved.unavailableFallbacks,
   };
 }
 
@@ -444,10 +452,73 @@ function jobResult(deps: ToolDependencies, jobId: string) {
     ),
     items: items.map((item) => ({
       ...item,
-      candidates: item.candidates.slice(0, 20),
+      candidates: item.candidates.slice(0, 20).map(
+        ({ downloadUrl: _downloadUrl, ...candidate }) => candidate,
+      ),
       candidateCount: item.candidates.length,
     })),
   };
+}
+
+async function resolveUpgradeCandidates(
+  deps: ToolDependencies,
+  selected: MediaUpgradeCandidate,
+  fallbacks: MediaUpgradeCandidate[],
+): Promise<{
+  candidates: DownloadCandidate[];
+  unavailableFallbacks: Array<{
+    candidateId: string;
+    title: string;
+    error: string;
+  }>;
+}> {
+  const releases = [selected, ...fallbacks];
+  const results = await Promise.allSettled(
+    releases.map(async (candidate) => ({
+      id: candidate.id,
+      title: candidate.title,
+      magnetUri: await deps.jackett.resolveDownloadUrl(
+        candidate.downloadUrl,
+        candidate.title,
+      ),
+    })),
+  );
+  const primary = results[0];
+  if (!primary || primary.status === "rejected") {
+    throw new Error(
+      `所选资源无法转换为磁力链接：${
+        primary?.status === "rejected"
+          ? errorMessage(primary.reason)
+          : "解析结果为空"
+      }`,
+    );
+  }
+  const candidates = [primary.value];
+  const unavailableFallbacks: Array<{
+    candidateId: string;
+    title: string;
+    error: string;
+  }> = [];
+  for (const [index, result] of results.slice(1).entries()) {
+    if (result.status === "fulfilled") {
+      candidates.push(result.value);
+    } else {
+      const fallback = fallbacks[index]!;
+      unavailableFallbacks.push({
+        candidateId: fallback.id,
+        title: fallback.title,
+        error: errorMessage(result.reason),
+      });
+    }
+  }
+  return {
+    candidates: uniqueDownloadCandidates(candidates),
+    unavailableFallbacks,
+  };
+}
+
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
 }
 
 function requireCandidate(

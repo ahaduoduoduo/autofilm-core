@@ -6,6 +6,13 @@ import {
   type MediaSelection,
 } from "../media-destination.js";
 import type { AgentTool, ToolDependencies } from "../tool-types.js";
+import { normalizeMagnetUri } from "../../integrations/torrent-magnet.js";
+import {
+  directMagnetCandidate,
+  taskDownloadCandidates,
+  uniqueDownloadCandidates,
+  type DownloadCandidate,
+} from "../../tasks/download-candidates.js";
 import {
   delay,
   objectSchema,
@@ -25,13 +32,24 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
           "在 OpenList 中创建一个离线下载。仅在用户明确选定资源后调用。",
         parameters: objectSchema(
           {
-            url: stringProperty("磁力链接或下载链接"),
-            fallback_urls: {
+            release_candidate_id: stringProperty(
+              "search_releases 返回的主资源 candidateId",
+            ),
+            magnet_uri: stringProperty(
+              "仅用于用户直接提供的磁力链接；与 release_candidate_id 二选一",
+            ),
+            fallback_candidate_ids: {
               type: "array",
               maxItems: 8,
               items: { type: "string" },
               description:
-                "同一内容的备用磁力链接，按优先级排列；超时后只展示给用户选择",
+                "search_releases 返回的备用 candidateId，按优先级排列",
+            },
+            fallback_magnet_uris: {
+              type: "array",
+              maxItems: 8,
+              items: { type: "string" },
+              description: "用户直接提供的备用磁力链接，按优先级排列",
             },
             media_type: {
               type: "string",
@@ -53,8 +71,8 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
             title: stringProperty("任务显示名称"),
           },
           [
-            "url",
-            "fallback_urls",
+            "fallback_candidate_ids",
+            "fallback_magnet_uris",
             "media_type",
             "tmdb_id",
             "seasons",
@@ -64,10 +82,11 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       },
       execute: async (args) => {
         const target = await resolveTarget(deps, args);
+        const title = requireString(args, "title");
+        const resolution = await resolveDownloadCandidates(deps, args, title);
         return startDownload(deps, {
-          url: requireString(args, "url"),
-          fallbackUrls: optionalStringArray(args, "fallback_urls", 8),
-          title: requireString(args, "title"),
+          ...resolution,
+          title,
           target,
           workflowId: randomUUID(),
         });
@@ -104,16 +123,31 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
               items: {
                 type: "object",
                 properties: {
-                  url: stringProperty("磁力链接或下载链接"),
-                  fallback_urls: {
+                  release_candidate_id: stringProperty(
+                    "search_releases 返回的主资源 candidateId",
+                  ),
+                  magnet_uri: stringProperty(
+                    "用户直接提供的磁力链接；与 release_candidate_id 二选一",
+                  ),
+                  fallback_candidate_ids: {
                     type: "array",
                     maxItems: 8,
                     items: { type: "string" },
-                    description: "这一项的备用磁力链接，按优先级排列",
+                    description: "这一项的备用 candidateId，按优先级排列",
+                  },
+                  fallback_magnet_uris: {
+                    type: "array",
+                    maxItems: 8,
+                    items: { type: "string" },
+                    description: "这一项由用户直接提供的备用磁力链接",
                   },
                   title: stringProperty("任务名称"),
                 },
-                required: ["url", "fallback_urls", "title"],
+                required: [
+                  "fallback_candidate_ids",
+                  "fallback_magnet_uris",
+                  "title",
+                ],
                 additionalProperties: false,
               },
             },
@@ -132,11 +166,16 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
             throw new Error(`downloads[${index}] 格式无效`);
           }
           const item = value as Record<string, unknown>;
+          const title = requireString(item, "title");
+          const resolution = await resolveDownloadCandidates(
+            deps,
+            item,
+            title,
+          );
           results.push(
             await startDownload(deps, {
-              url: requireString(item, "url"),
-              fallbackUrls: optionalStringArray(item, "fallback_urls", 8),
-              title: requireString(item, "title"),
+              ...resolution,
+              title,
               target,
               workflowId,
             }),
@@ -155,20 +194,22 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "resume_offline_download",
         description:
-          "用户明确选择备用资源后，恢复一个正在等待选择的离线任务。url 必须是该任务保存的备用链接。",
+          "用户明确选择备用资源后，使用任务保存的 candidateId 恢复离线任务。",
         parameters: objectSchema(
           {
             task_id: stringProperty("list_download_tasks 返回的 waiting 任务 ID"),
-            url: stringProperty("用户明确选中的备用磁力链接或下载链接"),
+            candidate_id: stringProperty(
+              "list_download_tasks 返回的备用资源 candidateId",
+            ),
           },
-          ["task_id", "url"],
+          ["task_id", "candidate_id"],
         ),
       },
       execute: async (args) =>
         resumeDownload(
           deps,
           requireString(args, "task_id"),
-          requireString(args, "url"),
+          requireString(args, "candidate_id"),
         ),
     },
   ];
@@ -177,20 +218,25 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
 async function startDownload(
   deps: ToolDependencies,
   input: {
-    url: string;
-    fallbackUrls?: string[];
+    candidates: DownloadCandidate[];
+    unavailableFallbacks: Array<{
+      reference: string;
+      error: string;
+    }>;
     title: string;
     target: MediaDestination;
     workflowId: string;
   },
 ): Promise<unknown> {
-  const candidates = uniqueUrls([input.url, ...(input.fallbackUrls ?? [])]);
+  const candidates = uniqueDownloadCandidates(input.candidates);
+  const primary = candidates[0];
+  if (!primary) throw new Error("没有可提交的磁力资源");
   const policy = deps.openList.instantOfflinePolicy();
   const metadata = downloadMetadata(deps, input, candidates, policy);
   await deps.openList.mkdir(input.target.destination);
   const remoteTasks = await deps.openList.startOfflineDownload({
     path: input.target.destination,
-    url: input.url,
+    url: primary.magnetUri,
   });
   if (remoteTasks.length === 0) {
     return deps.tasks.create({
@@ -219,7 +265,7 @@ async function startDownload(
 async function resumeDownload(
   deps: ToolDependencies,
   taskId: string,
-  url: string,
+  candidateId: string,
 ): Promise<unknown> {
   const task = deps.tasks.get(taskId);
   if (!task || task.userId !== deps.userId) {
@@ -231,24 +277,31 @@ async function resumeDownload(
   ) {
     throw new Error("该任务当前不在等待备用资源选择");
   }
-  const candidates = Array.isArray(task.metadata.candidateUrls)
-    ? task.metadata.candidateUrls.filter(
-        (candidate): candidate is string =>
-          typeof candidate === "string" && Boolean(candidate),
-      )
-    : [];
-  const selectedIndex = candidates.indexOf(url);
+  const candidates = taskDownloadCandidates(task);
+  const selectedIndex = candidates.findIndex(
+    (candidate) => candidate.id === candidateId,
+  );
   const currentIndex = Number(task.metadata.attemptIndex ?? 0);
   if (selectedIndex <= currentIndex) {
-    throw new Error("所选链接不是该任务尚未尝试的备用资源");
+    throw new Error("所选 candidateId 不是该任务尚未尝试的备用资源");
   }
+  const selected = candidates[selectedIndex]!;
+  const magnetUri = selected.magnetUri ||
+    (selected.legacySourceUrl
+      ? await deps.jackett.resolveDownloadUrl(
+          selected.legacySourceUrl,
+          legacyCandidateTitle(deps, task, selected.legacySourceUrl) ??
+            selected.title,
+        )
+      : "");
+  if (!magnetUri) throw new Error("备用资源无法转换为磁力链接");
   const destination = String(task.metadata.destination ?? "");
   if (!destination.startsWith("/")) {
     throw new Error("等待中的任务缺少有效目标目录");
   }
   const remoteTasks = await deps.openList.startOfflineDownload({
     path: destination,
-    url,
+    url: magnetUri,
   });
   const remote = remoteTasks[0];
   if (!remote) {
@@ -261,7 +314,7 @@ async function resumeDownload(
     externalId: remote.id,
     metadata: {
       ...task.metadata,
-      sourceUrl: url,
+      sourceCandidateId: selected.id,
       attemptIndex: selectedIndex,
       attemptStartedAt: new Date().toISOString(),
       remoteName: remote.name,
@@ -285,18 +338,23 @@ async function resumeDownload(
 function downloadMetadata(
   deps: ToolDependencies,
   input: {
-    url: string;
+    candidates: DownloadCandidate[];
+    unavailableFallbacks: Array<{
+      reference: string;
+      error: string;
+    }>;
     title: string;
     target: MediaDestination;
     workflowId: string;
   },
-  candidates: string[],
+  candidates: DownloadCandidate[],
   policy: { enabled: boolean; timeoutMs: number },
 ): Record<string, unknown> {
   return {
     ...taskMetadata(input.target),
-    sourceUrl: candidates[0],
-    candidateUrls: candidates,
+    sourceCandidateId: candidates[0]?.id,
+    downloadCandidates: candidates,
+    unavailableFallbacks: input.unavailableFallbacks,
     attemptIndex: 0,
     attemptStartedAt: new Date().toISOString(),
     instantOfflinePolicy: policy,
@@ -310,6 +368,97 @@ function downloadMetadata(
         }
       : undefined,
   };
+}
+
+async function resolveDownloadCandidates(
+  deps: ToolDependencies,
+  args: Record<string, unknown>,
+  taskTitle: string,
+): Promise<{
+  candidates: DownloadCandidate[];
+  unavailableFallbacks: Array<{ reference: string; error: string }>;
+}> {
+  const candidateId =
+    typeof args.release_candidate_id === "string"
+      ? args.release_candidate_id.trim()
+      : "";
+  const directMagnet =
+    typeof args.magnet_uri === "string" ? args.magnet_uri.trim() : "";
+  if (Boolean(candidateId) === Boolean(directMagnet)) {
+    throw new Error("release_candidate_id 与 magnet_uri 必须且只能提供一个");
+  }
+  const primary = candidateId
+    ? await deps.jackett.resolveCandidate(candidateId)
+    : directMagnetCandidate(
+        normalizeMagnetUri(directMagnet, taskTitle),
+        "用户提供的磁力资源",
+      );
+  const fallbackIds = optionalStringArray(
+    args,
+    "fallback_candidate_ids",
+    8,
+  );
+  const fallbackMagnets = optionalStringArray(
+    args,
+    "fallback_magnet_uris",
+    8,
+  );
+  const fallbackResolvers = [
+    ...fallbackIds.map((id) => ({
+      reference: id,
+      resolve: () => deps.jackett.resolveCandidate(id),
+    })),
+    ...fallbackMagnets.map((magnet, index) => ({
+      reference: `用户提供的备用资源 ${index + 1}`,
+      resolve: async () =>
+        directMagnetCandidate(
+          normalizeMagnetUri(magnet, `${taskTitle} 备用 ${index + 1}`),
+          `用户提供的备用资源 ${index + 1}`,
+        ),
+    })),
+  ];
+  const results = await Promise.allSettled(
+    fallbackResolvers.map((entry) => entry.resolve()),
+  );
+  const resolvedFallbacks: DownloadCandidate[] = [];
+  const unavailableFallbacks: Array<{ reference: string; error: string }> = [];
+  for (const [index, result] of results.entries()) {
+    if (result.status === "fulfilled") {
+      resolvedFallbacks.push(result.value);
+    } else {
+      unavailableFallbacks.push({
+        reference: fallbackResolvers[index]!.reference,
+        error: result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason),
+      });
+    }
+  }
+  return {
+    candidates: uniqueDownloadCandidates([primary, ...resolvedFallbacks]),
+    unavailableFallbacks,
+  };
+}
+
+function legacyCandidateTitle(
+  deps: ToolDependencies,
+  task: { metadata: Record<string, unknown> },
+  sourceUrl: string,
+): string | undefined {
+  const mediaUpgrade = task.metadata.mediaUpgrade;
+  if (
+    !mediaUpgrade ||
+    typeof mediaUpgrade !== "object" ||
+    Array.isArray(mediaUpgrade)
+  ) {
+    return undefined;
+  }
+  const itemId = (mediaUpgrade as Record<string, unknown>).upgradeItemId;
+  if (typeof itemId !== "string") return undefined;
+  return deps.mediaUpgrades
+    .get(itemId)
+    ?.candidates.find((candidate) => candidate.downloadUrl === sourceUrl)
+    ?.title;
 }
 
 async function resolveTarget(
@@ -361,10 +510,6 @@ function mediaSummary(target: MediaDestination): Record<string, unknown> {
     seasons: target.seasons,
     isMultiSeason: target.seasons.length > 1,
   };
-}
-
-function uniqueUrls(urls: string[]): string[] {
-  return [...new Set(urls.map((url) => url.trim()).filter(Boolean))].slice(0, 9);
 }
 
 function recordValue(value: unknown): Record<string, unknown> | undefined {

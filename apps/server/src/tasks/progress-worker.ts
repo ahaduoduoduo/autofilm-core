@@ -5,6 +5,10 @@ import {
   type OpenListTask,
 } from "../integrations/openlist.js";
 import type { TaskSummary } from "@autofilm/contracts";
+import {
+  taskDownloadCandidates,
+  type StoredDownloadCandidate,
+} from "./download-candidates.js";
 
 interface OpenListTaskSource {
   listOfflineTasks(): Promise<OpenListTask[]>;
@@ -246,13 +250,14 @@ export class ProgressWorker {
     local: TaskSummary,
     reason: string,
   ): Promise<void> {
-    const candidates = candidateUrls(local);
+    const candidates = taskDownloadCandidates(local);
     const currentIndex = attemptIndex(local);
     const nextIndex = currentIndex + 1;
     const attempts = attemptHistory(local);
     attempts.push({
       index: currentIndex,
-      url: candidates[currentIndex] ?? String(local.metadata.sourceUrl ?? ""),
+      candidateId: candidates[currentIndex]?.id,
+      title: candidates[currentIndex]?.title,
       endedAt: new Date().toISOString(),
       reason,
     });
@@ -297,12 +302,12 @@ export class ProgressWorker {
 
   private enqueueFallbackPrompt(
     task: TaskSummary,
-    candidates: string[],
+    candidates: StoredDownloadCandidate[],
   ): void {
     if (!this.outbox || !task.userId) return;
     const target = notificationTarget(task.metadata.notificationTarget);
     const options = candidates
-      .map((candidate, index) => `${index + 1}. ${candidateLabel(candidate)}`)
+      .map((candidate, index) => `${index + 1}. ${candidate.title}`)
       .join("\n");
     const seconds = Math.round(
       (instantPolicy(task)?.timeoutMs ?? 40_000) / 1000,
@@ -404,18 +409,6 @@ function instantPolicy(
   return { enabled: policy.enabled === true, timeoutMs };
 }
 
-function candidateUrls(task: TaskSummary): string[] {
-  const value = task.metadata.candidateUrls;
-  if (!Array.isArray(value)) {
-    const source = String(task.metadata.sourceUrl ?? "");
-    return source ? [source] : [];
-  }
-  return value.filter(
-    (candidate): candidate is string =>
-      typeof candidate === "string" && candidate.length > 0,
-  );
-}
-
 function attemptIndex(task: TaskSummary): number {
   const value = Number(task.metadata.attemptIndex ?? 0);
   return Number.isInteger(value) && value >= 0 ? value : 0;
@@ -445,17 +438,6 @@ function notificationTarget(value: unknown):
         targetId: target.targetId,
       }
     : undefined;
-}
-
-function candidateLabel(value: string): string {
-  try {
-    const url = new URL(value);
-    const displayName = url.searchParams.get("dn");
-    if (displayName) return displayName;
-  } catch {
-    // Non-URL download values are represented by a short safe prefix.
-  }
-  return value.length > 120 ? `${value.slice(0, 117)}...` : value;
 }
 
 function jellyfinRefreshState(

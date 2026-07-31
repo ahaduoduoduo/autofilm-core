@@ -24,7 +24,7 @@ describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
     const prompt = promptDefinition("agent.main");
 
-    expect(prompt?.version).toBe(14);
+    expect(prompt?.version).toBe(15);
     expect(prompt?.content).toContain("必须共用一个 workspace");
     expect(prompt?.content).toContain("一次提交完整映射列表");
     expect(prompt?.content).toContain("不要重复创建");
@@ -59,5 +59,14 @@ describe("main agent subtitle batching rules", () => {
     expect(prompt?.content).toContain("rollback_media_upgrades");
     expect(prompt?.content).toContain("原 Jellyfin Item ID");
     expect(prompt?.content).toContain("旧文件进入独立备份目录");
+  });
+
+  it("uses opaque Jackett candidates and server-resolved magnets", () => {
+    const prompt = promptDefinition("agent.main");
+
+    expect(prompt?.content).toContain("release_candidate_id");
+    expect(prompt?.content).toContain("fallback_candidate_ids");
+    expect(prompt?.content).toContain("torrent");
+    expect(prompt?.content).not.toContain("downloadUrl 原样");
   });
 });

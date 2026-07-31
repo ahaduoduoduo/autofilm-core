@@ -1,4 +1,5 @@
 import type { AgentTool, ToolDependencies } from "../tool-types.js";
+import { safeDownloadTask } from "../../tasks/download-candidates.js";
 import {
   objectSchema,
   requireAbsolutePath,
@@ -156,7 +157,10 @@ export function createBaseTools(deps: ToolDependencies): AgentTool[] {
         parameters: objectSchema({}),
       },
       execute: async () =>
-        deps.tasks.list(50).filter((task) => task.userId === deps.userId),
+        deps.tasks
+          .list(50)
+          .filter((task) => task.userId === deps.userId)
+          .map(safeDownloadTask),
     },
     {
       definition: {
