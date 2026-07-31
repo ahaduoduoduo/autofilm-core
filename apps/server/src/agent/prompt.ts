@@ -382,7 +382,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 16,
+    version: 17,
     content: MAIN_AGENT_PROMPT,
   },
   {
