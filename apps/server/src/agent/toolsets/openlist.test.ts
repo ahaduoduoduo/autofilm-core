@@ -327,7 +327,6 @@ describe("OpenList download tools", () => {
     }]);
     expect(updated).toMatchObject({
       id: task.id,
-      state: "running",
       externalId: "remote-second",
       metadata: {
         sourceCandidateId: "candidate-second",
@@ -335,6 +334,7 @@ describe("OpenList download tools", () => {
         remoteName: "Second",
       },
     });
+    expect(stored.state).toBe("running");
     expect(
       (updated?.metadata as Record<string, unknown>)
         .awaitingFallbackSelection,
