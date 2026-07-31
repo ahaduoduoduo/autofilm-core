@@ -543,6 +543,8 @@ describe("OpenList task progress worker", () => {
               progress: 0,
               total_bytes: 0,
               error: "",
+              provider_task_id: "provider-first",
+              provider_submitted_at: new Date(0).toISOString(),
             },
           ];
         },
@@ -560,6 +562,17 @@ describe("OpenList task progress worker", () => {
     expect(tasks.get(local.id)?.metadata.attemptIndex).toBe(0);
     expect(tasks.get(local.id)?.metadata.awaitingFallbackSelection).toBe(true);
     expect(tasks.get(local.id)?.state).toBe("waiting");
+    expect(tasks.get(local.id)?.metadata.providerTaskId).toBe(
+      "provider-first",
+    );
+    const attempts = tasks.get(local.id)?.metadata.attempts as Array<
+      Record<string, unknown>
+    >;
+    expect(attempts[0]).toMatchObject({
+      openListTaskId: "remote-old",
+      providerTaskId: "provider-first",
+      providerSubmittedAt: new Date(0).toISOString(),
+    });
     const messages = outbox.claimDue();
     expect(messages).toHaveLength(1);
     expect(messages[0]?.payload.messages[0]?.text).toContain(
@@ -598,7 +611,8 @@ describe("OpenList task progress worker", () => {
           magnetUri: `magnet:?xt=urn:btih:${"c".repeat(40)}`,
         }],
         attemptIndex: 0,
-        attemptStartedAt: new Date(0).toISOString(),
+        providerTaskId: "provider-only",
+        providerSubmittedAt: new Date(0).toISOString(),
         instantOfflinePolicy: { enabled: true, timeoutMs: 1_000 },
       },
     });

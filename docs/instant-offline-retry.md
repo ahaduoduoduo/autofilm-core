@@ -1,6 +1,6 @@
 # 115 instant offline timeout and fallback selection
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## 行为
 
@@ -10,21 +10,28 @@ Core 在内网读取候选的 `.torrent` 下载入口并计算 BitTorrent v1 inf
 magnet 也必须通过 v1 校验。OpenList 最终只接收 magnet，Jackett URL 不会离开
 Core。用户直接提供磁力时不经过 Jackett，但使用相同校验。
 
-Core 每 2 秒读取 OpenList 的内存任务快照。默认规则是：
+OpenList 创建的本地任务可能先在内部队列等待。只有离线下载驱动成功调用 115 并取得
+provider task ID（115 使用 infohash）后，才表示 115 已接受任务。Core 每 2 秒读取
+OpenList 的内存任务快照。默认规则是：
 
-1. 首选候选转换并提交 magnet 后等待 40 秒。
-2. 只有 OpenList 返回 `StateSucceeded`，Core 才将任务标记为完成。进度达到
+1. 首选候选转换为 magnet 后，OpenList 创建本地提交任务；这个阶段不计算秒传时限。
+2. OpenList 成功取得 `provider_task_id` 和 `provider_submitted_at` 后，Core 才开始
+   计算 40 秒。
+3. 只有 OpenList 返回 `StateSucceeded`，Core 才将任务标记为完成。进度达到
    100% 或出现结束时间，但状态仍在整理或转存时，继续视为运行中。
-3. 任务明确失败，或者超过时限仍未完成，Core 调用
+4. 任务明确失败，或者从 115 接受时刻起超过时限仍未完成，Core 调用
    `POST /api/autofilm/offline-tasks/delete`。
-4. OpenList 取消本地任务，并通过离线下载驱动删除 115 中对应任务。
-5. Core 将业务任务改为 `waiting`，向原聊天发送尚未尝试的备用资源列表。
-6. 成员明确选择后，Agent 调用 `resume_offline_download`，继续使用同一条业务
+5. OpenList 取消本地任务；存在 provider task ID 时再通过离线下载驱动删除 115
+   对应任务。尚未被 115 接受的任务只取消 OpenList 本地任务。
+6. Core 将业务任务改为 `waiting`，向原聊天发送尚未尝试的备用资源列表。
+7. 成员明确选择后，Agent 调用 `resume_offline_download`，继续使用同一条业务
    任务记录；成员未选择时不提交任何备用资源。
-7. 没有备用资源时，任务进入失败状态并发送通知。
+8. 没有备用资源时，任务进入失败状态并发送通知。
 
-每次尝试的候选 ID、Jackett 标题、结束时间和失败原因保存在任务
-`metadata.attempts` 中。继续任务不重新搜索 Jackett，也不产生新的成员任务。
+每次尝试的候选 ID、Jackett 标题、OpenList 本地任务 ID、provider task ID、115
+接受时间、结束时间和失败原因保存在任务 `metadata.attempts` 中。继续任务不重新搜索
+Jackett，也不产生新的成员任务。OpenList 本地任务在 provider task ID 出现前失败时，
+状态会明确说明“115 未确认接受该资源”，不会报告为 40 秒超时。
 
 备用资源提示由进度 Worker 通过 Outbox 主动发送，不伪装成 Agent 历史消息。成员
 随后只回复序号、资源名或确认使用备用资源时，Agent 必须读取
@@ -54,6 +61,7 @@ Jellyfin `RemoteRefresh`，并等待接口返回成功。最终聊天通知不�
 - Core 最多读取 32 MiB 的 torrent，最多跟随 5 次重定向；纯 BitTorrent v2 torrent
   因没有 v1 infohash 而拒绝提交，v1 和 hybrid torrent 均可转换。
 - 任务状态读取只访问 OpenList 内存，不列举 115 目录。
+- `provider_task_id` 只用于区分提交阶段和 115 已接受阶段，不建立媒体文件对象映射。
 - 进度百分比不用于推断任务终态；只有 OpenList `StateSucceeded` 才触发
   Jellyfin 远端目录刷新。
 - 已进入完成、失败或取消状态的 Core 任务不会被延迟到达的运行中快照改回非终态。
@@ -73,7 +81,7 @@ Jellyfin `RemoteRefresh`，并等待接口返回成功。最终聊天通知不�
   生成 v1 magnet。
 - `apps/server/src/tasks/download-candidates.ts`：读取新旧候选格式并过滤 Agent
   可见的敏感字段。
-- `apps/server/src/tasks/progress-worker.ts`：短时判定、删除和等待成员选择。
+- `apps/server/src/tasks/progress-worker.ts`：provider 接受时间判定、删除和等待成员选择。
 - `apps/server/src/tasks/download-completion-worker.ts`：等待 Jellyfin 导入并恢复
   原 Agent 会话。
 - `apps/server/src/integrations/openlist.ts`：受限任务删除接口。

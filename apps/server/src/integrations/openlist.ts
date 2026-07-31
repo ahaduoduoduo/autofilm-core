@@ -13,6 +13,8 @@ export interface OpenListTask {
   result_path?: string;
   start_time?: string;
   end_time?: string;
+  provider_task_id?: string;
+  provider_submitted_at?: string;
 }
 
 export const OPENLIST_TASK_STATE = {

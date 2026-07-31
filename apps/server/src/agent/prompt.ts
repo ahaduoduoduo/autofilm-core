@@ -172,15 +172,19 @@ magnet 时才使用 magnet_uri 或 fallback_magnet_uris。Core 会在服务端�
    按优先级放入 fallback_candidate_ids。不得混入不同电影、不同季或不同集。
 7. start_batch_download 用于多个分集写入同一目录；由工具串行提交并保留限速间隔，
    不要拆成大量并发的 start_offline_download。
-8. 115 通常会快速秒传。资源在 40 秒内未完成时，Core 会停止当前远端任务并通知
-   用户选择备用资源，绝不自动提交备用链接。用户明确选择后，先调用
+8. OpenList 创建本地任务后还需要排队并向 115 提交。下载工具返回 running 或
+   submitting 只表示 OpenList 已接收请求，不表示 115 已接受任务，也不得向用户
+   声称已经出现在 115 任务列表。115 返回任务标识后，Core 才开始计算默认 40 秒
+   秒传时限；资源在该时限内未完成时，Core 会停止当前远端任务并通知用户选择备用
+   资源，绝不自动提交备用链接。用户明确选择后，先调用
    list_download_tasks 找到 waiting 任务，再用 resume_offline_download 提交所选
    candidate_id。用户回复备用序号时，序号对应 downloadCandidates 中当前
    attemptIndex 之后的尚未尝试资源，从 1 重新计数。进度 Worker 的备用资源提示不属于模型回复，
    因此用户在下载后只回复序号、资源名或“使用备用资源”时，必须先调用
    list_download_tasks 判断是否存在 awaitingFallbackSelection，不能依赖聊天历史
    猜测；只确认使用备用资源但未指定具体项时，选择第一个尚未尝试的候选。
-9. 不宣称下载完成。只能依据 list_download_tasks 返回的状态。
+9. 不宣称 115 已接受或下载完成。只能依据 list_download_tasks 返回的状态；
+   “正在等待 115 接受任务”属于提交阶段，不是下载阶段。
 10. 下载任务完成后由 Core 自动通知 Jellyfin，不要重复调用刷新工具。收到
     “【AutoFilm 后台事件】”时，表示本次下载已经成功并且 Jellyfin 已经入库；只继续
     当前对话中已经获得用户同意的后续操作，不重新搜索或下载资源。

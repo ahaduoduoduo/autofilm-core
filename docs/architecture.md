@@ -56,11 +56,13 @@ Core 按 OpenList 服务中配置的电影/电视剧根目录计算路径：电�
 `剧名/Sxx`，多季合集进入剧集根目录。详细规则见
 [media-download-paths.md](media-download-paths.md)。
 
-下载创建后，Core 保存 OpenList 内存任务 ID。进度 Worker 每 2 秒读取
-受限的 `/api/autofilm/offline-tasks`。该端点读取 OpenList 进程内任务对象，
-不会调用 115 列目录接口。115 秒传任务失败或超过默认 40 秒时，Core
-通过受限删除接口让 OpenList 删除 115 离线任务，然后通知成员选择尚未尝试的
-备用资源；收到成员明确选择前不会提交备用资源。Jackett 搜索只向 Agent 返回候选 ID
+下载创建后，Core 保存 OpenList 内存任务 ID。OpenList 成功调用 115 后，再公开
+provider task ID 和 provider 接受时间。进度 Worker 每 2 秒读取受限的
+`/api/autofilm/offline-tasks`。该端点读取 OpenList 进程内任务对象，不会调用 115
+列目录接口。默认 40 秒从 provider 接受时间开始计算；115 未接受前不会触发秒传
+超时。任务失败或 provider 接受后超过时限时，Core 通过受限删除接口让 OpenList
+删除对应离线任务，然后通知成员选择尚未尝试的备用资源；收到成员明确选择前不会提交
+备用资源。Jackett 搜索只向 Agent 返回候选 ID
 和原始标题。Core 选中候选后在内网读取 `.torrent` 并转换为 v1 magnet，OpenList
 不接收 Jackett 内网 URL。
 任务真实结束后，OpenList 同一快照返回 115 最终生成的 `result_path`；Core 只将

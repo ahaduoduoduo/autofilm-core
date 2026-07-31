@@ -78,6 +78,17 @@ export class ProgressWorker {
               task.metadata.awaitingFallbackSelection !== true &&
               (!task.externalId || !remoteIds.has(task.externalId)),
           )) {
+          if (
+            local.externalId &&
+            !remoteIds.has(local.externalId) &&
+            !providerSubmissionTime(local)
+          ) {
+            await this.awaitFallbackSelection(
+              local,
+              "OpenList 提交任务已结束，115 未确认接受该资源",
+            );
+            continue;
+          }
           if (this.isExpired(local)) {
             await this.awaitFallbackSelection(
               local,
@@ -101,18 +112,51 @@ export class ProgressWorker {
     if (!local) return;
     if (["completed", "failed", "cancelled"].includes(local.state)) return;
     const state = inferState(remote);
+    const providerTaskId = remote.provider_task_id?.trim() || undefined;
+    const submittedAt = validDate(remote.provider_submitted_at);
+    const observedAt = new Date().toISOString();
+    const statusText =
+      remote.error ||
+      (submittedAt
+        ? remote.status || "115 已接受任务，等待离线转存完成"
+        : "正在等待 115 接受任务");
+    const observedMetadata = {
+      ...local.metadata,
+      openListTaskId: remote.id,
+      lastRemoteState: remote.state,
+      lastRemoteStatus: statusText,
+      lastRemoteObservedAt: observedAt,
+      ...(providerTaskId ? { providerTaskId } : {}),
+      ...(submittedAt
+        ? {
+            providerSubmittedAt: submittedAt,
+            attemptStartedAt: submittedAt,
+          }
+        : {}),
+    };
+    const observedLocal: TaskSummary = {
+      ...local,
+      statusText,
+      metadata: observedMetadata,
+    };
     if (
       ["failed", "cancelled"].includes(state) &&
-      this.hasInstantPolicy(local)
+      this.hasInstantPolicy(observedLocal)
     ) {
       await this.awaitFallbackSelection(
-        local,
-        remote.error || remote.status || "115 离线任务失败",
+        observedLocal,
+        remote.error || remote.status ||
+          (submittedAt
+            ? "115 离线任务失败"
+            : "115 未接受该离线任务"),
       );
       return;
     }
-    if (state === "running" && this.isExpired(local)) {
-      await this.awaitFallbackSelection(local, this.timeoutMessage(local));
+    if (state === "running" && this.isExpired(observedLocal)) {
+      await this.awaitFallbackSelection(
+        observedLocal,
+        this.timeoutMessage(observedLocal),
+      );
       return;
     }
     const completedNow =
@@ -123,9 +167,9 @@ export class ProgressWorker {
       progress: Number.isFinite(remote.progress)
         ? Math.max(0, Math.min(100, remote.progress))
         : null,
-      statusText: remote.error || remote.status || state,
+      statusText,
       metadata: {
-        ...local.metadata,
+        ...observedMetadata,
         remoteName: remote.name,
         remoteResultPath: remote.result_path,
         totalBytes: remote.total_bytes,
@@ -258,6 +302,11 @@ export class ProgressWorker {
       index: currentIndex,
       candidateId: candidates[currentIndex]?.id,
       title: candidates[currentIndex]?.title,
+      openListTaskId: local.metadata.openListTaskId ?? local.externalId,
+      providerTaskId: local.metadata.providerTaskId,
+      providerSubmittedAt: local.metadata.providerSubmittedAt,
+      lastRemoteState: local.metadata.lastRemoteState,
+      lastRemoteStatus: local.metadata.lastRemoteStatus,
       endedAt: new Date().toISOString(),
       reason,
     });
@@ -309,17 +358,17 @@ export class ProgressWorker {
     const options = candidates
       .map((candidate, index) => `${index + 1}. ${candidate.title}`)
       .join("\n");
-    const seconds = Math.round(
-      (instantPolicy(task)?.timeoutMs ?? 40_000) / 1000,
-    );
+    const failureReason = task.statusText
+      .replace(/；等待用户选择备用资源$/, "")
+      .trim();
     this.outbox.enqueue({
       userId: task.userId,
       channel: target?.channel,
       providerInstanceId: target?.providerInstanceId,
       targetId: target?.targetId,
       text:
-        `《${task.title}》刚刚选择的资源在 ${seconds} 秒内没有完成 115 离线转存，` +
-        `本次尝试已判定失败并停止。\n是否改用以下备用资源？\n${options}\n` +
+        `《${task.title}》本次资源处理未完成：${failureReason}。\n` +
+        `是否改用以下备用资源？\n${options}\n` +
         "请回复要使用的资源名称或序号；未确认前不会下载备用资源。",
     });
   }
@@ -331,7 +380,13 @@ export class ProgressWorker {
   private isExpired(task: TaskSummary): boolean {
     const policy = instantPolicy(task);
     if (!policy?.enabled) return false;
-    const startedAt = Date.parse(String(task.metadata.attemptStartedAt ?? ""));
+    const startedAt = Date.parse(
+      String(
+        task.metadata.providerSubmittedAt ??
+          task.metadata.attemptStartedAt ??
+          "",
+      ),
+    );
     return (
       Number.isFinite(startedAt) &&
       Date.now() - startedAt >= policy.timeoutMs
@@ -342,7 +397,7 @@ export class ProgressWorker {
     const timeoutSeconds = Math.round(
       (instantPolicy(task)?.timeoutMs ?? 40_000) / 1000,
     );
-    return `115 离线任务在 ${timeoutSeconds} 秒内未完成，已删除原任务`;
+    return `115 已接受任务，但在 ${timeoutSeconds} 秒内未完成离线转存，已删除远端任务`;
   }
 }
 
@@ -420,6 +475,18 @@ function attemptHistory(
   return Array.isArray(task.metadata.attempts)
     ? [...(task.metadata.attempts as Array<Record<string, unknown>>)]
     : [];
+}
+
+function providerSubmissionTime(task: TaskSummary): string | undefined {
+  return validDate(
+    typeof task.metadata.providerSubmittedAt === "string"
+      ? task.metadata.providerSubmittedAt
+      : undefined,
+  );
+}
+
+function validDate(value: string | undefined): string | undefined {
+  return value && Number.isFinite(Date.parse(value)) ? value : undefined;
 }
 
 function notificationTarget(value: unknown):

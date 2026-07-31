@@ -57,11 +57,12 @@ OpenList -> Jellyfin        http://jellyfin:8096
 6. TMDB 身份唯一确定后，Core 获取对应封面；Adapter 先发送封面，再发送 Agent
    的作品和资源说明。
 7. Agent 选择资源后，Core 根据 TMDB ID、媒体类型和季号计算 OpenList 目标目录。
-8. OpenList 创建离线任务；Core 每 2 秒读取 OpenList 内存任务状态。只有
-   `StateSucceeded` 才视为完成；快照同时返回 115 实际生成的结果路径，Core 用
-   该路径精确通知 Jellyfin。
-9. 115 秒传超过默认 40 秒时，OpenList 删除本次失败任务，Core 通知成员选择备用
-   资源；成员未明确选择前不再创建离线任务。
+8. OpenList 先创建本地任务；调用 115 成功后，任务快照增加 provider task ID 和
+   provider 接受时间。Core 每 2 秒读取该内存状态，默认 40 秒从 provider 接受时间
+   开始计算，而不是从 OpenList 本地任务创建时间开始计算。
+9. 只有 `StateSucceeded` 才视为完成；快照同时返回 115 实际生成的结果路径，Core
+   用该路径精确通知 Jellyfin。115 接受后超过默认 40 秒仍未完成时，OpenList 删除
+   本次失败任务，Core 通知成员选择备用资源；成员未明确选择前不再创建离线任务。
 10. 成功后 Core 显式调用 Jellyfin `RemoteRefresh`。Jellyfin 导入完成后，Core
     恢复原 Agent 会话，执行此前已经约定的可选字幕操作，最后通过原 Adapter
     通知成员。没有字幕计划时不强制搜索或上传字幕。

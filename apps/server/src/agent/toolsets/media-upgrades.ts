@@ -141,7 +141,7 @@ export function createMediaUpgradeTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "start_media_upgrades",
         description:
-          "用户确认候选资源后，为多个升级项并发创建相互隔离的离线下载。每个选择必须使用稳定ID，任一项失败不影响其他项。",
+          "用户确认候选资源后，为多个升级项并发创建相互隔离的 OpenList 离线提交任务。返回结果不表示 115 已接受或下载完成；每个选择必须使用稳定ID，任一项失败不影响其他项。",
         parameters: objectSchema(
           {
             selections: {
@@ -416,7 +416,7 @@ async function startUpgradeDownload(
     sourceCandidateId: primary.id,
     downloadCandidates: resolved.candidates,
     attemptIndex: 0,
-    attemptStartedAt: new Date().toISOString(),
+    attemptQueuedAt: new Date().toISOString(),
     instantOfflinePolicy: policy,
     notificationTarget: deps.notificationTarget,
     mediaUpgrade: {
@@ -436,6 +436,7 @@ async function startUpgradeDownload(
     metadata: {
       ...metadata,
       remoteName: remote?.name,
+      openListTaskId: remote?.id,
     },
   });
   deps.mediaUpgrades.update(item.id, {
@@ -448,7 +449,7 @@ async function startUpgradeDownload(
     jobId: item.jobId,
     upgradeItemId: item.id,
     title: item.title,
-    state: remote ? "downloading" : "awaiting_alternative",
+    state: remote ? "submitting" : "awaiting_alternative",
     downloadTaskId: task.id,
     stagingPath,
     unavailableFallbacks: resolved.unavailableFallbacks,

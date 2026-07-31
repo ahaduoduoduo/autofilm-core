@@ -29,7 +29,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "start_offline_download",
         description:
-          "在 OpenList 中创建一个离线下载。仅在用户明确选定资源后调用。",
+          "在 OpenList 中创建离线提交任务。返回结果只表示 OpenList 已接收请求；115 是否接受及最终完成状态必须用 list_download_tasks 查询。仅在用户明确选定资源后调用。",
         parameters: objectSchema(
           {
             release_candidate_id: stringProperty(
@@ -96,7 +96,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "start_batch_download",
         description:
-          "向同一个 OpenList 目录串行提交多个离线下载。用于分集资源；为降低网盘风控风险，任务之间保留间隔。",
+          "向同一个 OpenList 目录串行创建多个离线提交任务。返回结果不表示 115 已接受或下载完成。用于分集资源；为降低网盘风控风险，任务之间保留间隔。",
         parameters: objectSchema(
           {
             media_type: {
@@ -194,7 +194,7 @@ export function createOpenListTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "resume_offline_download",
         description:
-          "用户明确选择备用资源后，使用任务保存的 candidateId 恢复离线任务。",
+          "用户明确选择备用资源后，使用任务保存的 candidateId 创建新的 OpenList 提交任务；返回结果不表示 115 已接受或下载完成。",
         parameters: objectSchema(
           {
             task_id: stringProperty("list_download_tasks 返回的 waiting 任务 ID"),
@@ -257,6 +257,7 @@ async function startDownload(
       metadata: {
         ...metadata,
         remoteName: remoteTask.name,
+        openListTaskId: remoteTask.id,
       },
     }),
   );
@@ -316,8 +317,15 @@ async function resumeDownload(
       ...task.metadata,
       sourceCandidateId: selected.id,
       attemptIndex: selectedIndex,
-      attemptStartedAt: new Date().toISOString(),
+      attemptQueuedAt: new Date().toISOString(),
+      attemptStartedAt: undefined,
+      providerTaskId: undefined,
+      providerSubmittedAt: undefined,
+      openListTaskId: remote.id,
       remoteName: remote.name,
+      lastRemoteState: undefined,
+      lastRemoteStatus: undefined,
+      lastRemoteObservedAt: undefined,
       awaitingFallbackSelection: undefined,
     },
   });
@@ -356,7 +364,7 @@ function downloadMetadata(
     downloadCandidates: candidates,
     unavailableFallbacks: input.unavailableFallbacks,
     attemptIndex: 0,
-    attemptStartedAt: new Date().toISOString(),
+    attemptQueuedAt: new Date().toISOString(),
     instantOfflinePolicy: policy,
     notificationTarget: deps.notificationTarget,
     completionContinuation: deps.notificationTarget
