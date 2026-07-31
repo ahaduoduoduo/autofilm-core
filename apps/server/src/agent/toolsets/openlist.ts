@@ -17,6 +17,7 @@ import {
   providerSubmissionMetadata,
   providerSubmissionReceipt,
   waitForProviderSubmission,
+  type ProviderSubmittedTask,
 } from "../../tasks/openlist-provider-submission.js";
 import {
   delay,
@@ -374,14 +375,7 @@ async function resumeDownload(
 function recordProviderSubmission(
   deps: ToolDependencies,
   taskId: string,
-  remote: {
-    id: string;
-    name: string;
-    state: number;
-    status: string;
-    provider_task_id: string;
-    provider_submitted_at: string;
-  },
+  remote: ProviderSubmittedTask,
 ) {
   const current = deps.tasks.get(taskId);
   if (!current) throw new Error("离线下载任务记录不存在");
