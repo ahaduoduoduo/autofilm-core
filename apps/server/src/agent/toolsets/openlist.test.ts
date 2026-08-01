@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ToolDependencies } from "../tool-types.js";
 import { createOpenListTools } from "./openlist.js";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function taskStoreRecorder(created: Array<Record<string, unknown>>) {
   let stored: Record<string, unknown> | undefined;
@@ -159,6 +163,8 @@ describe("OpenList download tools", () => {
   });
 
   it("resolves Jackett candidate IDs and submits only their magnet", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-31T12:00:00.000Z"));
     const submitted: Array<{ path: string; url: string }> = [];
     const createdTasks: Array<Record<string, unknown>> = [];
     const magnetUri = `magnet:?xt=urn:btih:${"c".repeat(40)}&dn=Jackett`;
