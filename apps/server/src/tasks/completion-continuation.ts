@@ -11,7 +11,7 @@ export interface CompletionContinuation {
 }
 
 export function createCompletionContinuation(
-  workflowId = randomUUID(),
+  workflowId: string = randomUUID(),
 ): CompletionContinuation {
   return {
     workflowId,
