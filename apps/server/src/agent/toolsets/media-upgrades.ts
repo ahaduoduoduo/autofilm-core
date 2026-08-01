@@ -40,7 +40,7 @@ export function createMediaUpgradeTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "search_media_upgrade_candidates",
         description:
-          "为一部或多部现有 Jellyfin 电影/单集并发搜索替换资源。每个目标独立保存，返回稳定的 upgrade_item_id 和 release_candidate_id。",
+          "为一部或多部现有 Jellyfin 电影/单集并发搜索替换资源。每个目标独立保存，返回与该升级项绑定的 upgrade_item_id 和 upgrade_selection_id；普通资源搜索的 candidateId 不能用于升级。",
         parameters: objectSchema(
           {
             targets: {
@@ -157,15 +157,18 @@ export function createMediaUpgradeTools(deps: ToolDependencies): AgentTool[] {
                 type: "object",
                 properties: {
                   upgrade_item_id: stringProperty("升级子任务ID"),
-                  release_candidate_id: stringProperty("已确认的候选资源ID"),
-                  fallback_candidate_ids: {
+                  upgrade_selection_id: stringProperty(
+                    "search_media_upgrade_candidates 为当前升级子任务返回的选择ID",
+                  ),
+                  fallback_upgrade_selection_ids: {
                     type: "array",
                     maxItems: 8,
                     items: { type: "string" },
-                    description: "可选备用候选ID，失败后只供用户重新选择",
+                    description:
+                      "同一升级子任务中的可选备用选择ID，失败后只供用户重新选择",
                   },
                 },
-                required: ["upgrade_item_id", "release_candidate_id"],
+                required: ["upgrade_item_id", "upgrade_selection_id"],
                 additionalProperties: false,
               },
             },
@@ -531,21 +534,26 @@ function jobResult(deps: ToolDependencies, jobId: string) {
         items.filter((item) => item.state === state).length,
       ]),
     ),
-    items: items.map((item) => ({
-      ...item,
-      candidates: item.candidates.slice(0, 20).map(
-        ({ downloadUrl: _downloadUrl, ...candidate }) => ({
-          ...candidate,
-          sameAsCurrent: isLikelySameMediaRelease({
-            currentPath: openListPathFromUri(item.current.path),
-            currentSize: currentMediaSize(item.current),
-            candidateName: candidate.title,
-            candidateSize: candidate.size,
+    items: items.map((item) => {
+      const { id, candidates, ...publicItem } = item;
+      return {
+        ...publicItem,
+        upgrade_item_id: id,
+        candidates: candidates.slice(0, 20).map(
+          ({ id: candidateId, downloadUrl: _downloadUrl, ...candidate }) => ({
+            ...candidate,
+            upgrade_selection_id: upgradeSelectionId(id, candidateId),
+            sameAsCurrent: isLikelySameMediaRelease({
+              currentPath: openListPathFromUri(item.current.path),
+              currentSize: currentMediaSize(item.current),
+              candidateName: candidate.title,
+              candidateSize: candidate.size,
+            }),
           }),
-        }),
-      ),
-      candidateCount: item.candidates.length,
-    })),
+        ),
+        candidateCount: candidates.length,
+      };
+    }),
   };
 }
 
@@ -612,13 +620,24 @@ function errorMessage(value: unknown): string {
 
 function requireCandidate(
   item: MediaUpgradeItem,
-  id: string,
+  selectionId: string,
 ): MediaUpgradeCandidate {
+  const prefix = `upgrade:v1:${item.id}:`;
+  if (!selectionId.startsWith(prefix)) {
+    throw new Error(
+      `${item.title} 的 upgrade_selection_id 不属于当前升级项目；请使用 search_media_upgrade_candidates 或 get_media_upgrade_job 返回的选择 ID`,
+    );
+  }
+  const id = selectionId.slice(prefix.length);
   const candidate = item.candidates.find((value) => value.id === id);
   if (!candidate) {
-    throw new Error(`${item.title} 的候选资源已失效`);
+    throw new Error(`${item.title} 的升级候选已经变化，请重新读取该升级任务`);
   }
   return candidate;
+}
+
+function upgradeSelectionId(itemId: string, candidateId: string): string {
+  return `upgrade:v1:${itemId}:${candidateId}`;
 }
 
 function candidateId(itemId: string, url: string): string {
@@ -652,12 +671,12 @@ function parseSelections(values: unknown[]) {
     if (!seen.add(itemId)) {
       throw new Error("同一个升级子任务不能重复提交");
     }
-    const fallbackIds = Array.isArray(object.fallback_candidate_ids)
-      ? object.fallback_candidate_ids.map((id) => String(id))
+    const fallbackIds = Array.isArray(object.fallback_upgrade_selection_ids)
+      ? object.fallback_upgrade_selection_ids.map((id) => String(id))
       : [];
     return {
       itemId,
-      candidateId: requireString(object, "release_candidate_id"),
+      candidateId: requireString(object, "upgrade_selection_id"),
       fallbackCandidateIds: fallbackIds,
     };
   });

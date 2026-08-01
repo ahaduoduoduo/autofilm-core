@@ -1,6 +1,6 @@
 # 现有媒体资源升级
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 ## 目标
 
@@ -23,10 +23,11 @@ Updated: 2026-07-31
    - 一次接收 1 到 8 个现有 Jellyfin Movie/Episode ID。
    - 每个目标生成不可变 `upgrade_item_id`。
    - Jackett 查询最多 4 项并发，结果继续按大小从大到小保存。
-   - 每个资源使用目标 ID 和服务端下载入口生成稳定 `release_candidate_id`；
-     Agent 只读取 Jackett 原始标题和候选 ID，不读取下载入口。
+   - 每个资源生成与该升级项绑定的 `upgrade_selection_id`；普通资源搜索返回的
+     `candidateId` 无法用于升级，Agent 也不读取下载入口。
 2. `start_media_upgrades`
-   - 只接受上述稳定 ID，不接受数字序号。
+   - 每项只接受同一个 `upgrade_item_id` 返回的 `upgrade_selection_id` 和
+     `fallback_upgrade_selection_ids`，不接受普通搜索 ID 或数字序号。
    - Core 选中候选后才读取 Jackett 的 torrent 下载入口；`.torrent` 在内网转换为
      BitTorrent v1 magnet，已有 magnet 也会重新校验并用 Jackett 标题替换 `dn`。
    - OpenList 只接收通过校验的 magnet，不接收 Jackett URL。
@@ -61,6 +62,10 @@ Jackett 查询和 OpenList 下载最多 4 项并发。后台替换最多处理 4
 来自 Jackett `Title`；Core 不从 magnet `dn` 推断展示名称，也不向 Agent 返回 Jackett
 API Key、内网下载 URL 或 magnet。普通搜索候选的内存有效期为 30 分钟，过期后必须
 重新搜索。
+
+升级选择 ID 本身包含升级项身份。即使两个搜索结果指向同一 Jackett 资源，它们也不能
+跨升级项互换。升级候选保存在 SQLite 中，不使用普通搜索的 30 分钟内存缓存；读取旧的
+未完成升级任务时，Core 会根据已保存候选重新生成当前格式的选择 ID，无需迁移数据库。
 
 ## 下载完成判定
 

@@ -108,14 +108,56 @@ describe("media upgrade download selection", () => {
     expect(JSON.stringify(safeJob)).not.toContain("downloadUrl");
     expect(JSON.stringify(safeJob)).toContain("Example.2026.2160p.REMUX");
 
+    const publicJob = safeJob as {
+      items: Array<{
+        upgrade_item_id: string;
+        candidates: Array<{
+          title: string;
+          upgrade_selection_id: string;
+        }>;
+      }>;
+    };
+    const publicItem = publicJob.items[0]!;
+    const primarySelection = publicItem.candidates.find(
+      (candidate) => candidate.title === "Example.2026.2160p.REMUX",
+    )!.upgrade_selection_id;
+    const fallbackSelection = publicItem.candidates.find(
+      (candidate) => candidate.title === "Example.2026.2160p.WEB-DL",
+    )!.upgrade_selection_id;
+
     const start = tools.find(
       (tool) => tool.definition.name === "start_media_upgrades",
     )!;
+    const startParameters = start.definition.parameters as {
+      properties: {
+        selections: { items: { properties: Record<string, unknown> } };
+      };
+    };
+    const selectionProperties =
+      startParameters.properties.selections.items.properties;
+    expect(selectionProperties.upgrade_selection_id).toBeDefined();
+    expect(selectionProperties.release_candidate_id).toBeUndefined();
+
+    const mismatched = await start.execute({
+      selections: [{
+        upgrade_item_id: item.id,
+        upgrade_selection_id: "release-main",
+      }],
+    });
+    expect(mismatched).toMatchObject({
+      submitted: 0,
+      failed: 1,
+      items: [{
+        ok: false,
+        error: expect.stringContaining("不属于当前升级项目"),
+      }],
+    });
+
     const result = await start.execute({
       selections: [{
         upgrade_item_id: item.id,
-        release_candidate_id: "release-main",
-        fallback_candidate_ids: ["release-fallback"],
+        upgrade_selection_id: primarySelection,
+        fallback_upgrade_selection_ids: [fallbackSelection],
       }],
     });
 

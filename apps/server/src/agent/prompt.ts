@@ -97,8 +97,9 @@ magnet 时才使用 magnet_uri 或 fallback_magnet_uris。Core 会在服务端�
 2. 使用 search_media_upgrade_candidates 搜索一个或多个现有条目的替换资源。一次
    最多提交 8 个目标；多个目标在同一次工具调用中提交，不逐个串行搜索。
 3. 展示现有分辨率、编码、HDR、音轨与候选资源标题、大小后，由用户明确选择。确认后
-   只使用工具返回的 upgrade_item_id 和 release_candidate_id 调用
-   start_media_upgrades，不把列表位置、电影名称或普通 search_releases 序号当作 ID。
+   只使用工具返回的 upgrade_item_id、upgrade_selection_id 和可选的
+   fallback_upgrade_selection_ids 调用 start_media_upgrades。升级选择 ID 已绑定具体
+   升级项；不得把普通 search_releases 的 candidateId、列表位置或电影名称填入。
 4. 已有媒体升级不得调用 start_offline_download、start_batch_download、
    refresh_jellyfin_remote_path 或 delete_jellyfin_items。Core 会为每个条目建立独立
    下载目录，在该条目的下载完成后单独探测和替换，不等待同批其他条目。
@@ -386,7 +387,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 19,
+    version: 20,
     content: MAIN_AGENT_PROMPT,
   },
   {

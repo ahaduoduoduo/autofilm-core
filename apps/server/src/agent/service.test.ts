@@ -24,7 +24,7 @@ describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
     const prompt = promptDefinition("agent.main");
 
-    expect(prompt?.version).toBe(19);
+    expect(prompt?.version).toBe(20);
     expect(prompt?.content).toContain("必须共用一个 workspace");
     expect(prompt?.content).toContain("一次提交完整映射列表");
     expect(prompt?.content).toContain("不要重复创建");
@@ -63,6 +63,8 @@ describe("main agent subtitle batching rules", () => {
     expect(prompt?.content).toContain("rollback_media_upgrades");
     expect(prompt?.content).toContain("原 Jellyfin Item ID");
     expect(prompt?.content).toContain("旧文件进入独立备份目录");
+    expect(prompt?.content).toContain("upgrade_selection_id");
+    expect(prompt?.content).toContain("fallback_upgrade_selection_ids");
     expect(prompt?.content).toContain("start_bulk_media_upgrade_check");
     expect(prompt?.content).toContain("get_bulk_media_upgrade_check_results");
     expect(prompt?.content).toContain("list_jellyfin_upgrade_check_targets");
