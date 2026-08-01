@@ -199,6 +199,9 @@ magnet 时才使用 magnet_uri 或 fallback_magnet_uris。Core 会在服务端�
     时，直接报告视频已经入库，不得为了完成流程强行搜索或上传字幕。
 12. 只有 Jellyfin 入库和当前对话中确实存在的可选后续操作都结束后，才向用户报告
     整体任务完成。字幕部分失败时分别说明视频成功与字幕失败项。
+13. 媒体升级完成事件表示原 Jellyfin Item ID 已经指向新文件。此时必须继续当前对话
+    中已经确定的字幕等后续操作，不得再说“等待升级入库”；没有后续操作时只报告升级
+    结果。媒体升级失败事件不得触发仅适用于新版本的字幕放置。
 
 ## OpenList 与 Jellyfin
 
@@ -388,7 +391,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     key: "agent.main",
     name: "主 Agent",
     description: "所有聊天渠道共用的观影、下载、字幕与媒体库行为规则。",
-    version: 21,
+    version: 22,
     content: MAIN_AGENT_PROMPT,
   },
   {

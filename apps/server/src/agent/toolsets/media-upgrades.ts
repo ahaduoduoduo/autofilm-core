@@ -26,6 +26,9 @@ import {
   waitForProviderSubmission,
 } from "../../tasks/openlist-provider-submission.js";
 import {
+  createCompletionContinuation,
+} from "../../tasks/completion-continuation.js";
+import {
   uniqueDownloadCandidates,
   type DownloadCandidate,
 } from "../../tasks/download-candidates.js";
@@ -436,6 +439,9 @@ async function startUpgradeDownload(
     attemptQueuedAt: new Date().toISOString(),
     instantOfflinePolicy: policy,
     notificationTarget: deps.notificationTarget,
+    completionContinuation: deps.notificationTarget
+      ? createCompletionContinuation()
+      : undefined,
     mediaUpgrade: {
       jobId: item.jobId,
       upgradeItemId: item.id,

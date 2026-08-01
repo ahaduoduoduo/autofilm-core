@@ -81,10 +81,20 @@ API Key、内网下载 URL 或 magnet。普通搜索候选的内存有效期为 
 
 - 调用 `RemoteRefresh`；
 - 创建第二个 Jellyfin 条目；
-- 恢复普通下载的字幕后续事件。
+- 在 OpenList 下载完成时提前恢复 Agent 会话。
+
+每个升级项还保存独立 `completionContinuation`。只有媒体升级 Worker 已经完成原
+Jellyfin Item 替换并写入 `succeeded`、`succeeded_with_backup_error` 或 `failed`
+终态后，下载完成 Worker 才把结果作为后台事件写入原 Agent 会话。成功时 Agent 继续
+此前已经确定的字幕等操作；失败时不得执行只适用于新版本的字幕操作。同批多个升级项
+使用不同工作流 ID，A 完成后立即恢复 A 的会话处理，不等待 B。
+
+带有续接信息的新任务不会再由媒体升级 Worker 发送固定结果文字，避免先出现一条
+“升级成功”，随后 Agent 又发送一次结果。部署前创建、没有续接信息的历史任务继续
+使用固定通知，避免完成后无人收到结果。
 
 40 秒的 115 秒传规则保持不变。超时后任务进入 `awaiting_alternative`，用户选择保存的
-备用候选后，复用同一个升级项和临时目录。
+备用候选后，复用同一个升级项、临时目录和原会话续接信息。
 
 ## 识别与替换
 

@@ -269,6 +269,12 @@ describe("OpenList download tools", () => {
       externalId: null,
       metadata: {
         destination: "/115/nvideo/movie/2026-07",
+        completionContinuation: {
+          workflowId: "fallback-workflow",
+          state: "pending",
+          attempts: 0,
+          nextAttemptAt: new Date(0).toISOString(),
+        },
         downloadCandidates: [
           {
             id: "candidate-first",
@@ -341,6 +347,9 @@ describe("OpenList download tools", () => {
       },
     });
     expect(stored.state).toBe("running");
+    expect(
+      (updated?.metadata as Record<string, unknown>).completionContinuation,
+    ).toEqual(task.metadata.completionContinuation);
     expect(
       (updated?.metadata as Record<string, unknown>)
         .awaitingFallbackSelection,

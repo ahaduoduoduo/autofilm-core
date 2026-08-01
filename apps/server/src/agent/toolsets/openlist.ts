@@ -8,6 +8,9 @@ import {
 import type { AgentTool, ToolDependencies } from "../tool-types.js";
 import { normalizeMagnetUri } from "../../integrations/torrent-magnet.js";
 import {
+  createCompletionContinuation,
+} from "../../tasks/completion-continuation.js";
+import {
   directMagnetCandidate,
   taskDownloadCandidates,
   uniqueDownloadCandidates,
@@ -469,12 +472,7 @@ function downloadMetadata(
     instantOfflinePolicy: policy,
     notificationTarget: deps.notificationTarget,
     completionContinuation: deps.notificationTarget
-      ? {
-          workflowId: input.workflowId,
-          state: "pending",
-          attempts: 0,
-          nextAttemptAt: new Date().toISOString(),
-        }
+      ? createCompletionContinuation(input.workflowId)
       : undefined,
   };
 }

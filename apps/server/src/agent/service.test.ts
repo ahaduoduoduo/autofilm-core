@@ -33,13 +33,14 @@ describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
     const prompt = promptDefinition("agent.main");
 
-    expect(prompt?.version).toBe(21);
+    expect(prompt?.version).toBe(22);
     expect(prompt?.content).toContain("必须共用一个 workspace");
     expect(prompt?.content).toContain("一次提交完整映射列表");
     expect(prompt?.content).toContain("不要重复创建");
     expect(prompt?.content).toContain("离线下载提交成功");
     expect(prompt?.content).toContain("不得再说“正在提交”");
     expect(prompt?.content).toContain("这不等于什么");
+    expect(prompt?.content).toContain("不得再说“等待升级入库”");
   });
 
   it("requires exact version confirmation before deleting media", () => {

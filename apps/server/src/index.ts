@@ -43,6 +43,7 @@ const downloadCompletionWorker = new DownloadCompletionWorker(
   context.agent,
   context.outbox,
   config.mediaBaseUrl,
+  context.mediaUpgrades,
 );
 const mediaUpgradeWorker = new MediaUpgradeWorker(
   context.mediaUpgrades,

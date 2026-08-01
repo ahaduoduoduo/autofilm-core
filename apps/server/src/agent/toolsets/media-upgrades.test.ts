@@ -88,6 +88,11 @@ describe("media upgrade download selection", () => {
     const submissions: string[] = [];
     const deps = {
       userId: user.id,
+      notificationTarget: {
+        channel: "wechat",
+        providerInstanceId: "wechat-main",
+        targetId: "upgrade-user@wechat",
+      },
       mediaUpgrades,
       tasks,
       jackett: {
@@ -219,6 +224,12 @@ describe("media upgrade download selection", () => {
     expect(metadata.attemptQueuedAt).toEqual(expect.any(String));
     expect(metadata.attemptStartedAt).toEqual(expect.any(String));
     expect(metadata.providerTaskId).toBe("provider-1");
+    expect(metadata.completionContinuation).toMatchObject({
+      workflowId: expect.any(String),
+      state: "pending",
+      attempts: 0,
+      nextAttemptAt: expect.any(String),
+    });
     expect(metadata.downloadCandidates).toEqual([
       {
         id: "release-main",

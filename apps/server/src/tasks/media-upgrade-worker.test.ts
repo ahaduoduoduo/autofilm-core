@@ -54,6 +54,12 @@ describe("MediaUpgradeWorker", () => {
         destination: `/115/autofilm-staging/upgrades/${successful.id}`,
         remoteResultPath: `/115/autofilm-staging/upgrades/${successful.id}`,
         notificationTarget,
+        completionContinuation: {
+          workflowId: "upgrade-success-workflow",
+          state: "pending",
+          attempts: 0,
+          nextAttemptAt: new Date(0).toISOString(),
+        },
       },
     });
     const failedDownload = tasks.create({
@@ -181,7 +187,14 @@ describe("MediaUpgradeWorker", () => {
     expect(deleted).toEqual([
       `/115/autofilm-staging/upgrades/${successful.id}`,
     ]);
-    expect(outbox.claimDue()).toHaveLength(2);
+    const notifications = outbox.claimDue();
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.payload.messages).toEqual([
+      expect.objectContaining({
+        type: "text",
+        text: expect.stringContaining("资源升级失败"),
+      }),
+    ]);
     db.close();
   });
 

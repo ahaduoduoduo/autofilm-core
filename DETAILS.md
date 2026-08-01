@@ -136,12 +136,14 @@ Updated: 2026-07-31
 - `tasks/download-candidates.ts`：读取新旧任务的下载候选；新任务使用结构化
   candidateId、Jackett 标题和 magnet，Agent 读取任务时删除历史 Jackett URL、
   API Key、magnet 和尝试记录中的原始 URL。
-- `tasks/download-completion-worker.ts`：按同一次下载请求的工作流 ID 等待所有
-  OpenList 任务成功且 Jellyfin 导入完成，然后恢复原聊天会话。只执行此前已经约定
-  的可选字幕操作；没有字幕计划时直接报告视频入库结果。
+- `tasks/completion-continuation.ts`：创建并校验下载完成后的持久化会话续接信息。
+- `tasks/download-completion-worker.ts`：普通下载按工作流 ID 等待所有 OpenList 任务
+  成功且 Jellyfin 导入完成；媒体升级按条目等待原 Jellyfin Item 替换完成。终态随后
+  恢复原聊天会话，只执行此前已经约定的可选字幕等操作。
 - `tasks/media-upgrade-worker.ts`：最多并行处理 4 个已下载升级项；逐项识别视频、
   拒绝分辨率下降、更新原 Jellyfin Item ID、自动检查条目路径和视频流，再移动旧文件
-  并发送独立结果通知。
+  并写入终态。带有会话续接信息的新任务由下载完成 Worker 调用 Agent；历史任务仍使用
+  独立结果通知。
 - `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
   公共函数；能继续旧版改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
   不存在时执行一层、唯一且受大小限制的分隔符差异匹配。

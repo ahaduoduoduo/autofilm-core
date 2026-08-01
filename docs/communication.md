@@ -68,6 +68,10 @@ OpenList -> Jellyfin        http://jellyfin:8096
     恢复原 Agent 会话，执行此前已经约定的可选字幕操作，最后通过原 Adapter
     通知成员。没有字幕计划时不强制搜索或上传字幕。
 
+资源升级不执行第 10 步的 `RemoteRefresh`。媒体升级 Worker 更新原 Jellyfin Item
+并完成自动检查后，下载完成 Worker 把升级终态写入该条目发起时的 Agent 会话。每个
+升级项独立恢复，已确定的字幕操作因此可以在新版启用后继续执行。
+
 第 7 步不列举网盘目录，也不是文件同步。普通文件变更与 Jellyfin 无关。
 
 ## 播放

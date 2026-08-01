@@ -18,6 +18,7 @@ import {
   resolveOriginalOpenListPath,
   toOpenListUri,
 } from "./media-upgrade-files.js";
+import { parseCompletionContinuation } from "./completion-continuation.js";
 
 const PROCESS_CONCURRENCY = 4;
 
@@ -339,6 +340,13 @@ export class MediaUpgradeWorker {
     const download = item.downloadTaskId
       ? this.tasks.get(item.downloadTaskId)
       : undefined;
+    if (
+      parseCompletionContinuation(
+        download?.metadata.completionContinuation,
+      )
+    ) {
+      return;
+    }
     const target = notificationTarget(download?.metadata.notificationTarget);
     this.outbox.enqueue({
       userId: download?.userId,

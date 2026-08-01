@@ -1,18 +1,16 @@
 import type { TaskSummary } from "@autofilm/contracts";
 import type { AgentService } from "../agent/service.js";
 import { agentMessages } from "../channels/agent-messages.js";
+import type {
+  MediaUpgradeItem,
+  MediaUpgradeStore,
+} from "../db/media-upgrade-store.js";
 import type { OutboxStore } from "../db/outbox-store.js";
 import type { TaskStore } from "../db/task-store.js";
-
-interface CompletionContinuation {
-  workflowId: string;
-  state: "pending" | "running" | "completed" | "failed";
-  attempts: number;
-  nextAttemptAt: string;
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
-}
+import {
+  parseCompletionContinuation,
+  type CompletionContinuation,
+} from "./completion-continuation.js";
 
 interface NotificationTarget {
   channel: string;
@@ -32,6 +30,7 @@ export class DownloadCompletionWorker {
     private readonly agent: AgentService,
     private readonly outbox: OutboxStore,
     private readonly mediaBaseUrl: string,
+    private readonly mediaUpgrades?: MediaUpgradeStore,
     private readonly intervalMs = 5_000,
   ) {}
 
@@ -53,7 +52,7 @@ export class DownloadCompletionWorker {
     try {
       const groups = completionGroups(this.tasks.list(500));
       for (const group of groups) {
-        if (!ready(group) || !due(group)) continue;
+        if (!this.ready(group) || !due(group)) continue;
         await this.complete(group).catch(() => undefined);
       }
     } finally {
@@ -61,9 +60,33 @@ export class DownloadCompletionWorker {
     }
   }
 
+  private ready(group: TaskSummary[]): boolean {
+    return group.every((task) => {
+      const upgrade = mediaUpgradeReference(task.metadata.mediaUpgrade);
+      if (upgrade) {
+        const item = this.mediaUpgrades?.get(upgrade.upgradeItemId);
+        return Boolean(
+          item &&
+            ["succeeded", "succeeded_with_backup_error", "failed"].includes(
+              item.state,
+            ) &&
+            ["completed", "failed", "cancelled"].includes(task.state),
+        );
+      }
+      if (task.state !== "completed") return false;
+      const refresh = task.metadata.jellyfinRefresh;
+      return Boolean(
+        refresh &&
+          typeof refresh === "object" &&
+          !Array.isArray(refresh) &&
+          (refresh as Record<string, unknown>).state === "completed",
+      );
+    });
+  }
+
   private async complete(group: TaskSummary[]): Promise<void> {
     const leader = group[0]!;
-    const continuation = completionContinuation(
+    const continuation = parseCompletionContinuation(
       leader.metadata.completionContinuation,
     )!;
     const target = notificationTarget(leader.metadata.notificationTarget);
@@ -90,7 +113,11 @@ export class DownloadCompletionWorker {
         channel: target.channel,
         providerInstanceId: target.providerInstanceId,
         externalConversationId: target.targetId,
-        text: completionEvent(group, continuation.workflowId),
+        text: completionEvent(
+          group,
+          continuation.workflowId,
+          this.mediaUpgrades,
+        ),
       });
       this.outbox.enqueueMessages({
         userId: leader.userId,
@@ -130,7 +157,7 @@ export class DownloadCompletionWorker {
           userId: leader.userId,
           ...target,
           text:
-            `视频已经加入 Jellyfin，但后续处理失败：${message}\n` +
+            `${completionFailurePrefix(group)}，但 Agent 后续处理失败：${message}\n` +
             "字幕尚未完成时，可在当前对话中继续处理。",
         });
       }
@@ -164,7 +191,7 @@ export class DownloadCompletionWorker {
 function completionGroups(tasks: TaskSummary[]): TaskSummary[][] {
   const groups = new Map<string, TaskSummary[]>();
   for (const task of tasks) {
-    const continuation = completionContinuation(
+    const continuation = parseCompletionContinuation(
       task.metadata.completionContinuation,
     );
     if (!continuation || continuation.state === "completed") continue;
@@ -177,21 +204,8 @@ function completionGroups(tasks: TaskSummary[]): TaskSummary[][] {
   );
 }
 
-function ready(group: TaskSummary[]): boolean {
-  return group.every((task) => {
-    if (task.state !== "completed") return false;
-    const refresh = task.metadata.jellyfinRefresh;
-    return Boolean(
-      refresh &&
-        typeof refresh === "object" &&
-        !Array.isArray(refresh) &&
-        (refresh as Record<string, unknown>).state === "completed",
-    );
-  });
-}
-
 function due(group: TaskSummary[]): boolean {
-  const continuation = completionContinuation(
+  const continuation = parseCompletionContinuation(
     group[0]!.metadata.completionContinuation,
   );
   if (!continuation || continuation.state === "failed") return false;
@@ -201,26 +215,6 @@ function due(group: TaskSummary[]): boolean {
       Date.now() - startedAt >= RUNNING_STALE_MS;
   }
   return Date.parse(continuation.nextAttemptAt) <= Date.now();
-}
-
-function completionContinuation(
-  value: unknown,
-): CompletionContinuation | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  const continuation = value as Partial<CompletionContinuation>;
-  if (
-    typeof continuation.workflowId !== "string" ||
-    !["pending", "running", "completed", "failed"].includes(
-      String(continuation.state),
-    ) ||
-    typeof continuation.attempts !== "number" ||
-    typeof continuation.nextAttemptAt !== "string"
-  ) {
-    return undefined;
-  }
-  return continuation as CompletionContinuation;
 }
 
 function notificationTarget(value: unknown): NotificationTarget | undefined {
@@ -239,7 +233,20 @@ function notificationTarget(value: unknown): NotificationTarget | undefined {
     : undefined;
 }
 
-function completionEvent(group: TaskSummary[], workflowId: string): string {
+function completionEvent(
+  group: TaskSummary[],
+  workflowId: string,
+  mediaUpgrades?: MediaUpgradeStore,
+): string {
+  const upgradeItems = group
+    .map((task) => {
+      const reference = mediaUpgradeReference(task.metadata.mediaUpgrade);
+      return reference ? mediaUpgrades?.get(reference.upgradeItemId) : undefined;
+    })
+    .filter((item): item is MediaUpgradeItem => Boolean(item));
+  if (upgradeItems.length === group.length) {
+    return mediaUpgradeCompletionEvent(upgradeItems, workflowId);
+  }
   const tasks = group
     .map((task) => {
       const refresh = task.metadata.jellyfinRefresh as
@@ -258,4 +265,61 @@ function completionEvent(group: TaskSummary[], workflowId: string): string {
     "不要新增字幕，直接报告视频已经入库。不得重新搜索或下载视频资源。" +
     "最终回复分别说明视频入库结果和实际执行的字幕结果。"
   );
+}
+
+function mediaUpgradeCompletionEvent(
+  items: MediaUpgradeItem[],
+  workflowId: string,
+): string {
+  const failed = items.filter((item) => item.state === "failed");
+  const details = items
+    .map((item) => {
+      const lines = [
+        `- ${item.title}`,
+        `  升级项目 ID：${item.id}`,
+        `  Jellyfin Item ID：${item.jellyfinItemId}`,
+        `  状态：${item.state}`,
+      ];
+      if (item.newPath) lines.push(`  新文件：${item.newPath}`);
+      if (item.backupPath) lines.push(`  旧文件备份：${item.backupPath}`);
+      if (item.error) lines.push(`  说明：${item.error}`);
+      return lines.join("\n");
+    })
+    .join("\n");
+  if (failed.length > 0) {
+    return (
+      "【AutoFilm 后台事件】\n" +
+      "这不是用户的新升级指令。此前已经获得同意的媒体升级现已结束，但升级失败。\n" +
+      `工作流 ID：${workflowId}\n${details}\n` +
+      "向用户报告具体失败结果。不得把下载提交或临时文件误报为升级成功，也不要执行仅在" +
+      "新版本启用后才适用的字幕放置。保留当前对话中仍然有效的信息，等待用户决定是否重新选择资源。"
+    );
+  }
+  return (
+    "【AutoFilm 后台事件】\n" +
+    "这不是用户的新升级指令。此前已经获得同意的媒体升级现已完成，Jellyfin 原条目已经指向新文件。\n" +
+    `工作流 ID：${workflowId}\n${details}\n` +
+    "继续当前对话中已经约定但尚未执行的后续操作。若此前已经确定或用户明确要求了字幕，" +
+    "现在使用原 Jellyfin Item ID 完成字幕处理和放置；若没有字幕计划、没有满意字幕或视频已有" +
+    "合适字幕，不要新增字幕。不得重新搜索或下载视频资源。最终回复分别说明资源升级结果和" +
+    "实际执行的字幕结果。状态为 succeeded_with_backup_error 时还要说明旧文件备份未完成。"
+  );
+}
+
+function mediaUpgradeReference(
+  value: unknown,
+): { upgradeItemId: string } | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const reference = value as Record<string, unknown>;
+  return typeof reference.upgradeItemId === "string"
+    ? { upgradeItemId: reference.upgradeItemId }
+    : undefined;
+}
+
+function completionFailurePrefix(group: TaskSummary[]): string {
+  return group.some((task) => mediaUpgradeReference(task.metadata.mediaUpgrade))
+    ? "资源升级状态已经写入"
+    : "视频已经加入 Jellyfin";
 }
