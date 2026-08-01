@@ -37,6 +37,25 @@ describe("media upgrade download selection", () => {
       query: "Example 2026",
       current: {
         path: "openlist:///115/movie/Example.2026.1080p.mkv",
+        mediaSources: [{
+          Id: "jellyfin-1",
+          Container: "mkv",
+          Size: 90,
+          MediaStreams: [
+            {
+              Type: "Video",
+              Codec: "h264",
+              Width: 1920,
+              Height: 1080,
+            },
+            ...Array.from({ length: 80 }, (_, index) => ({
+              Type: "Subtitle",
+              Codec: "PGSSUB",
+              Language: index % 2 === 0 ? "eng" : "zho",
+              DisplayTitle: `Subtitle ${index} ${"x".repeat(500)}`,
+            })),
+          ],
+        }],
       },
     });
     const internalUrl =
@@ -106,6 +125,8 @@ describe("media upgrade download selection", () => {
     const safeJob = await getJob.execute({ job_id: jobId });
     expect(JSON.stringify(safeJob)).not.toContain("jackett_apikey");
     expect(JSON.stringify(safeJob)).not.toContain("downloadUrl");
+    expect(JSON.stringify(safeJob)).not.toContain("MediaStreams");
+    expect(JSON.stringify(safeJob).length).toBeLessThan(24_000);
     expect(JSON.stringify(safeJob)).toContain("Example.2026.2160p.REMUX");
 
     const publicJob = safeJob as {
@@ -118,12 +139,16 @@ describe("media upgrade download selection", () => {
       }>;
     };
     const publicItem = publicJob.items[0]!;
+    expect(publicItem.upgrade_item_id).toBe(item.id);
     const primarySelection = publicItem.candidates.find(
       (candidate) => candidate.title === "Example.2026.2160p.REMUX",
     )!.upgrade_selection_id;
     const fallbackSelection = publicItem.candidates.find(
       (candidate) => candidate.title === "Example.2026.2160p.WEB-DL",
     )!.upgrade_selection_id;
+    expect(primarySelection).toMatch(
+      new RegExp(`^upgrade:v1:${item.id}:`),
+    );
 
     const start = tools.find(
       (tool) => tool.definition.name === "start_media_upgrades",
@@ -137,6 +162,21 @@ describe("media upgrade download selection", () => {
       startParameters.properties.selections.items.properties;
     expect(selectionProperties.upgrade_selection_id).toBeDefined();
     expect(selectionProperties.release_candidate_id).toBeUndefined();
+
+    const wrongItem = await start.execute({
+      selections: [{
+        upgrade_item_id: "jellyfin-1",
+        upgrade_selection_id: primarySelection,
+      }],
+    });
+    expect(wrongItem).toMatchObject({
+      submitted: 0,
+      failed: 1,
+      items: [{
+        ok: false,
+        error: expect.stringContaining("不能使用 Jellyfin Item ID"),
+      }],
+    });
 
     const mismatched = await start.execute({
       selections: [{

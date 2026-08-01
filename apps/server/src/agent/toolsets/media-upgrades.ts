@@ -29,6 +29,10 @@ import {
   uniqueDownloadCandidates,
   type DownloadCandidate,
 } from "../../tasks/download-candidates.js";
+import {
+  mediaUpgradeJobResult,
+  requireUpgradeCandidate,
+} from "./media-upgrade-results.js";
 
 const MAX_TARGETS = 8;
 const SEARCH_CONCURRENCY = 4;
@@ -139,7 +143,7 @@ export function createMediaUpgradeTools(deps: ToolDependencies): AgentTool[] {
             });
           }
         });
-        return jobResult(deps, jobId);
+        return mediaUpgradeJobResult(deps.mediaUpgrades, jobId);
       },
     },
     {
@@ -218,7 +222,7 @@ export function createMediaUpgradeTools(deps: ToolDependencies): AgentTool[] {
         if (deps.mediaUpgrades.jobOwner(jobId) !== deps.userId) {
           throw new Error("资源升级任务不存在");
         }
-        return jobResult(deps, jobId);
+        return mediaUpgradeJobResult(deps.mediaUpgrades, jobId);
       },
     },
     {
@@ -384,13 +388,18 @@ async function startUpgradeDownload(
   },
 ): Promise<unknown> {
   const item = deps.mediaUpgrades.get(selection.itemId);
-  if (!item || deps.mediaUpgrades.jobOwner(item.jobId) !== deps.userId) {
+  if (!item) {
+    throw new Error(
+      "upgrade_item_id 无效；必须使用升级候选结果中当前 items 条目的 upgrade_item_id，不能使用 Jellyfin Item ID 或 job_id",
+    );
+  }
+  if (deps.mediaUpgrades.jobOwner(item.jobId) !== deps.userId) {
     throw new Error("升级子任务不存在");
   }
   if (item.state !== "awaiting_selection") {
     throw new Error(`${item.title} 当前不能选择资源`);
   }
-  const selected = requireCandidate(item, selection.candidateId);
+  const selected = requireUpgradeCandidate(item, selection.candidateId);
   if (
     isLikelySameMediaRelease({
       currentPath: openListPathFromUri(item.current.path),
@@ -404,7 +413,7 @@ async function startUpgradeDownload(
     );
   }
   const fallbacks = selection.fallbackCandidateIds.map((id) =>
-    requireCandidate(item, id),
+    requireUpgradeCandidate(item, id),
   );
   const resolved = await resolveUpgradeCandidates(
     deps,
@@ -523,40 +532,6 @@ async function startUpgradeDownload(
   }
 }
 
-function jobResult(deps: ToolDependencies, jobId: string) {
-  const items = deps.mediaUpgrades.items(jobId);
-  return {
-    jobId,
-    total: items.length,
-    states: Object.fromEntries(
-      [...new Set(items.map((item) => item.state))].map((state) => [
-        state,
-        items.filter((item) => item.state === state).length,
-      ]),
-    ),
-    items: items.map((item) => {
-      const { id, candidates, ...publicItem } = item;
-      return {
-        ...publicItem,
-        upgrade_item_id: id,
-        candidates: candidates.slice(0, 20).map(
-          ({ id: candidateId, downloadUrl: _downloadUrl, ...candidate }) => ({
-            ...candidate,
-            upgrade_selection_id: upgradeSelectionId(id, candidateId),
-            sameAsCurrent: isLikelySameMediaRelease({
-              currentPath: openListPathFromUri(item.current.path),
-              currentSize: currentMediaSize(item.current),
-              candidateName: candidate.title,
-              candidateSize: candidate.size,
-            }),
-          }),
-        ),
-        candidateCount: candidates.length,
-      };
-    }),
-  };
-}
-
 async function resolveUpgradeCandidates(
   deps: ToolDependencies,
   selected: MediaUpgradeCandidate,
@@ -616,28 +591,6 @@ async function resolveUpgradeCandidates(
 
 function errorMessage(value: unknown): string {
   return value instanceof Error ? value.message : String(value);
-}
-
-function requireCandidate(
-  item: MediaUpgradeItem,
-  selectionId: string,
-): MediaUpgradeCandidate {
-  const prefix = `upgrade:v1:${item.id}:`;
-  if (!selectionId.startsWith(prefix)) {
-    throw new Error(
-      `${item.title} 的 upgrade_selection_id 不属于当前升级项目；请使用 search_media_upgrade_candidates 或 get_media_upgrade_job 返回的选择 ID`,
-    );
-  }
-  const id = selectionId.slice(prefix.length);
-  const candidate = item.candidates.find((value) => value.id === id);
-  if (!candidate) {
-    throw new Error(`${item.title} 的升级候选已经变化，请重新读取该升级任务`);
-  }
-  return candidate;
-}
-
-function upgradeSelectionId(itemId: string, candidateId: string): string {
-  return `upgrade:v1:${itemId}:${candidateId}`;
 }
 
 function candidateId(itemId: string, url: string): string {

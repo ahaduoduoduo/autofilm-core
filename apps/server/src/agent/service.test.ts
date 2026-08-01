@@ -11,6 +11,15 @@ describe("agent tool result formatting", () => {
     expect(formatToolResult("get_subtitle_workspace", content)).toBe(content);
   });
 
+  it("preserves complete media upgrade selection manifests", () => {
+    const content = "x".repeat(30_000);
+
+    expect(formatToolResult("search_media_upgrade_candidates", content)).toBe(
+      content,
+    );
+    expect(formatToolResult("get_media_upgrade_job", content)).toBe(content);
+  });
+
   it("retains the general tool output limit", () => {
     const content = "x".repeat(30_000);
     const result = formatToolResult("search_releases", content);
@@ -24,7 +33,7 @@ describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
     const prompt = promptDefinition("agent.main");
 
-    expect(prompt?.version).toBe(20);
+    expect(prompt?.version).toBe(21);
     expect(prompt?.content).toContain("必须共用一个 workspace");
     expect(prompt?.content).toContain("一次提交完整映射列表");
     expect(prompt?.content).toContain("不要重复创建");

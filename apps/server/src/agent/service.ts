@@ -540,7 +540,9 @@ export function formatToolResult(toolName: string, content: string): string {
   if (
     toolName === "search_subtitle" ||
     toolName === "get_subtitle_detail" ||
-    toolName === "get_subtitle_workspace"
+    toolName === "get_subtitle_workspace" ||
+    toolName === "search_media_upgrade_candidates" ||
+    toolName === "get_media_upgrade_job"
   ) {
     return content;
   }

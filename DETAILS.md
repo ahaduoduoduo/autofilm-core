@@ -86,6 +86,8 @@ Updated: 2026-07-31
 - `media-upgrade-store.ts`：升级批次、逐条状态、候选、下载任务、替换路径、备份和
   恢复信息；对 Agent 返回的升级选择 ID 由工具层绑定升级项，内部候选 ID 不与普通
   Jackett 搜索共用。
+- `agent/toolsets/media-upgrade-results.ts`：生成紧凑升级任务结果、媒体流摘要和绑定升级
+  项的选择 ID；不向模型返回完整 Jellyfin 轨道或内部 Jackett 下载地址。
 - `media-upgrade-check-store.ts`：批量画质检查任务、逐片状态、命中样例、统计和聊天
   通知状态；支持 Core 重启后继续未完成项目。
 - `user-memory-store.ts`：按成员隔离的长期偏好、限制、资料和备注；生成受长度限制的
