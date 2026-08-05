@@ -273,13 +273,8 @@ Core SQLite；仅复制主数据库而遗漏 WAL 不是有效在线备份。
 - `OPENLIST_DATA_DIR`：OpenList 持久化目录，挂载到 `/opt/openlist/data`。
 - `JELLYFIN_CONFIG_DIR`：Jellyfin 配置和数据库目录，挂载到 `/config`。
 - `JELLYFIN_CACHE_DIR`：Jellyfin 缓存目录，挂载到 `/cache`。
-- `JELLYFIN_MEDIA_DIR`：旧本地媒体根目录，挂载到 `/movie`。
-`JELLYFIN_MEDIA_DIR` 保留本地媒体库和未迁移记录的读取能力。
-
-个人迁移分支曾将旧软链接树只读挂载到 `/legacy-subtitles`，用于字幕首次读取时的
-延迟迁移。当前迁移已经完成，公共镜像和正式 Compose 不再声明该挂载。正式部署于
-2026-08-06 停止旧 rclone，并退役 `/volume1/movie/dri` 和
-`/volume1/movie/drimnt`。`/movie` 父目录挂载继续用于真正的本地媒体库。
+- `JELLYFIN_MEDIA_DIR`：本地媒体根目录，挂载到 `/movie`。
+`JELLYFIN_MEDIA_DIR` 用于常规本地媒体库；OpenList 媒体不依赖该挂载。
 
 ### 接管已有部署
 
@@ -290,11 +285,6 @@ Core SQLite；仅复制主数据库而遗漏 WAL 不是有效在线备份。
 旧 AList 数据目录由 UID `1001` 的 OpenList 进程写入。接管旧目录时需要保证该
 UID 拥有读写权限。Jellyfin 旧数据库首次由 v12 启动时会执行数据库升级，
 应等待升级完成后再访问媒体库。
-
-历史路径迁移已将旧媒体条目、外挂字幕和媒体库根目录改为 `openlist:///`。字幕迁移
-报告位于工作区 `artifacts/legacy-subtitle-migration-2026-08-06.md`：84 个本地字幕
-均已存在于远端或完成上传，失败和待处理数量均为 0。旧软链接树不再参与播放、字幕
-读取或媒体库维护。
 
 ## 备份
 
