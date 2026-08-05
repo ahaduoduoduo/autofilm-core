@@ -1,6 +1,6 @@
 # System repositories and upstreams
 
-Updated: 2026-07-30
+Updated: 2026-08-06
 
 AutoFilm 媒体系统由六个相邻源码仓库组成。`autofilm-core` 是业务入口和
 Docker Compose 编排仓库，其余五个仓库保持独立 fork，便于继续跟踪上游更新。
@@ -12,12 +12,13 @@ Docker Compose 编排仓库，其余五个仓库保持独立 fork，便于继续
 | `autofilm-core` | `ahaduoduoduo/autofilm-core` | 新建项目，无上游 | `agent/initial-core` | Agent、成员、AI、任务、管理界面和 Compose |
 | `autofilm-openlist` | `ahaduoduoduo/autofilm-openlist` | `OpenListTeam/OpenList` | `feature/autofilm-remote-media` | 网盘文件、115、离线任务和 Jellyfin 专用路径接口 |
 | `autofilm-openlist-frontend` | `ahaduoduoduo/autofilm-openlist-frontend` | `OpenListTeam/OpenList-Frontend` | `feature/autofilm-remote-media` | 115 风控/扫码界面和手动扫描菜单 |
-| `autofilm-jellyfin` | `ahaduoduoduo/autofilm-jellyfin` | `jellyfin/jellyfin` | `master`、`codex/personal-legacy-compat` | 远端媒体、播放、字幕、删除和个人迁移 |
-| `autofilm-jellyfin-web` | `ahaduoduoduo/autofilm-jellyfin-web` | `jellyfin/jellyfin-web` | `codex/autofilm-integrated-web`、`codex/personal-legacy-compat` | OpenList 媒体库选择和个人迁移界面 |
+| `autofilm-jellyfin` | `ahaduoduoduo/autofilm-jellyfin` | `jellyfin/jellyfin` | `master` | 远端媒体、播放、字幕、删除和资源替换 |
+| `autofilm-jellyfin-web` | `ahaduoduoduo/autofilm-jellyfin-web` | `jellyfin/jellyfin-web` | `codex/autofilm-integrated-web` | OpenList 媒体库选择和远端目录扫描 |
 | `autofilm-weclaw` | `ahaduoduoduo/weclaw` | `fastclaw-ai/weclaw` | `agent/generic-native-services` | 通用微信 Adapter、多 Agent 和联系人权限 |
 
 OpenList、Jellyfin 和 Jellyfin Web fork 会保留上游创建的维护分支；上表只列出
-AutoFilm 使用和维护的分支。
+AutoFilm 当前使用和继续开发的分支。Jellyfin 前后端的
+`codex/personal-legacy-compat` 保留为迁移历史分支，不再作为开发或部署基线。
 
 ## 修改边界
 
@@ -102,7 +103,7 @@ AutoFilm 只是一个 Native Agent。其他服务可以实现相同 HTTP 契约�
 
 ## 上游更新原则
 
-1. 通用能力优先保存在公开主分支，个人迁移逻辑保存在个人分支。
+1. 新功能只在公开 Jellyfin 前后端分支开发；个人迁移分支只保留历史代码。
 2. 合并上游前先比较上游是否已经提供同等能力，避免长期保留重复补丁。
 3. OpenList 和 Jellyfin 之间只共享路径与受限服务令牌，不建立网盘对象 ID 映射。
 4. Core 负责明确的业务操作，不恢复目录常驻同步。

@@ -156,7 +156,6 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 | `JELLYFIN_CONFIG_DIR` | Jellyfin 配置和数据库目录 |
 | `JELLYFIN_CACHE_DIR` | Jellyfin 缓存目录 |
 | `JELLYFIN_MEDIA_DIR` | 本地媒体根目录 |
-| `JELLYFIN_LEGACY_SUBTITLE_DIR` | 个人迁移分支读取旧字幕的只读目录 |
 
 `.env`、数据库、Cookie、扫码状态和真实服务密钥不能加入 Git。
 
@@ -169,10 +168,11 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 | `AUTOFILM_CORE_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-core:latest` |
 | `AUTOFILM_TELEGRAM_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-telegram-adapter:latest` |
 | `AUTOFILM_OPENLIST_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-openlist:latest` |
-| `AUTOFILM_JELLYFIN_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-jellyfin:personal` |
+| `AUTOFILM_JELLYFIN_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-jellyfin:latest` |
 | `AUTOFILM_WECLAW_IMAGE` | `ghcr.io/ahaduoduoduo/weclaw:latest` |
 
-公开部署不需要个人迁移能力时，将 Jellyfin 改为 `:latest`。
+完整编排默认使用公共分支镜像。`personal` 标签只保留用于历史数据库迁移，不再用于
+当前正式部署。
 
 ## 本地开发检查
 
@@ -274,12 +274,10 @@ Core SQLite；仅复制主数据库而遗漏 WAL 不是有效在线备份。
 - `JELLYFIN_CONFIG_DIR`：Jellyfin 配置和数据库目录，挂载到 `/config`。
 - `JELLYFIN_CACHE_DIR`：Jellyfin 缓存目录，挂载到 `/cache`。
 - `JELLYFIN_MEDIA_DIR`：旧本地媒体根目录，挂载到 `/movie`。
-- `JELLYFIN_LEGACY_SUBTITLE_DIR`：旧软链接树，按只读方式挂载到
-  `/legacy-subtitles`，只用于字幕首次读取时的延迟迁移。
-
 `JELLYFIN_MEDIA_DIR` 保留本地媒体库和未迁移记录的读取能力。
-`JELLYFIN_LEGACY_SUBTITLE_DIR` 不参与视频播放，也不是独立整理出的字幕目录；
-它就是旧视频软链接与外挂字幕原来共同所在的目录。
+
+个人迁移分支曾将旧软链接树只读挂载到 `/legacy-subtitles`，用于字幕首次读取时的
+延迟迁移。当前迁移已经完成，公共镜像和正式 Compose 不再声明该挂载。
 
 ### 接管已有部署
 

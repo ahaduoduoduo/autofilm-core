@@ -172,8 +172,9 @@ autofilm-weclaw/
 [docs/telegram-adapter.md](docs/telegram-adapter.md)。
 
 `.github/workflows/build-images.yml` 负责发布 Core、Telegram、OpenList、
-Jellyfin 公共版/个人版和 WeClaw 的 `linux/amd64` GHCR 镜像。Core 源码变化自动
-构建 Core 与 Telegram；其他组合镜像从 Actions 页面按组件和分支手动构建。
+Jellyfin 公共版和 WeClaw 的 `linux/amd64` GHCR 镜像；个人 Jellyfin 构建项只保留
+历史迁移复现用途。Core 源码变化自动构建 Core 与 Telegram；其他组合镜像从
+Actions 页面按组件和分支手动构建。当前 Jellyfin 开发和正式部署均使用公共分支。
 
 ## 开发
 

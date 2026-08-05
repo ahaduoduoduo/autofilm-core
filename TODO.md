@@ -1,8 +1,13 @@
 # AutoFilm Core development status
 
-Updated: 2026-08-05
+Updated: 2026-08-06
 
 ## 已完成
+
+- [x] 2026-08-06：Jellyfin 数据库路径迁移完成；正式 Compose 从个人迁移镜像切换到
+  公共 `latest` 镜像，移除旧字幕只读挂载和个人迁移环境变量。本地 Jellyfin 后端与
+  Web 工作目录分别改用 `master` 和 `codex/autofilm-integrated-web`，后续功能只在
+  公共分支开发；个人分支保留为历史记录。
 
 - [x] 2026-08-05：参考 Codex 增加主 Agent 本地上下文压缩；完整消息和工具原始结果
   保留在 SQLite，模型视图按 Token 限制单项工具结果，并在上下文窗口默认 80% 时
