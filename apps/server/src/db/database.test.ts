@@ -42,6 +42,18 @@ describe("database migrations", () => {
       INSERT INTO service_configs VALUES
         ('one', 'OpenList', 'openlist', 'http://openlist:5244', NULL, '{}', 1,
          '2026-07-01', '2026-07-01');
+      CREATE TABLE model_profiles (
+        id TEXT PRIMARY KEY,
+        provider_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        model TEXT NOT NULL,
+        is_default INTEGER NOT NULL DEFAULT 0,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        temperature REAL,
+        max_output_tokens INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
       CREATE TABLE users (
         id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
@@ -104,6 +116,17 @@ describe("database migrations", () => {
         "SELECT name FROM sqlite_master WHERE type='table' AND name='media_upgrade_check_items'",
       ).get(),
     ).toBeTruthy();
+    expect(
+      db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_compactions'",
+      ).get(),
+    ).toBeTruthy();
+    expect(
+      db.prepare("PRAGMA table_info(model_profiles)").all().some(
+        (column) =>
+          (column as { name: string }).name === "context_window_tokens",
+      ),
+    ).toBe(true);
     db.close();
   });
 });

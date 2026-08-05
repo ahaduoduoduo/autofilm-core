@@ -200,4 +200,73 @@ describe("conversation history", () => {
     });
     database.close();
   });
+
+  it("keeps raw messages while using a persistent compacted model view", () => {
+    const directory = mkdtempSync(
+      path.join(os.tmpdir(), "autofilm-conversation-"),
+    );
+    directories.push(directory);
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const users = new UserStore(database);
+    const conversations = new ConversationStore(database);
+    const user = users.create({
+      username: "compact-member",
+      displayName: "Compact Member",
+      role: "member",
+    });
+    const identity = {
+      userId: user.id,
+      channel: "wechat",
+      providerInstanceId: "wechat-main",
+      externalConversationId: "compact@wechat",
+    };
+    const conversationId = conversations.getOrCreate(identity);
+    conversations.append(conversationId, {
+      role: "user",
+      content: "升级电影 A，并在成功后放置字幕。",
+    });
+    conversations.append(conversationId, {
+      role: "assistant",
+      content: "",
+      toolCalls: [{
+        id: "call-upgrade",
+        name: "start_media_upgrades",
+        arguments: { id: "upgrade-one" },
+      }],
+    });
+    const last = conversations.append(conversationId, {
+      role: "tool",
+      toolCallId: "call-upgrade",
+      content: JSON.stringify({ state: "running", id: "upgrade-one" }),
+    });
+
+    conversations.saveCompaction({
+      conversationId,
+      throughSequence: last.sequence,
+      summary: "当前目标：升级电影 A。关键状态：upgrade-one 正在运行。",
+      retainedUserMessages: ["升级电影 A，并在成功后放置字幕。"],
+      sourceTokenEstimate: 200,
+      summaryTokenEstimate: 40,
+      compactionCount: 1,
+    });
+    conversations.append(conversationId, {
+      role: "assistant",
+      content: "升级完成后继续。",
+    });
+
+    const model = conversations.modelHistory(conversationId, {
+      toolOutputTokenLimit: 1_000,
+    });
+    expect(model.messages).toHaveLength(2);
+    expect(model.messages[0]?.content).toContain("upgrade-one 正在运行");
+    expect(model.messages[0]?.content).toContain(
+      "升级电影 A，并在成功后放置字幕。",
+    );
+    expect(model.messages[1]?.content).toBe("升级完成后继续。");
+    expect(conversations.history(conversationId)).toHaveLength(4);
+
+    conversations.reset(identity);
+    expect(conversations.modelHistory(conversationId).messages).toEqual([]);
+    database.close();
+  });
 });

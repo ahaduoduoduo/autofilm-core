@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "./database.js";
 import type { CanonicalMessage, ToolCall } from "../ai/types.js";
+import { limitToolOutputs } from "../ai/token-budget.js";
+import {
+  type ConversationCompactionInput,
+  type ConversationCompactionPlan,
+  type ConversationCompactionRow,
+  formatCompactedContext,
+  parseRetainedUserMessages,
+} from "./conversation-compaction.js";
+import { formatTopicMemory } from "./conversation-topic.js";
+
+export type { ConversationCompactionInput, ConversationCompactionPlan } from "./conversation-compaction.js";
 
 interface ConversationRow {
   id: string;
@@ -134,6 +145,11 @@ export class ConversationStore {
           )
           .run(row.id);
         this.db
+          .prepare(
+            "DELETE FROM conversation_compactions WHERE conversation_id = ?",
+          )
+          .run(row.id);
+        this.db
           .prepare("DELETE FROM messages WHERE conversation_id = ?")
           .run(row.id);
       })();
@@ -205,12 +221,23 @@ export class ConversationStore {
     return { id, sequence: Number(result.lastInsertRowid) };
   }
 
-  modelHistory(conversationId: string, limit = 80): {
+  modelHistory(
+    conversationId: string,
+    options: { limit?: number; toolOutputTokenLimit?: number } = {},
+  ): {
     messages: CanonicalMessage[];
     memory: string;
   } {
+    const limit = options.limit ?? 80;
     const state = this.topicState(conversationId);
-    const messages = state
+    const activeStartSequence = state
+      ? this.messageSequence(conversationId, state.started_message_id) ?? 0
+      : 0;
+    const compaction = this.compactionRow(conversationId);
+    const messages = compaction &&
+        compaction.through_sequence >= activeStartSequence
+      ? this.compactedModelHistory(conversationId, compaction)
+      : state
       ? this.historyStartingAt(
           conversationId,
           state.started_message_id,
@@ -219,9 +246,88 @@ export class ConversationStore {
       : this.history(conversationId, limit);
     const summaries = this.topicSummaries(conversationId, 12);
     return {
-      messages,
+      messages: options.toolOutputTokenLimit
+        ? limitToolOutputs(messages, options.toolOutputTokenLimit)
+        : messages,
       memory: formatTopicMemory(summaries),
     };
+  }
+
+  compactionPlan(
+    conversationId: string,
+  ): ConversationCompactionPlan | undefined {
+    const state = this.topicState(conversationId);
+    const topicStartSequence = state
+      ? this.messageSequence(conversationId, state.started_message_id) ?? 0
+      : 0;
+    const retainedStartId = this.retainedHistoryStartMessageId(
+      conversationId,
+      80,
+    );
+    const retainedStartSequence = retainedStartId
+      ? this.messageSequence(conversationId, retainedStartId) ?? 0
+      : 0;
+    const initialStartSequence = Math.max(
+      topicStartSequence,
+      retainedStartSequence,
+    );
+    const previous = this.compactionRow(conversationId);
+    const previousApplies = Boolean(
+      previous && previous.through_sequence >= topicStartSequence,
+    );
+    const startSequence = previousApplies
+      ? previous!.through_sequence + 1
+      : initialStartSequence;
+    const rows = this.db
+      .prepare(
+        `SELECT rowid AS sequence, role, content, tool_calls_json, tool_call_id
+         FROM messages
+         WHERE conversation_id = ? AND rowid >= ?
+         ORDER BY rowid`,
+      )
+      .all(conversationId, startSequence) as MessageRow[];
+    const last = rows.at(-1);
+    if (!last) return undefined;
+    return {
+      previousSummary: previousApplies ? previous!.summary : "",
+      previousRetainedUserMessages: previousApplies
+        ? parseRetainedUserMessages(previous!.retained_user_messages_json)
+        : [],
+      messages: rows.map(toCanonicalMessage),
+      targetSequence: last.sequence,
+      compactionCount: previousApplies ? previous!.compaction_count + 1 : 1,
+    };
+  }
+
+  saveCompaction(input: ConversationCompactionInput): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO conversation_compactions
+          (conversation_id, through_sequence, summary,
+           retained_user_messages_json, source_token_estimate,
+           summary_token_estimate, compaction_count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(conversation_id) DO UPDATE SET
+           through_sequence=excluded.through_sequence,
+           summary=excluded.summary,
+           retained_user_messages_json=excluded.retained_user_messages_json,
+           source_token_estimate=excluded.source_token_estimate,
+           summary_token_estimate=excluded.summary_token_estimate,
+           compaction_count=excluded.compaction_count,
+           updated_at=excluded.updated_at`,
+      )
+      .run(
+        input.conversationId,
+        input.throughSequence,
+        input.summary.trim(),
+        JSON.stringify(input.retainedUserMessages),
+        input.sourceTokenEstimate,
+        input.summaryTokenEstimate,
+        input.compactionCount,
+        now,
+        now,
+      );
   }
 
   planTopicSwitch(
@@ -362,6 +468,57 @@ export class ConversationStore {
          WHERE conversation_id = ?`,
       )
       .get(conversationId) as TopicStateRow | undefined;
+  }
+
+  private compactionRow(
+    conversationId: string,
+  ): ConversationCompactionRow | undefined {
+    return this.db
+      .prepare(
+        `SELECT through_sequence, summary, retained_user_messages_json,
+                source_token_estimate, summary_token_estimate, compaction_count
+         FROM conversation_compactions
+         WHERE conversation_id = ?`,
+      )
+      .get(conversationId) as ConversationCompactionRow | undefined;
+  }
+
+  private compactedModelHistory(
+    conversationId: string,
+    compaction: ConversationCompactionRow,
+  ): CanonicalMessage[] {
+    const suffix = this.db
+      .prepare(
+        `SELECT rowid AS sequence, role, content, tool_calls_json, tool_call_id
+         FROM messages
+         WHERE conversation_id = ? AND rowid > ?
+         ORDER BY rowid`,
+      )
+      .all(conversationId, compaction.through_sequence) as MessageRow[];
+    return [
+      {
+        role: "user",
+        content: formatCompactedContext(
+          compaction.summary,
+          parseRetainedUserMessages(compaction.retained_user_messages_json),
+        ),
+      },
+      ...suffix.map(toCanonicalMessage),
+    ];
+  }
+
+  private messageSequence(
+    conversationId: string,
+    messageId: string,
+  ): number | undefined {
+    return (
+      this.db
+        .prepare(
+          `SELECT rowid AS sequence FROM messages
+           WHERE conversation_id = ? AND id = ?`,
+        )
+        .get(conversationId, messageId) as { sequence: number } | undefined
+    )?.sequence;
   }
 
   private topicSummaries(
@@ -507,21 +664,6 @@ function toCanonicalMessage(row: MessageRow): CanonicalMessage {
 
 function topicKey(topic: MediaTopic): string {
   return `${topic.mediaType}:tmdb:${topic.tmdbId}`;
-}
-
-function formatTopicMemory(summaries: TopicSummary[]): string {
-  if (summaries.length === 0) return "";
-  const blocks: string[] = [];
-  let length = 0;
-  for (const item of summaries) {
-    const block =
-      `### ${item.title}${item.productionYear ? ` (${item.productionYear})` : ""}\n` +
-      `身份：${item.mediaType} / TMDB ${item.tmdbId}\n${item.summary.trim()}`;
-    if (length + block.length > 16_000) break;
-    blocks.push(block);
-    length += block.length;
-  }
-  return `## 较早影视主题摘要\n\n${blocks.join("\n\n")}`;
 }
 
 function expandToTurnStart(

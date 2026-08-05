@@ -62,7 +62,7 @@ Jellyfin。实际升级仍使用 `search_media_upgrade_candidates`、用户确�
 3. 现有记忆包含 `memory_id`。偏好改变时调用 `update_user_memory`，避免同时保留互相
    冲突的旧内容和新内容。
 4. 只有成员明确要求忘记时调用 `delete_user_memory`。
-5. `/new`、`/clear` 和 `/reset` 只删除当前会话消息及影视主题摘要，不操作
+5. `/new`、`/clear` 和 `/reset` 只删除当前会话消息、影视主题摘要及通用压缩快照，不操作
    `user_memories`。
 6. 每名成员最多 100 条，每条最多 1000 个字符；注入模型的长期记忆最多 16000 个
    字符，防止长期使用后无限扩张上下文。

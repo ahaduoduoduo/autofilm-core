@@ -99,10 +99,16 @@ Core；它们继续保留媒体条目、播放历史、存储和文件状态。C
 Cookie Jar，请求开始遵守统一间隔，但不同任务可以同时等待网络和 OCR 响应。追更条件
 与分集状态需要跨重启保留，因此存入 Core SQLite。
 
-会话原始消息始终保存在 `messages`。当前影视主题使用 TMDB ID 标识；Agent 明确
+会话原始消息和工具原始结果始终保存在 `messages`。主 Agent 模型视图按模型配置的
+工具输出预算限制单项结果，并在上下文使用量达到默认 80% 时执行本地分块压缩，最新
+替代历史保存到 `conversation_compactions`。压缩可发生在同一任务的工具调用过程中，
+不会覆盖原始消息。详细规则见 `docs/context-management.md`。
+
+当前影视主题使用 TMDB ID 标识；Agent 明确
 切换作品后，Core 使用独立无工具请求生成上一主题摘要，保存到
-`conversation_topic_summaries`。发给模型的历史由较早主题摘要、当前主题完整消息和
-当前服务器时间组成。摘要不删除原始消息，也不拆分一次工具调用及其结果。
+`conversation_topic_summaries`。发给模型的历史由较早主题摘要、通用压缩替代历史、
+压缩后的新增消息和当前服务器时间组成。两类摘要都不删除原始消息，也不拆分一次
+工具调用及其结果。
 
 Telegram 与 WeClaw 都在独立 Adapter 进程中。Telegram Adapter 使用 long polling，
 Core 只接收统一事件并通过统一 `/v1/messages` 接口发送结果。

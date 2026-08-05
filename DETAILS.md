@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-07-31
+Updated: 2026-08-05
 
 ## 根目录
 
@@ -41,11 +41,15 @@ Updated: 2026-07-31
 - `anthropic.ts`：Anthropic Messages 映射。
 - `gemini.ts`：Gemini GenerateContent 映射。
 - `http.ts`：AI HTTP 错误和超时处理。
+- `token-budget.ts`：跨协议 Token 保守估算、模型上下文策略和工具结果视图限制。
 
 ### `agent`
 
 - `service.ts`：持久化会话、按会话顺序执行顶层请求、并行工具迭代、运行时间注入、
-  影视主题摘要、TMDB 封面媒体生成、只读追更检查和管理员扫码工具。
+  Token 阈值检查、影视主题摘要、TMDB 封面媒体生成、只读追更检查和管理员扫码工具。
+- `context-compactor.ts`：使用当前模型执行无工具本地分块压缩，保留近期用户原话并
+  写入持久化替代视图。
+- `conversation-transcript.ts`：为影视主题摘要和通用上下文压缩统一生成受限会话片段。
 - `conversation-queue.ts`：同一会话按提交顺序执行，不同会话互不等待。
 - `catalog-poster.ts`：从本次 TMDB 搜索结果和最终回复中确定唯一条目，不猜测
   存在歧义的封面。
@@ -81,7 +85,10 @@ Updated: 2026-07-31
 - `database.ts`：SQLite WAL 和顺序迁移。
 - `user-store.ts`：成员、会话和外部身份。
 - `config-store.ts`：AI、模型、渠道和媒体服务配置。
-- `conversation-store.ts`：会话消息、Native 事件去重、当前影视主题和历史主题摘要。
+- `conversation-store.ts`：会话消息、Native 事件去重、当前影视主题、历史主题摘要和
+  压缩后的模型视图。
+- `conversation-compaction.ts`：压缩快照数据类型、近期用户原话解析和替代消息格式。
+- `conversation-topic.ts`：较早影视主题摘要的模型上下文格式和长度限制。
 - `task-store.ts`：任务生命周期。
 - `media-upgrade-store.ts`：升级批次、逐条状态、候选、下载任务、替换路径、备份和
   恢复信息；对 Agent 返回的升级选择 ID 由工具层绑定升级项，内部候选 ID 不与普通
@@ -97,8 +104,10 @@ Updated: 2026-07-31
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
 - `prompt-store.ts`：提示词初始化、读取、自定义和恢复默认值；系统升级只替换
   未自定义的旧版本。
-- `conversation-store.ts` 保留全部原始聊天消息；模型视图使用最近 80 条完整请求。
-  当前影视主题保留完整消息，较早主题读取结构化摘要，不改写工具调用历史。
+- `conversation-store.ts` 保留全部原始聊天消息；首次模型视图使用最近 80 条消息记录，
+  并向前扩展到完整用户回合。达到模型 Token 阈值后读取
+  `conversation_compactions` 替代历史并追加新消息。
+  当前影视主题和较早主题摘要继续独立管理，不改写工具调用历史。
 
 ### `integrations`、`tasks`、`channels`
 
@@ -199,7 +208,7 @@ Updated: 2026-07-31
 - `pages/ServicesPage.tsx`：媒体服务和 115 扫码登录。
 - `pages/TasksPage.tsx`：任务进度。
 - `pages/WatchlistsPage.tsx`：管理员查看和删除追更项。
-- `pages/PromptsPage.tsx`：查看、编辑和恢复五类数据库提示词。
+- `pages/PromptsPage.tsx`：查看、编辑和恢复七类数据库提示词。
 - `pages/PlaygroundPage.tsx`：管理员 Agent 测试。
 - `styles/`：按中性设计令牌、顶部布局、基础组件和业务页面拆分的样式。
 
@@ -213,7 +222,7 @@ Updated: 2026-07-31
 
 系统仓库关系和通信方式分别记录在 `docs/system-repositories.md`、
 `docs/communication.md`。复杂流程分别记录在 `docs/architecture.md`、`docs/ai-providers.md`、
-`docs/prompts.md`、`docs/native-adapters.md`、`docs/openlist-jellyfin.md` 和
+`docs/prompts.md`、`docs/context-management.md`、`docs/native-adapters.md`、`docs/openlist-jellyfin.md` 和
 `docs/security.md`；字幕与追更见 `docs/subtitles-watchlists.md`，管理界面规范见
 `docs/admin-ui.md`；115 重试和 Telegram 分别见
 `docs/instant-offline-retry.md`、`docs/telegram-adapter.md`；自动下载目录见

@@ -33,6 +33,9 @@ interface ModelRow {
   enabled: number;
   temperature: number | null;
   max_output_tokens: number | null;
+  context_window_tokens: number;
+  auto_compact_token_limit: number | null;
+  tool_output_token_limit: number;
   created_at: string;
   updated_at: string;
 }
@@ -176,6 +179,9 @@ export class ConfigStore {
     enabled: boolean;
     temperature?: number | null;
     maxOutputTokens?: number | null;
+    contextWindowTokens?: number;
+    autoCompactTokenLimit?: number | null;
+    toolOutputTokenLimit?: number;
   }): ModelProfile {
     const existing = input.id ? this.model(input.id) : undefined;
     const id = existing?.id ?? randomUUID();
@@ -187,12 +193,18 @@ export class ConfigStore {
       this.db
         .prepare(
           `INSERT INTO model_profiles
-            (id, provider_id, name, model, is_default, enabled, temperature, max_output_tokens, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, provider_id, name, model, is_default, enabled, temperature,
+             max_output_tokens, context_window_tokens,
+             auto_compact_token_limit, tool_output_token_limit,
+             created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              provider_id=excluded.provider_id, name=excluded.name, model=excluded.model,
              is_default=excluded.is_default, enabled=excluded.enabled,
              temperature=excluded.temperature, max_output_tokens=excluded.max_output_tokens,
+             context_window_tokens=excluded.context_window_tokens,
+             auto_compact_token_limit=excluded.auto_compact_token_limit,
+             tool_output_token_limit=excluded.tool_output_token_limit,
              updated_at=excluded.updated_at`,
         )
         .run(
@@ -204,6 +216,11 @@ export class ConfigStore {
           Number(input.enabled),
           input.temperature ?? null,
           input.maxOutputTokens ?? null,
+          input.contextWindowTokens ?? existing?.contextWindowTokens ?? 128_000,
+          input.autoCompactTokenLimit === undefined
+            ? existing?.autoCompactTokenLimit ?? null
+            : input.autoCompactTokenLimit,
+          input.toolOutputTokenLimit ?? existing?.toolOutputTokenLimit ?? 12_000,
           existing?.createdAt ?? now,
           now,
         );
@@ -410,6 +427,9 @@ function toModel(row: ModelRow): ModelProfile {
     enabled: Boolean(row.enabled),
     temperature: row.temperature,
     maxOutputTokens: row.max_output_tokens,
+    contextWindowTokens: row.context_window_tokens,
+    autoCompactTokenLimit: row.auto_compact_token_limit,
+    toolOutputTokenLimit: row.tool_output_token_limit,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

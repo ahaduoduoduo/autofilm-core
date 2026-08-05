@@ -44,6 +44,9 @@ export interface ModelProfile {
   enabled: boolean;
   temperature: number | null;
   maxOutputTokens: number | null;
+  contextWindowTokens: number;
+  autoCompactTokenLimit: number | null;
+  toolOutputTokenLimit: number;
   createdAt: string;
   updatedAt: string;
 }

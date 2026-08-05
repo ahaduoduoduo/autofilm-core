@@ -1,3 +1,4 @@
+import type { ModelProfile } from "@autofilm/contracts";
 import type { ConfigStore } from "../db/config-store.js";
 import type {
   ConversationStore,
@@ -13,7 +14,13 @@ import { createAiClient } from "../ai/client.js";
 import type {
   AiClient,
   CanonicalMessage,
+  ToolDefinition,
 } from "../ai/types.js";
+import {
+  contextBudgetPolicy,
+  estimateGenerateRequestTokens,
+  limitToolOutputs,
+} from "../ai/token-budget.js";
 import type { JackettClient } from "../integrations/jackett.js";
 import type { MediaUpgradeStore } from "../db/media-upgrade-store.js";
 import type { MediaUpgradeCheckStore } from "../db/media-upgrade-check-store.js";
@@ -29,6 +36,8 @@ import type { SubtitleCleaner } from "../subtitles/cleaner.js";
 import { createAgentTools } from "./tools.js";
 import { executeToolCalls } from "./tool-executor.js";
 import { ConversationQueue } from "./conversation-queue.js";
+import { LocalContextCompactor } from "./context-compactor.js";
+import { formatConversationTranscript } from "./conversation-transcript.js";
 import {
   rememberCatalogResults,
   selectedCatalogItem,
@@ -59,8 +68,14 @@ export interface AgentDependencies {
 
 export class AgentService {
   private readonly conversationQueue = new ConversationQueue();
+  private readonly contextCompactor: LocalContextCompactor;
 
-  constructor(private readonly deps: AgentDependencies) {}
+  constructor(private readonly deps: AgentDependencies) {
+    this.contextCompactor = new LocalContextCompactor(
+      deps.conversations,
+      deps.prompts,
+    );
+  }
 
   async respond(input: {
     userId: string;
@@ -174,28 +189,25 @@ export class AgentService {
       },
     );
     const catalogItems = new Map<number, CatalogItem>();
+    let observedInputTokens = 0;
 
     for (let iteration = 0; iteration < 12; iteration += 1) {
-      const context = this.deps.conversations.modelHistory(conversationId);
+      const messages = await this.prepareAgentMessages({
+        conversationId,
+        userId: input.userId,
+        client,
+        model,
+        tools: tools.map((tool) => tool.definition),
+        observedInputTokens,
+      });
       const result = await client.generate({
         model: model.model,
-        messages: [
-          {
-            role: "system",
-            content: runtimeSystemPrompt(
-              this.deps.prompts.get("agent.main"),
-              combinedMemory(
-                this.deps.userMemories.prompt(input.userId),
-                context.memory,
-              ),
-            ),
-          },
-          ...context.messages,
-        ],
+        messages,
         tools: tools.map((tool) => tool.definition),
         temperature: model.temperature,
         maxOutputTokens: model.maxOutputTokens,
       });
+      observedInputTokens = result.usage.inputTokens;
 
       if (result.toolCalls.length === 0) {
         const content = result.content.trim() || "任务已处理，但模型没有返回文本。";
@@ -216,30 +228,31 @@ export class AgentService {
         rememberCatalogResults(call.name, content, catalogItems);
         this.deps.conversations.append(conversationId, {
           role: "tool",
-          content: formatToolResult(call.name, content),
+          content,
           toolCallId: call.id,
         });
       }
     }
-    const context = this.deps.conversations.modelHistory(conversationId);
+    const messages = await this.prepareAgentMessages({
+      conversationId,
+      userId: input.userId,
+      client,
+      model,
+      tools: [],
+      observedInputTokens,
+      finalResponse: true,
+    });
     const finalResult = await client.generate({
       model: model.model,
       messages: [
         {
           role: "system",
-          content:
-            `${runtimeSystemPrompt(
-              this.deps.prompts.get("agent.main"),
-              combinedMemory(
-                this.deps.userMemories.prompt(input.userId),
-                context.memory,
-              ),
-            )}\n\n` +
+          content: `${messages[0]?.content ?? ""}\n\n` +
             "本次请求已经达到工具轮次边界。不得继续调用工具。根据已有工具结果说明" +
             "哪些项目已经成功、哪些失败、哪些尚未执行；不得把内部轮次边界或未执行项" +
             "描述为业务成功。",
         },
-        ...context.messages,
+        ...messages.slice(1),
       ],
       temperature: model.temperature,
       maxOutputTokens: model.maxOutputTokens,
@@ -334,10 +347,11 @@ export class AgentService {
           `条件：${input.conditions || "有可用发布版本"}`,
       },
     ];
+    const policy = contextBudgetPolicy(model);
     for (let iteration = 0; iteration < 8; iteration += 1) {
       const response = await client.generate({
         model: model.model,
-        messages,
+        messages: limitToolOutputs(messages, policy.toolOutputTokenLimit),
         tools: tools.map((tool) => tool.definition),
         temperature: 0,
         maxOutputTokens: Math.min(model.maxOutputTokens ?? 4096, 4096),
@@ -352,12 +366,87 @@ export class AgentService {
       for (const { call, content } of toolResults) {
         messages.push({
           role: "tool",
-          content: formatToolResult(call.name, content),
+          content,
           toolCallId: call.id,
         });
       }
     }
     throw new Error("Watchlist evaluator exceeded the tool iteration limit");
+  }
+
+  private async prepareAgentMessages(input: {
+    conversationId: string;
+    userId: string;
+    client: AiClient;
+    model: ModelProfile;
+    tools: ToolDefinition[];
+    observedInputTokens: number;
+    finalResponse?: boolean;
+  }): Promise<CanonicalMessage[]> {
+    const policy = contextBudgetPolicy(input.model);
+    const build = () => {
+      const context = this.deps.conversations.modelHistory(
+        input.conversationId,
+        { toolOutputTokenLimit: policy.toolOutputTokenLimit },
+      );
+      return [
+        {
+          role: "system" as const,
+          content: runtimeSystemPrompt(
+            this.deps.prompts.get("agent.main"),
+            combinedMemory(
+              this.deps.userMemories.prompt(input.userId),
+              context.memory,
+            ),
+          ),
+        },
+        ...context.messages,
+      ];
+    };
+    let messages = build();
+    const estimatedTokens = estimateGenerateRequestTokens(
+      messages,
+      input.tools,
+    );
+    if (
+      Math.max(estimatedTokens, input.observedInputTokens) <
+      policy.autoCompactTokenLimit
+    ) {
+      return messages;
+    }
+
+    try {
+      const result = await this.contextCompactor.compact({
+        conversationId: input.conversationId,
+        client: input.client,
+        model: input.model,
+        policy,
+      });
+      if (result.compacted) {
+        messages = build();
+      }
+    } catch (error) {
+      console.warn("AutoFilm local context compaction failed", {
+        conversationId: input.conversationId,
+        finalResponse: Boolean(input.finalResponse),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (estimatedTokens >= Math.floor(policy.contextWindowTokens * 0.95)) {
+        throw new Error(
+          `会话接近模型上下文上限且本地压缩失败：${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    const preparedTokens = estimateGenerateRequestTokens(messages, input.tools);
+    if (preparedTokens >= Math.floor(policy.contextWindowTokens * 0.95)) {
+      throw new Error(
+        `本地压缩后上下文仍需要约 ${preparedTokens.toLocaleString()} Token，` +
+        `已接近配置窗口 ${policy.contextWindowTokens.toLocaleString()} Token`,
+      );
+    }
+    return messages;
   }
 
   async testModel(input: {
@@ -489,7 +578,7 @@ export class AgentService {
     previous: TopicSummary,
     messages: CanonicalMessage[],
   ): Promise<string> {
-    const transcript = topicTranscript(messages);
+    const transcript = formatConversationTranscript(messages);
     const result = await input.client.generate({
       model: input.model,
       messages: [
@@ -530,25 +619,6 @@ function conversationKey(input: {
   ]);
 }
 
-function truncate(value: string, length: number): string {
-  return value.length > length
-    ? `${value.slice(0, length)}…[truncated]`
-    : value;
-}
-
-export function formatToolResult(toolName: string, content: string): string {
-  if (
-    toolName === "search_subtitle" ||
-    toolName === "get_subtitle_detail" ||
-    toolName === "get_subtitle_workspace" ||
-    toolName === "search_media_upgrade_candidates" ||
-    toolName === "get_media_upgrade_job"
-  ) {
-    return content;
-  }
-  return truncate(content, 24_000);
-}
-
 function runtimeSystemPrompt(base: string, memory = ""): string {
   const now = new Date();
   const local = now.toLocaleString("zh-CN", {
@@ -568,32 +638,4 @@ function runtimeSystemPrompt(base: string, memory = ""): string {
 
 function combinedMemory(...values: string[]): string {
   return values.filter(Boolean).join("\n\n");
-}
-
-function topicTranscript(messages: CanonicalMessage[]): string {
-  const blocks = messages.map((message) => {
-    const calls = (message.toolCalls ?? [])
-      .map(
-        (call) =>
-          `${call.name}(${truncate(JSON.stringify(call.arguments), 2_000)})`,
-      )
-      .join(", ");
-    return (
-      `[${message.role}${message.toolCallId ? ` ${message.toolCallId}` : ""}]` +
-      `${calls ? ` 工具：${calls}` : ""}\n` +
-      truncate(message.content, message.role === "tool" ? 6_000 : 12_000)
-    );
-  });
-  const selected: string[] = [];
-  let total = 0;
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    const block = blocks[index]!;
-    if (total + block.length > 100_000) {
-      selected.unshift("[较早内容因摘要输入上限省略]");
-      break;
-    }
-    selected.unshift(block);
-    total += block.length;
-  }
-  return selected.join("\n\n");
 }

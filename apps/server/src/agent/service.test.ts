@@ -1,33 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { promptDefinition } from "./prompt.js";
-import { formatToolResult } from "./service.js";
-
-describe("agent tool result formatting", () => {
-  it("preserves complete subtitle search, detail, and workspace results", () => {
-    const content = "x".repeat(30_000);
-
-    expect(formatToolResult("search_subtitle", content)).toBe(content);
-    expect(formatToolResult("get_subtitle_detail", content)).toBe(content);
-    expect(formatToolResult("get_subtitle_workspace", content)).toBe(content);
-  });
-
-  it("preserves complete media upgrade selection manifests", () => {
-    const content = "x".repeat(30_000);
-
-    expect(formatToolResult("search_media_upgrade_candidates", content)).toBe(
-      content,
-    );
-    expect(formatToolResult("get_media_upgrade_job", content)).toBe(content);
-  });
-
-  it("retains the general tool output limit", () => {
-    const content = "x".repeat(30_000);
-    const result = formatToolResult("search_releases", content);
-
-    expect(result).toHaveLength(24_012);
-    expect(result.endsWith("…[truncated]")).toBe(true);
-  });
-});
 
 describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
@@ -62,6 +34,9 @@ describe("main agent subtitle batching rules", () => {
     expect(prompt?.content).toContain("set_active_media_topic");
     expect(promptDefinition("conversation.summarizer")?.content).toContain(
       "已知信息、已完成、待处理",
+    );
+    expect(promptDefinition("conversation.compactor")?.content).toContain(
+      "稳定 ID",
     );
   });
 

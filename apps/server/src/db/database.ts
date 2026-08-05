@@ -386,6 +386,27 @@ const migrations = [
   CREATE INDEX media_upgrade_check_items_results_idx
     ON media_upgrade_check_items(job_id, state, created_at);
   `,
+  `
+  ALTER TABLE model_profiles
+    ADD COLUMN context_window_tokens INTEGER NOT NULL DEFAULT 128000;
+  ALTER TABLE model_profiles
+    ADD COLUMN auto_compact_token_limit INTEGER;
+  ALTER TABLE model_profiles
+    ADD COLUMN tool_output_token_limit INTEGER NOT NULL DEFAULT 12000;
+
+  CREATE TABLE conversation_compactions (
+    conversation_id TEXT PRIMARY KEY
+      REFERENCES conversations(id) ON DELETE CASCADE,
+    through_sequence INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    retained_user_messages_json TEXT NOT NULL DEFAULT '[]',
+    source_token_estimate INTEGER NOT NULL DEFAULT 0,
+    summary_token_estimate INTEGER NOT NULL DEFAULT 0,
+    compaction_count INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  `,
 ];
 
 export type AppDatabase = Database.Database;

@@ -1,5 +1,6 @@
 export type PromptKey =
   | "agent.main"
+  | "conversation.compactor"
   | "conversation.summarizer"
   | "subtitle.captcha.system"
   | "subtitle.captcha.user"
@@ -386,6 +387,28 @@ const CONVERSATION_SUMMARIZER_PROMPT = `
 组织；没有内容的部分省略。
 `.trim();
 
+const CONVERSATION_COMPACTOR_PROMPT = `
+你是 AutoFilm 的本地会话上下文压缩器。输入包含此前压缩摘要（可能为空）和后续原始
+会话记录。只生成供主 Agent 继续工作的状态摘要，不调用工具，不回应用户，不执行
+任何外部操作，也不编造工具未明确确认的结果。
+
+摘要必须保留：
+- 当前用户目标、已经确认的选择和仍然有效的限制；
+- 已完成、运行中、等待选择、失败及需要重试的操作，并区分这些状态；
+- 继续任务所需的 TMDB/Jellyfin Item、任务、工作流、候选、workspace、放置计划、
+  字幕引用等稳定 ID，以及必要路径、季集和版本信息；
+- 用户已明确同意的外部修改，及尚未取得同意的修改；
+- 后台下载或资源升级完成后应继续执行的字幕、入库或通知事项；
+- 与当前任务有关的用户偏好。长期偏好仍由独立成员记忆保存，不需要重复扩写。
+
+工具结果是状态事实的主要依据。工具只返回“提交成功”时不得写成下载完成；失败、
+部分成功和等待必须按原状态记录。删除大段候选清单、工具协议细节、重复解释、失效
+链接、日志和已经没有后续意义的中间步骤。
+
+输出中文纯文本，必须能够脱离原始记录单独使用。按“当前目标、关键状态、已完成、
+待处理、必要标识”组织，没有内容的部分省略。控制在 3000 字以内。
+`.trim();
+
 export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
   {
     key: "agent.main",
@@ -400,6 +423,13 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition[] = [
     description: "切换影视主题时压缩上一作品上下文，原始聊天不会删除。",
     version: 1,
     content: CONVERSATION_SUMMARIZER_PROMPT,
+  },
+  {
+    key: "conversation.compactor",
+    name: "会话上下文压缩",
+    description: "接近模型窗口时在本地生成替代历史，原始聊天不会删除。",
+    version: 1,
+    content: CONVERSATION_COMPACTOR_PROMPT,
   },
   {
     key: "subtitle.captcha.system",

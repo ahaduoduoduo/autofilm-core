@@ -171,6 +171,9 @@ export function AiPage() {
                 providerId: providers[0]?.id,
                 enabled: true,
                 isDefault: models.length === 0,
+                contextWindowTokens: 128_000,
+                autoCompactTokenLimit: null,
+                toolOutputTokenLimit: 12_000,
               })
             }
           >
@@ -418,6 +421,9 @@ function ModelModal({
     providerId: value.providerId ?? providers[0]?.id ?? "",
     temperature: value.temperature?.toString() ?? "",
     maxOutputTokens: value.maxOutputTokens?.toString() ?? "",
+    contextWindowTokens: (value.contextWindowTokens ?? 128_000).toString(),
+    autoCompactTokenLimit: value.autoCompactTokenLimit?.toString() ?? "",
+    toolOutputTokenLimit: (value.toolOutputTokenLimit ?? 12_000).toString(),
     isDefault: value.isDefault ?? false,
     enabled: value.enabled ?? true,
   });
@@ -435,6 +441,11 @@ function ModelModal({
           maxOutputTokens: form.maxOutputTokens
             ? Number(form.maxOutputTokens)
             : null,
+          contextWindowTokens: Number(form.contextWindowTokens),
+          autoCompactTokenLimit: form.autoCompactTokenLimit
+            ? Number(form.autoCompactTokenLimit)
+            : null,
+          toolOutputTokenLimit: Number(form.toolOutputTokenLimit),
           isDefault: form.isDefault,
           enabled: form.enabled,
         }),
@@ -470,6 +481,46 @@ function ModelModal({
             </Select>
           </Field>
         </div>
+        <div className="form-grid">
+          <Field
+            label="上下文窗口 Token"
+            hint="填写供应方为这个模型提供的完整上下文窗口"
+          >
+            <Input
+              type="number"
+              min="8192"
+              max="2000000"
+              value={form.contextWindowTokens}
+              onChange={(e) => change("contextWindowTokens", e.target.value)}
+              required
+            />
+          </Field>
+          <Field
+            label="自动压缩 Token 阈值"
+            hint="留空使用窗口的 80%；最高允许 90%"
+          >
+            <Input
+              type="number"
+              min="4096"
+              max="1800000"
+              value={form.autoCompactTokenLimit}
+              onChange={(e) => change("autoCompactTokenLimit", e.target.value)}
+            />
+          </Field>
+        </div>
+        <Field
+          label="单工具输出 Token 预算"
+          hint="只限制发送给模型的视图；SQLite 保留工具原始结果"
+        >
+          <Input
+            type="number"
+            min="512"
+            max="100000"
+            value={form.toolOutputTokenLimit}
+            onChange={(e) => change("toolOutputTokenLimit", e.target.value)}
+            required
+          />
+        </Field>
         <Field label="模型 ID" hint="填写供应方接口实际接受的 model 值">
           <Input
             value={form.model}

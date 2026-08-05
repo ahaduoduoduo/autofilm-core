@@ -17,19 +17,49 @@ const providerSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
-const modelSchema = z.object({
-  id: z.string().uuid().optional(),
-  providerId: z.string().uuid(),
-  name: z.string().trim().min(1).max(100),
-  model: z.string().trim().min(1).max(200),
-  isDefault: z.boolean().default(false),
-  enabled: z.boolean().default(true),
-  temperature: z.number().min(0).max(2).nullable().optional(),
-  maxOutputTokens: z.number().int().positive().max(1_000_000).nullable().optional(),
-});
+const modelSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    providerId: z.string().uuid(),
+    name: z.string().trim().min(1).max(100),
+    model: z.string().trim().min(1).max(200),
+    isDefault: z.boolean().default(false),
+    enabled: z.boolean().default(true),
+    temperature: z.number().min(0).max(2).nullable().optional(),
+    maxOutputTokens: z
+      .number()
+      .int()
+      .positive()
+      .max(1_000_000)
+      .nullable()
+      .optional(),
+    contextWindowTokens: z.number().int().min(8_192).max(2_000_000).optional(),
+    autoCompactTokenLimit: z
+      .number()
+      .int()
+      .min(4_096)
+      .max(1_800_000)
+      .nullable()
+      .optional(),
+    toolOutputTokenLimit: z.number().int().min(512).max(100_000).optional(),
+  })
+  .superRefine((input, context) => {
+    const contextWindowTokens = input.contextWindowTokens ?? 128_000;
+    if (
+      input.autoCompactTokenLimit &&
+      input.autoCompactTokenLimit > Math.floor(contextWindowTokens * 0.9)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["autoCompactTokenLimit"],
+        message: "自动压缩阈值不能超过上下文窗口的 90%",
+      });
+    }
+  });
 
 const promptKeySchema = z.enum([
   "agent.main",
+  "conversation.compactor",
   "conversation.summarizer",
   "subtitle.captcha.system",
   "subtitle.captcha.user",

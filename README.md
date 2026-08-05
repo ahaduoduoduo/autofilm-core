@@ -17,7 +17,7 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   - Anthropic Messages。
   - Gemini GenerateContent。
 - New API 可作为任意供应方配置，不是特殊代码路径。
-- 主 Agent、影视主题摘要、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
+- 主 Agent、会话压缩、影视主题摘要、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
   管理界面修改并恢复当前版本的系统默认内容；修改在下一次模型请求时生效。
 - 39 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
   ASS 样式和按成员追更；管理员聊天另有 OpenList 扫码工具。
@@ -29,8 +29,11 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   直接核对作品。
 - 同一成员会话的顶层请求按顺序执行，避免工具调用历史交叉；不同会话和同一轮工具
   仍可并行。
-- 最近 80 条会话上下文按完整用户请求截取，不拆分工具调用与结果；历史中存在旧版
-  孤立结果或进程中断时会在发送模型前自动恢复，同类供应方错误会使用当前请求重试。
+- 完整会话和工具原始结果保存在 SQLite；模型视图按 Token 预算限制单项工具输出，
+  默认在上下文窗口 80% 使用当前模型执行本地分块压缩，并可在同一任务的工具调用
+  过程中压缩后继续。首次压缩以最近 80 条消息记录为初始边界，并向前扩展到完整
+  用户回合，不拆分工具调用与结果；
+  历史中存在孤立结果或进程中断时会在发送模型前自动恢复。
 - 每次模型请求都包含服务器当前时间；精确的播出、上映和相对日期判断仍要求 Agent
   调用时间工具。作品焦点切换时，上一作品的完整历史转换为可恢复摘要，原始消息保留。
 - Jackett 完整结果按文件大小降序分页，同一搜索词复用短期缓存；同轮只读工具
@@ -55,7 +58,7 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   ffprobe 结果替换原 Item ID，不执行普通媒体库导入。观看记录、收藏、Provider ID、
   图片和元数据保持不变，旧文件进入按升级项隔离的备份目录，并支持确认后恢复。升级
   选择 ID 与具体升级项绑定，普通 Jackett 搜索候选不能误用于媒体升级；工具只返回
-  当前媒体的紧凑轨道摘要，完整候选选择清单不会被通用文本长度限制截断。原条目替换
+  当前媒体的紧凑轨道摘要，并用稳定选择 ID、分页和 Token 预算限制候选规模。原条目替换
   完成后恢复对应 Agent 会话，继续已经确定的字幕等操作；同批升级互不等待。
 - 每个 SubHD 下载使用独立 session、Cookie Jar 和视觉模型请求；请求开始受间隔限制
   但可并发等待响应。自动识别五次后，使用独立任务码请求人工输入。
@@ -195,6 +198,8 @@ npm run build
 - [docs/ai-providers.md](docs/ai-providers.md)：供应方与协议模型。
 - [docs/conversation-recovery.md](docs/conversation-recovery.md)：会话截断、工具配对和
   供应方错误恢复。
+- [docs/context-management.md](docs/context-management.md)：模型 Token 配置、工具输出
+  预算、本地分块压缩和活动历史替换。
 - [docs/media-inventory-and-memory.md](docs/media-inventory-and-memory.md)：
   分辨率、重复电影、TMDB 分层详情、运行时间和影视主题摘要。
 - [docs/media-upgrades.md](docs/media-upgrades.md)：现有条目资源查询、并发下载、
