@@ -16,11 +16,12 @@ OpenList 与 Backrest 镜像均由各自 GitHub Actions 的单一 `linux/amd64` 
 
 ## 数据范围
 
-Backrest 首页首先按计划显示“将备份”和“将跳过”，并可直接进入内容编辑。计划编辑器将已部署的挂载目录
-转换为 Docker 服务、Home Assistant、DSM 证书、群晖恢复资料和 Time Machine 开关；
-日志缓存、Git 历史、旧传输缓存、Backrest 运行目录及在线数据库原文件分别显示。
-原始 Restic 路径和 glob 规则位于“高级路径与规则”。手机端使用覆盖完整视口的
-不透明单列编辑器，主要内容开关不显示技术路径。
+Backrest 首页使用大号容量数字、分隔式指标、编号内容目录和背景曲线组织备份状态，
+首先按计划显示“将备份”和“将跳过”，并可直接进入内容编辑。计划编辑器将已部署的
+挂载目录转换为 Docker 服务、Home Assistant、DSM 证书、群晖恢复资料和 Time Machine
+开关；日志缓存、Git 历史、旧传输缓存、Backrest 运行目录及在线数据库原文件分别显示。
+原始 Restic 路径和 glob 规则位于“高级路径与规则”。手机端使用设备真实 viewport；
+导航与内容编辑均覆盖完整视口，主要内容开关不显示技术路径。
 
 自动计划 `nas-config` 包含：
 
