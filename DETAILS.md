@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-08-05
+Updated: 2026-08-06
 
 ## 根目录
 
@@ -11,7 +11,8 @@ Updated: 2026-08-05
 - `Dockerfile.telegram`：构建独立 Telegram Adapter 镜像。
 - `compose.yaml`：从 GHCR 运行 Core 与可选 Adapter/搜索服务。
 - `compose.full.yaml`：从 GHCR 运行完整媒体系统；数据目录通过环境变量指定，
-  可接管现有 OpenList/Jellyfin 持久化目录。
+  可接管现有 OpenList/Jellyfin 持久化目录；Backrest 使用通过完整 GitHub 检查的
+  不可变提交哈希镜像。
 - `compose.build.yaml`：仅在开发时加入相邻 fork 的本地构建上下文。
 - `.github/workflows/build-images.yml`：在 GitHub Actions 构建并发布五类 GHCR
   镜像，Jellyfin 同时提供公共版和个人版标签。
