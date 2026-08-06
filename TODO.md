@@ -4,6 +4,8 @@ Updated: 2026-08-06
 
 ## 已完成
 
+- [x] 2026-08-06：更新 Backrest 移动端布局；首页直接显示每个计划的备份内容与
+  排除内容，计划编辑器使用中文内容开关并保留高级 Restic 路径规则。
 - [x] 2026-08-06：部署 OpenList 原生 Restic 网关和定制 Backrest；GitHub Actions
   仅构建群晖使用的 linux/amd64 镜像，生产配置包含 Docker、Home Assistant、DSM
   证书和独立 Time Machine 恢复计划，并记录流量限制与跨 NAS 恢复方式。
