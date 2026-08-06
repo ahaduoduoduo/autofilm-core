@@ -18,6 +18,11 @@ Updated: 2026-08-05
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
 - `docs/system-repositories.md`：六个源码仓库、上游、分支和修改边界。
 - `docs/communication.md`：容器通信、认证方式和用户交互流程。
+- `docs/restic-backup.md`：115 异地备份架构、数据范围、流量限制和恢复入口。
+- `scripts/prepare-restic-staging.sh`：导出 DSM 配置、套件与容器清单，并生成
+  OpenList SQLite 一致性副本。
+- `scripts/configure-backrest.sh`：通过 Backrest API 配置 115 仓库、认证、自动配置
+  备份计划和手动 Time Machine 计划。
 
 ## `packages/contracts`
 

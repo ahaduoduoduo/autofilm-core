@@ -35,7 +35,7 @@ services:
       - autofilm
 
   openlist:
-    image: "${AUTOFILM_OPENLIST_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-openlist:latest}"
+    image: "${AUTOFILM_OPENLIST_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-openlist-restic:sha-c9c9b98a9cd0b1f033e50ea3366a0399b59608a2}"
     pull_policy: always
     restart: unless-stopped
     ports:
@@ -44,8 +44,43 @@ services:
       AUTOFILM_SERVICE_TOKEN: "${OPENLIST_JELLYFIN_TOKEN:?set OPENLIST_JELLYFIN_TOKEN}"
       AUTOFILM_JELLYFIN_URL: http://jellyfin:8096
       AUTOFILM_JELLYFIN_API_KEY: "${JELLYFIN_API_KEY:-}"
+      RESTIC_ENABLE: "true"
+      RESTIC_USERNAME: backrest
+      RESTIC_PASSWORD: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
+      RESTIC_TIMEZONE: Asia/Shanghai
+      RESTIC_UPLOAD_MIB_PER_SECOND: "4"
+      RESTIC_DAILY_UPLOAD_GIB: "80"
+      RESTIC_MONTHLY_UPLOAD_GIB: "1500"
     volumes:
       - "${OPENLIST_DATA_DIR:-./data/openlist}:/opt/openlist/data"
+    networks:
+      - autofilm
+
+  backrest:
+    image: ghcr.io/ahaduoduoduo/backrest:sha-0bbb133dcec0cd97a35fd2e1b3071bdd2281c5b2
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      - openlist
+    ports:
+      - "${BACKREST_PORT:-9898}:9898"
+    environment:
+      BACKREST_PORT: 0.0.0.0:9898
+      BACKREST_DATA: /data
+      BACKREST_CONFIG: /config/config.json
+      BACKREST_RESTIC_COMMAND: /bin/restic
+      BACKREST_OPENLIST_URL: http://openlist:5244
+      BACKREST_OPENLIST_USERNAME: backrest
+      BACKREST_OPENLIST_PASSWORD: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/backrest/data:/data
+      - ./data/backrest/config:/config
+      - ./data/backrest/staging:/staging
+      - /volume1/docker:/source/docker:ro
+      - /volume1/web/HA:/source/home-assistant:ro
+      - /volume2/TimeMachine:/source/time-machine:ro
+      - /usr/syno/etc/certificate:/source/dsm-certificates:ro
     networks:
       - autofilm
 

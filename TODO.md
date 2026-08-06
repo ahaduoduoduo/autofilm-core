@@ -4,6 +4,9 @@ Updated: 2026-08-06
 
 ## 已完成
 
+- [x] 2026-08-06：部署 OpenList 原生 Restic 网关和定制 Backrest；GitHub Actions
+  仅构建群晖使用的 linux/amd64 镜像，生产配置包含 Docker、Home Assistant、DSM
+  证书和独立 Time Machine 恢复计划，并记录流量限制与跨 NAS 恢复方式。
 - [x] 2026-08-05：参考 Codex 增加主 Agent 本地上下文压缩；完整消息和工具原始结果
   保留在 SQLite，模型视图按 Token 限制单项工具结果，并在上下文窗口默认 80% 时
   使用当前模型执行无工具分块摘要。压缩快照支持任务中途继续、近期用户原话、稳定 ID、
