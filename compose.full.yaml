@@ -57,7 +57,7 @@ services:
       - autofilm
 
   backrest:
-    image: ghcr.io/ahaduoduoduo/backrest:sha-85e54ca44c066bdd53f5963900841a1b4ec2fed7
+    image: ghcr.io/ahaduoduoduo/backrest:sha-89b2481860750336fcfe3fb11bba1b49976714d6
     pull_policy: always
     restart: unless-stopped
     depends_on:
