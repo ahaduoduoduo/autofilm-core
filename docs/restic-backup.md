@@ -1,6 +1,6 @@
 # Restic 异地备份
 
-更新时间：2026-08-06
+更新时间：2026-08-09
 
 ## 架构
 
@@ -26,17 +26,33 @@ Backrest 首页使用大号容量数字、分隔式指标、编号内容目录�
 自动计划 `nas-config` 包含：
 
 - `/volume1/docker` 中的 Compose、服务配置和持久化数据；
+- Telegram Adapter 的 Docker 命名卷；
 - `/volume1/web/HA` 中的 Home Assistant 配置；
+- `/volume1/web/live` 的直播代理 Compose、代码和频道配置；
+- `/volume1/web/autoaccount/data` 的配置与附件；
+- `/volume1/@appconf` 与 `/volume1/@appdata` 中的 DSM 套件配置，排除日志和 VMM
+  活动 etcd 数据；
 - DSM 证书目录；
-- 部署时导出的 DSM 配置与 OpenList SQLite 一致性副本。
+- 每次备份前生成的 DSM、Docker、Backrest 和应用数据库恢复资料。
 
-主机端可执行 `scripts/prepare-restic-staging.sh` 刷新恢复材料；Backrest 的自动计划
-在每次快照前重新生成 OpenList SQLite 副本。
+Backrest 的快照前置命令通过 `/staging/control/requests` 请求主机刷新恢复资料；DSM
+主机每分钟执行 `scripts/service-restic-staging-request.sh`，完成后写入对应结果文件，
+Backrest 收到成功结果才开始扫描。定时备份和界面手动备份使用同一流程。
 `scripts/configure-backrest.sh` 可重复应用仓库、认证、排除规则和两个计划。
 
 计划排除日志、缓存、临时目录、`node_modules`、Git 对象、Jellyfin 缓存、旧 rclone
-缓存和 Home Assistant 运行日志。OpenList 的在线 SQLite 文件不直接读取，由计划前置
-命令生成一致性副本。
+缓存和 Home Assistant 运行日志。OpenList、AutoFilm、Jellyfin、Subhub、LocalProxy、
+NAS Gateway Manager 与 AutoAccount 的在线 SQLite 文件不直接读取，改为备份前通过
+SQLite 在线备份 API 生成并校验的一致副本。
+
+恢复资料位于 `/staging/recovery`：
+
+- `dsm/`：`dsm-config.dss`、版本、套件、用户/组、共享目录、ACL、网络、SMB、证书、
+  反向代理、防火墙、计划任务、套件存储占用、VMM 状态和恢复顺序；
+- `docker/`：容器完整 inspect、镜像 digest、网络、卷、原项目渲染 Compose、全部容器
+  生成 Compose、无 Compose 容器生成 Compose 和跨 NAS 根目录变量；
+- `databases/`：各应用的一致 SQLite 副本及校验结果；
+- `backrest/`：仓库和计划配置。该文件包含仓库密码，只存在于加密 Restic 仓库中。
 
 `time-machine` 是独立手动计划。当前共享目录约 1.4 TB，且所在卷可用空间不足以长期
 保留新的 Btrfs 快照，因此部署阶段不自动执行。它仍以本地 Time Machine 硬盘作为日常
@@ -54,8 +70,9 @@ OpenList 网关默认限制为 4 MiB/s、80 GiB/日、1500 GiB/月。计量位�
 ## 恢复
 
 Backrest 可按快照浏览目录、搜索历史版本，并恢复单个文件或目录。跨 NAS 恢复时先恢复
-Compose、环境文件、证书和持久化目录，再根据目标系统路径修改挂载。DSM 配置导出用于
-恢复到另一台群晖；Docker 目录和恢复说明用于飞牛等 Linux NAS。
+Compose、环境文件、证书和持久化目录，再根据目标系统路径修改挂载。群晖目标同时使用
+`dsm-config.dss` 与 AI 可读重建资料；飞牛等 Linux NAS 使用 Docker 生成 Compose、
+路径变量和 DSM 事实清单迁移可复用的服务配置。
 
 Restic 仓库密码当前复用 AutoFilm 的主密钥，OpenList REST 接口也由该密钥认证。
 灾难恢复必须在 NAS 之外保存 `.env` 中的 `AUTOFILM_MASTER_KEY`；只有 115 仓库本身

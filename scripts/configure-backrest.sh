@@ -58,7 +58,7 @@ else
   auth_args=(-u "$ui_username:$AUTOFILM_ADMIN_PASSWORD")
 fi
 
-snapshot_hook="mkdir -p /staging/openlist && sqlite3 /source/docker/alist/data.db \".backup '/staging/openlist/data.db'\" && cp -p /source/docker/alist/config.json /staging/openlist/config.json"
+snapshot_hook="/recovery-scripts/request-restic-staging.sh"
 
 configured="$(printf '%s' "$current_config" | jq \
   --arg restic_password "$AUTOFILM_MASTER_KEY" \
@@ -95,7 +95,11 @@ configured="$(printf '%s' "$current_config" | jq \
       repo: "115-offsite",
       paths: [
         "/source/docker",
+        "/source/docker-volumes/telegram-data",
+        "/source/dsm-packages",
         "/source/home-assistant",
+        "/source/web-live",
+        "/source/web-autoaccount",
         "/source/dsm-certificates",
         "/staging"
       ],
@@ -118,6 +122,14 @@ configured="$(printf '%s' "$current_config" | jq \
         "/source/docker/SYNC_BIU/**",
         "/source/docker/autofilm-suite/autofilm-core/data/backrest/**",
         "/source/docker/alist/data.db*",
+        "/source/docker/autofilm-suite/autofilm-core/data/autofilm.sqlite*",
+        "/source/docker/jellyfin/config/data/*.db*",
+        "/source/docker/subhub/data/subhub.db*",
+        "/source/docker/localproxy-data/localproxy.db*",
+        "/source/docker/nas-gateway-manager/data/manager.db*",
+        "/source/web-autoaccount/automation.db*",
+        "/source/dsm-packages/appconf/Virtualization/ccc/etcd.data/**",
+        "/staging/control/**",
         "/source/home-assistant/home-assistant_v2.db*"
       ],
       schedule: {cron: "0 5 * * *"},
