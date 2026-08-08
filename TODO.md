@@ -1,12 +1,14 @@
 # AutoFilm Core development status
 
-Updated: 2026-08-08
+Updated: 2026-08-09
 
 ## 已完成
 
 - [x] 2026-08-09：发现新的 115 HTTP 405 风控或凭据缺失状态时只创建一个扫码会话，将同一张
   二维码发送到全部管理员微信和 Telegram 身份；Telegram Adapter 改为读取 Core
   内部图片后通过 multipart 上传。
+- [x] 2026-08-09：自动二维码发送后继续读取有效会话状态，扫码确认时由 OpenList
+  使用原客户端类型更新并保存 Cookie。
 
 - [x] 2026-08-08：部署 OpenList 115 上传初始化响应解密重试修复；GitHub 单架构
   构建和实际增量备份验证通过，异常响应由 OpenList 内部重试后返回 HTTP 200。

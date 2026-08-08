@@ -42,6 +42,9 @@ OpenList 不执行低频 115 凭据检查。真实文件操作返回 HTTP 405 �
 变成凭据缺失，仍可继续重新认证。扫码成功或后续真实请求恢复成功时，OpenList
 清除标记。
 
+Core 在二维码有效期内读取该会话状态。确认扫码后，OpenList 使用 Storage 原有
+`QRCodeSource` 完成登录、校验 Cookie 并持久化；普通状态读取仍不请求 115。
+
 管理界面中的 Storage ID 只用于选择需要重新认证的 OpenList Storage，
 不会写入 Jellyfin 条目，也不会成为媒体路径的一部分。
 

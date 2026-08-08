@@ -71,6 +71,11 @@ describe("OpenList authentication worker", () => {
       expires_at: "2026-08-09T04:00:00.000Z",
     }));
     const authQrCode = vi.fn(async () => Buffer.from("png"));
+    const authStatus = vi.fn(async () => ({
+      session_id: "auth-session",
+      state: "pending",
+      expires_at: "2026-08-09T04:00:00.000Z",
+    }));
     const create = vi.fn(() => "media-token");
     const worker = new OpenListAuthWorker(
       {
@@ -85,6 +90,7 @@ describe("OpenList authentication worker", () => {
         },
         authStorageId: () => 1,
         startAuth,
+        authStatus,
         authQrCode,
       },
       { listChannels: () => channels },
@@ -99,6 +105,7 @@ describe("OpenList authentication worker", () => {
 
     expect(startAuth).toHaveBeenCalledOnce();
     expect(authQrCode).toHaveBeenCalledOnce();
+    expect(authStatus).toHaveBeenCalledOnce();
     expect(create).toHaveBeenCalledOnce();
     expect(enqueueMessages).toHaveBeenCalledTimes(2);
     expect(
@@ -132,6 +139,7 @@ describe("OpenList authentication worker", () => {
         },
         authStorageId: () => 1,
         startAuth: vi.fn(),
+        authStatus: vi.fn(),
         authQrCode: vi.fn(),
       },
       { listChannels: () => channels },
@@ -164,6 +172,7 @@ describe("OpenList authentication worker", () => {
           state: "pending",
           expires_at: "2026-08-09T04:00:00.000Z",
         })),
+        authStatus: vi.fn(),
         authQrCode: vi.fn(async () => Buffer.from("png")),
       },
       { listChannels: () => channels },
@@ -184,6 +193,44 @@ describe("OpenList authentication worker", () => {
     );
   });
 
+  it("confirms the QR session so OpenList persists the new credential", async () => {
+    const authStatus = vi.fn(async () => ({
+      session_id: "auth-session",
+      state: "confirmed",
+      expires_at: "2026-08-09T04:00:00.000Z",
+    }));
+    const worker = new OpenListAuthWorker(
+      {
+        async authState() {
+          return {
+            authenticated: false,
+            state: "error" as const,
+            requires_reauthentication: true,
+            message: "missing cookie or qrcode account",
+          };
+        },
+        authStorageId: () => 1,
+        startAuth: vi.fn(async () => ({
+          session_id: "auth-session",
+          state: "pending",
+          expires_at: "2026-08-09T04:00:00.000Z",
+        })),
+        authStatus,
+        authQrCode: vi.fn(async () => Buffer.from("png")),
+      },
+      { listChannels: () => channels },
+      { listMembers: () => members },
+      { enqueueMessages: vi.fn() },
+      { create: vi.fn(() => "media-token") },
+      "http://autofilm-core:3100",
+    );
+
+    await worker.tick();
+    await worker.tick();
+
+    expect(authStatus).toHaveBeenCalledWith(1, "auth-session");
+  });
+
   it("falls back to one actionable text when QR creation fails", async () => {
     const enqueueMessages = vi.fn();
     const worker = new OpenListAuthWorker(
@@ -201,6 +248,7 @@ describe("OpenList authentication worker", () => {
         startAuth: vi.fn(async () => {
           throw new Error("auth service unavailable");
         }),
+        authStatus: vi.fn(),
         authQrCode: vi.fn(),
       },
       { listChannels: () => channels },

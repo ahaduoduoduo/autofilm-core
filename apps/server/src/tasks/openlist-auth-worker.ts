@@ -11,11 +11,18 @@ export class OpenListAuthWorker {
   private timer: NodeJS.Timeout | undefined;
   private running = false;
   private state: AuthState = "unknown";
+  private activeAuthSession:
+    | { storageId: number; sessionId: string; expiresAt: number }
+    | undefined;
 
   constructor(
     private readonly openList: Pick<
       OpenListClient,
-      "authState" | "authStorageId" | "startAuth" | "authQrCode"
+      | "authState"
+      | "authStorageId"
+      | "startAuth"
+      | "authStatus"
+      | "authQrCode"
     >,
     private readonly configs: Pick<ConfigStore, "listChannels">,
     private readonly users: Pick<UserStore, "listMembers">,
@@ -41,6 +48,10 @@ export class OpenListAuthWorker {
     if (this.running) return;
     this.running = true;
     try {
+      if (this.activeAuthSession) {
+        await this.pollActiveAuthSession();
+        return;
+      }
       const state = await this.openList.authState();
       if (state.authenticated) {
         this.state = "authenticated";
@@ -117,6 +128,13 @@ export class OpenListAuthWorker {
         session.session_id,
       );
       const expiresAt = new Date(session.expires_at);
+      this.activeAuthSession = {
+        storageId,
+        sessionId: session.session_id,
+        expiresAt: Number.isFinite(expiresAt.getTime())
+          ? expiresAt.getTime()
+          : Date.now() + 10 * 60_000,
+      };
       const token = this.media.create({
         content: qrCode,
         contentType: "image/png",
@@ -159,6 +177,27 @@ export class OpenListAuthWorker {
         ...recipient,
         messages,
       });
+    }
+  }
+
+  private async pollActiveAuthSession(): Promise<void> {
+    const active = this.activeAuthSession;
+    if (!active) return;
+    if (Date.now() >= active.expiresAt) {
+      this.activeAuthSession = undefined;
+      return;
+    }
+    const session = await this.openList.authStatus(
+      active.storageId,
+      active.sessionId,
+    );
+    if (session.state === "confirmed") {
+      this.activeAuthSession = undefined;
+      this.state = "authenticated";
+      return;
+    }
+    if (["expired", "canceled", "failed"].includes(session.state)) {
+      this.activeAuthSession = undefined;
     }
   }
 }
