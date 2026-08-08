@@ -36,8 +36,10 @@ Core 使用 OpenList 管理端 AutoFilm 扫码 API：
 更新驱动字段并保存 Storage。Core 不接收 Cookie。
 
 OpenList 不执行低频 115 凭据检查。真实文件操作返回 HTTP 405 时，115 驱动记录
-明确的 `risk_controlled` 状态；Core 只读取这个本地状态，并向所有已配置且已有
-管理员身份的聊天渠道发送一次通知。扫码成功或后续真实请求恢复成功时，OpenList
+明确的 `risk_controlled` 状态；缺少可用凭据时也会返回
+`requires_reauthentication`。Core 只读取这些本地状态，并向所有已配置且已有
+管理员身份的聊天渠道发送一次二维码。这样服务在 405 后重启，即使驱动初始化状态
+变成凭据缺失，仍可继续重新认证。扫码成功或后续真实请求恢复成功时，OpenList
 清除标记。
 
 管理界面中的 Storage ID 只用于选择需要重新认证的 OpenList Storage，

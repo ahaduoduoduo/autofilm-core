@@ -146,6 +146,44 @@ describe("OpenList authentication worker", () => {
     expect(enqueueMessages).not.toHaveBeenCalled();
   });
 
+  it("sends a QR when a restart exposes a missing credential state", async () => {
+    const enqueueMessages = vi.fn();
+    const worker = new OpenListAuthWorker(
+      {
+        async authState() {
+          return {
+            authenticated: false,
+            state: "error" as const,
+            requires_reauthentication: true,
+            message: "missing cookie or qrcode account",
+          };
+        },
+        authStorageId: () => 1,
+        startAuth: vi.fn(async () => ({
+          session_id: "auth-session",
+          state: "pending",
+          expires_at: "2026-08-09T04:00:00.000Z",
+        })),
+        authQrCode: vi.fn(async () => Buffer.from("png")),
+      },
+      { listChannels: () => channels },
+      { listMembers: () => members },
+      { enqueueMessages },
+      { create: vi.fn(() => "media-token") },
+      "http://autofilm-core:3100",
+    );
+
+    await worker.tick();
+
+    expect(enqueueMessages).toHaveBeenCalledTimes(2);
+    expect(enqueueMessages.mock.calls[0]?.[0].messages[0]).toEqual(
+      expect.objectContaining({
+        type: "text",
+        text: expect.stringContaining("需要重新登录"),
+      }),
+    );
+  });
+
   it("falls back to one actionable text when QR creation fails", async () => {
     const enqueueMessages = vi.fn();
     const worker = new OpenListAuthWorker(

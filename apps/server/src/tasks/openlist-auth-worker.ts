@@ -46,10 +46,7 @@ export class OpenListAuthWorker {
         this.state = "authenticated";
         return;
       }
-      if (
-        state.state !== "risk_controlled" ||
-        state.status_code !== 405
-      ) {
+      if (!state.requires_reauthentication) {
         return;
       }
       if (this.state !== "required") {
@@ -129,10 +126,13 @@ export class OpenListAuthWorker {
           : new Date(Date.now() + 10 * 60_000),
         reads: Math.max(10, recipients.length * 5),
       });
+      const reason = detail?.toLowerCase().includes("405")
+        ? "触发 HTTP 405 风控"
+        : "需要重新登录";
       messages = [
         {
           type: "text" as const,
-          text: "OpenList 的 115 存储触发 HTTP 405 风控。请使用 115 客户端扫描下方二维码，登录信息将自动更新。",
+          text: `OpenList 的 115 存储${reason}。请使用 115 客户端扫描下方二维码，登录信息将自动更新。`,
         },
         {
           type: "image" as const,
@@ -148,7 +148,7 @@ export class OpenListAuthWorker {
         {
           type: "text" as const,
           text:
-            `OpenList 的 115 存储触发 HTTP 405 风控，但自动生成二维码失败：${reason}。请打开 OpenList 的 115 存储配置页面重新扫码。` +
+            `OpenList 的 115 存储需要重新登录，但自动生成二维码失败：${reason}。请打开 OpenList 的 115 存储配置页面重新扫码。` +
             suffix,
         },
       ];
