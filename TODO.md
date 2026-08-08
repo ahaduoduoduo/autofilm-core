@@ -4,6 +4,8 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：固定包含 Docker 命名卷、DSM 套件配置和数据库一致副本说明的
+  Backrest 提交镜像，并用于生产备份界面。
 - [x] 2026-08-09：为每次 Restic 备份增加主机请求与等待机制；原子生成 DSM 原生配置、
   AI 可读系统重建资料、完整 Docker 运行清单、渲染与生成 Compose，以及 OpenList、
   AutoFilm、Jellyfin、Subhub、LocalProxy、NAS Gateway Manager、AutoAccount 的一致
