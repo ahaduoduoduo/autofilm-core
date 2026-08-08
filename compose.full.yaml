@@ -35,7 +35,7 @@ services:
       - autofilm
 
   openlist:
-    image: "${AUTOFILM_OPENLIST_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-openlist-restic:sha-52dc6110e0c9b4e9b2de8347a5aa602bf701e388}"
+    image: "${AUTOFILM_OPENLIST_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-openlist-restic:sha-e2cee82c1cc244edf6311379506e6703510d3c78}"
     pull_policy: always
     restart: unless-stopped
     ports:
