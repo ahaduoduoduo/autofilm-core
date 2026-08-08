@@ -167,7 +167,7 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 | --- | --- |
 | `AUTOFILM_CORE_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-core:latest` |
 | `AUTOFILM_TELEGRAM_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-telegram-adapter:latest` |
-| `AUTOFILM_OPENLIST_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-openlist:latest` |
+| `AUTOFILM_OPENLIST_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-openlist-restic:sha-55d3b01d7992d384cd850770c0cebf0afafc8b07` |
 | `AUTOFILM_JELLYFIN_IMAGE` | `ghcr.io/ahaduoduoduo/autofilm-jellyfin:latest` |
 | `AUTOFILM_WECLAW_IMAGE` | `ghcr.io/ahaduoduoduo/weclaw:latest` |
 
