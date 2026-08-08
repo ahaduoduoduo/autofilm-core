@@ -63,8 +63,15 @@ const members = [
 ];
 
 describe("OpenList authentication worker", () => {
-  it("notifies every configured administrator channel once per failure", async () => {
-    const enqueue = vi.fn();
+  it("sends one shared QR session to every administrator channel", async () => {
+    const enqueueMessages = vi.fn();
+    const startAuth = vi.fn(async () => ({
+      session_id: "auth-session",
+      state: "pending",
+      expires_at: "2026-08-09T04:00:00.000Z",
+    }));
+    const authQrCode = vi.fn(async () => Buffer.from("png"));
+    const create = vi.fn(() => "media-token");
     const worker = new OpenListAuthWorker(
       {
         async authState() {
@@ -76,23 +83,43 @@ describe("OpenList authentication worker", () => {
             message: "HTTP 405",
           };
         },
+        authStorageId: () => 1,
+        startAuth,
+        authQrCode,
       },
       { listChannels: () => channels },
       { listMembers: () => members },
-      { enqueue },
+      { enqueueMessages },
+      { create },
+      "http://autofilm-core:3100",
     );
 
     await worker.tick();
     await worker.tick();
 
-    expect(enqueue).toHaveBeenCalledTimes(2);
+    expect(startAuth).toHaveBeenCalledOnce();
+    expect(authQrCode).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledOnce();
+    expect(enqueueMessages).toHaveBeenCalledTimes(2);
     expect(
-      enqueue.mock.calls.map(([message]) => message.providerInstanceId),
+      enqueueMessages.mock.calls.map(
+        ([message]) => message.providerInstanceId,
+      ),
     ).toEqual(["wechat-main", "telegram-main"]);
+    for (const [message] of enqueueMessages.mock.calls) {
+      expect(message.messages).toEqual([
+        expect.objectContaining({ type: "text" }),
+        {
+          type: "image",
+          media_url: "http://autofilm-core:3100/v1/media/media-token",
+          file_name: "openlist-115-auth.png",
+        },
+      ]);
+    }
   });
 
   it("does not notify for a local state read or an unrelated storage error", async () => {
-    const enqueue = vi.fn();
+    const enqueueMessages = vi.fn();
     const worker = new OpenListAuthWorker(
       {
         async authState() {
@@ -103,14 +130,56 @@ describe("OpenList authentication worker", () => {
             message: "storage is initializing",
           };
         },
+        authStorageId: () => 1,
+        startAuth: vi.fn(),
+        authQrCode: vi.fn(),
       },
       { listChannels: () => channels },
       { listMembers: () => members },
-      { enqueue },
+      { enqueueMessages },
+      { create: vi.fn() },
+      "http://autofilm-core:3100",
     );
 
     await worker.tick();
 
-    expect(enqueue).not.toHaveBeenCalled();
+    expect(enqueueMessages).not.toHaveBeenCalled();
+  });
+
+  it("falls back to one actionable text when QR creation fails", async () => {
+    const enqueueMessages = vi.fn();
+    const worker = new OpenListAuthWorker(
+      {
+        async authState() {
+          return {
+            authenticated: false,
+            state: "risk_controlled" as const,
+            requires_reauthentication: true,
+            status_code: 405,
+            message: "HTTP 405",
+          };
+        },
+        authStorageId: () => 1,
+        startAuth: vi.fn(async () => {
+          throw new Error("auth service unavailable");
+        }),
+        authQrCode: vi.fn(),
+      },
+      { listChannels: () => channels },
+      { listMembers: () => members },
+      { enqueueMessages },
+      { create: vi.fn() },
+      "http://autofilm-core:3100",
+    );
+
+    await worker.tick();
+
+    expect(enqueueMessages).toHaveBeenCalledTimes(2);
+    expect(enqueueMessages.mock.calls[0]?.[0].messages).toEqual([
+      expect.objectContaining({
+        type: "text",
+        text: expect.stringContaining("自动生成二维码失败"),
+      }),
+    ]);
   });
 });

@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildInboundEvent } from "./adapter.js";
 import { loadConfig } from "./config.js";
 import {
   decodeTarget,
   encodeTarget,
   splitTelegramText,
+  TelegramClient,
   type TelegramMessage,
 } from "./telegram.js";
+
+afterEach(() => vi.unstubAllGlobals());
 
 function message(overrides: Partial<TelegramMessage> = {}): TelegramMessage {
   return {
@@ -62,5 +65,46 @@ describe("Telegram native adapter mapping", () => {
 
   it("splits text without breaking Unicode code points", () => {
     expect(splitTelegramText("甲😀乙", 2)).toEqual(["甲😀", "乙"]);
+  });
+
+  it("downloads Core images and uploads their bytes to Telegram", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(Buffer.from("png"), {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, result: {} }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TelegramClient("test-token");
+    await client.send(
+      { chatId: "123" },
+      {
+        type: "image",
+        media_url: "http://autofilm-core:3100/v1/media/qr-token",
+        file_name: "openlist-115-auth.png",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "http://autofilm-core:3100/v1/media/qr-token",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://api.telegram.org/bottest-token/sendPhoto",
+    );
+    const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(request.body).toBeInstanceOf(FormData);
+    const form = request.body as FormData;
+    expect(form.get("chat_id")).toBe("123");
+    expect(form.get("photo")).toBeInstanceOf(Blob);
   });
 });

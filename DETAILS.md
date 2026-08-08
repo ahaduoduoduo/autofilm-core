@@ -165,7 +165,8 @@ Updated: 2026-08-06
 - `tasks/media-upgrade-check-worker.ts`：每批领取 8 个待检查电影，以标题和年份查询
   Jackett；只保存目标分辨率命中结果，完成后恢复原聊天并发送分页结果通知。
 - `tasks/openlist-auth-worker.ts`：每分钟读取 OpenList 本地的 115 风控状态，不访问
-  115；发现新的 HTTP 405 标记时向每个已配置渠道中的 owner/admin 身份发送通知，
+  115；发现新的 HTTP 405 标记时创建一个扫码会话，将同一张二维码向每个已配置
+  渠道中的 owner/admin 身份发送，
   同一次标记不重复发送。
 - `tasks/watchlist-worker.ts`：按间隔读取 TMDB 并调用只读 Agent 检查追更条件。
 - `channels/outbound.ts`：向 Native Adapter 发送主动消息；Adapter 因缺少当前会话

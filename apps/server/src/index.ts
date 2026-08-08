@@ -37,6 +37,8 @@ const openListAuthWorker = new OpenListAuthWorker(
   context.configs,
   context.users,
   context.outbox,
+  context.media,
+  config.mediaBaseUrl,
 );
 const downloadCompletionWorker = new DownloadCompletionWorker(
   context.tasks,

@@ -186,12 +186,17 @@ export class OpenListClient {
     message?: string;
   }> {
     const config = this.requireConfig();
-    const storageId = Number(config.options.authStorageId);
+    const storageId = this.authStorageId();
+    const query = new URLSearchParams({ storage_id: String(storageId) });
+    return this.get(`/api/autofilm/auth-state?${query}`);
+  }
+
+  authStorageId(): number {
+    const storageId = Number(this.requireConfig().options.authStorageId);
     if (!Number.isInteger(storageId) || storageId <= 0) {
       throw new Error("OpenList authStorageId is not configured");
     }
-    const query = new URLSearchParams({ storage_id: String(storageId) });
-    return this.get(`/api/autofilm/auth-state?${query}`);
+    return storageId;
   }
 
   async startAuth(storageId: number): Promise<OpenListAuthSession> {

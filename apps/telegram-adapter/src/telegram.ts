@@ -114,6 +114,10 @@ export class TelegramClient {
       audio: "audio",
       file: "document",
     }[message.type];
+    if (message.type === "image") {
+      await this.uploadImage(method, field, common, message);
+      return;
+    }
     await this.call(method, {
       ...common,
       [field]: message.media_url,
@@ -131,6 +135,38 @@ export class TelegramClient {
     });
   }
 
+  private async uploadImage(
+    method: string,
+    field: string,
+    common: Record<string, string | number>,
+    message: NativeOutboundMessage,
+  ): Promise<void> {
+    const response = await fetch(message.media_url!, {
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Telegram image source returned HTTP ${response.status}`,
+      );
+    }
+    const contentType = response.headers.get("content-type") || "image/png";
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      throw new Error(`Telegram image source returned ${contentType}`);
+    }
+
+    const form = new FormData();
+    for (const [key, value] of Object.entries(common)) {
+      form.append(key, String(value));
+    }
+    if (message.file_name) form.append("caption", message.file_name);
+    form.append(
+      field,
+      await response.blob(),
+      message.file_name || "autofilm-image.png",
+    );
+    await this.callMultipart(method, form);
+  }
+
   private async call<T = unknown>(
     method: string,
     payload: Record<string, unknown>,
@@ -142,14 +178,33 @@ export class TelegramClient {
       body: JSON.stringify(payload),
       signal: signal ?? AbortSignal.timeout(60_000),
     });
-    const envelope = (await response.json()) as TelegramEnvelope<T>;
-    if (!response.ok || !envelope.ok) {
-      throw new Error(
-        `Telegram ${method} failed: ${envelope.description ?? `HTTP ${response.status}`}`,
-      );
-    }
-    return envelope.result as T;
+    return parseTelegramResponse<T>(method, response);
   }
+
+  private async callMultipart<T = unknown>(
+    method: string,
+    body: FormData,
+  ): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/${method}`, {
+      method: "POST",
+      body,
+      signal: AbortSignal.timeout(60_000),
+    });
+    return parseTelegramResponse<T>(method, response);
+  }
+}
+
+async function parseTelegramResponse<T>(
+  method: string,
+  response: Response,
+): Promise<T> {
+  const envelope = (await response.json()) as TelegramEnvelope<T>;
+  if (!response.ok || !envelope.ok) {
+    throw new Error(
+      `Telegram ${method} failed: ${envelope.description ?? `HTTP ${response.status}`}`,
+    );
+  }
+  return envelope.result as T;
 }
 
 export interface TelegramTarget {

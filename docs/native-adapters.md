@@ -64,13 +64,14 @@ Agent 最终回复可能同时包含文字和 Core 短期媒体 URL。Core 在�
 `AUTOFILM_MEDIA_BASE_URL/v1/media/{token}`，生成独立的 `image` 消息，并从文字
 消息中移除该容器地址。外部网页链接不受影响。
 
-WeClaw 使用结构化消息的 `media_url` 下载并发送微信图片；Telegram Adapter 使用
-Bot API 发送图片。Adapter 不需要解析 Agent 的自然语言或识别某一种模型输出格式。
+WeClaw 使用结构化消息的 `media_url` 下载并发送微信图片；Telegram Adapter 先从
+Core 下载图片，再以 multipart 上传到 Bot API，因此 Docker 内部媒体地址不会交给
+Telegram 服务器读取。Adapter 不需要解析 Agent 的自然语言或识别某一种模型输出格式。
 
 ## 主动消息
 
 Core 调用 Adapter 的 `POST /v1/messages`。任务完成通知经过持久化 Outbox。
-115 二维码使用短期随机 URL，默认最多读取五次，过期后自动清理。
+115 二维码使用短期随机 URL，读取次数按管理员通知目标数量分配，过期后自动清理。
 
 `AUTOFILM_MEDIA_BASE_URL` 必须是 Adapter 容器能够访问的 Core URL。
 
