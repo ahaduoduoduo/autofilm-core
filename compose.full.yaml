@@ -83,6 +83,8 @@ services:
       - /volume1/web/live:/source/web-live:ro
       - /volume1/web/autoaccount/data:/source/web-autoaccount:ro
       - /volume1/@docker/volumes/autofilm-core_telegram-data/_data:/source/docker-volumes/telegram-data:ro
+      - /volume1/@appconf:/source/dsm-packages/appconf:ro
+      - /volume1/@appdata:/source/dsm-packages/appdata:ro
       - /volume2/TimeMachine:/source/time-machine:ro
       - /usr/syno/etc/certificate:/source/dsm-certificates:ro
     networks:

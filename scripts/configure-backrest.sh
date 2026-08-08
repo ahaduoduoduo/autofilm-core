@@ -96,6 +96,7 @@ configured="$(printf '%s' "$current_config" | jq \
       paths: [
         "/source/docker",
         "/source/docker-volumes/telegram-data",
+        "/source/dsm-packages",
         "/source/home-assistant",
         "/source/web-live",
         "/source/web-autoaccount",
@@ -127,6 +128,7 @@ configured="$(printf '%s' "$current_config" | jq \
         "/source/docker/localproxy-data/localproxy.db*",
         "/source/docker/nas-gateway-manager/data/manager.db*",
         "/source/web-autoaccount/automation.db*",
+        "/source/dsm-packages/appconf/Virtualization/ccc/etcd.data/**",
         "/staging/control/**",
         "/source/home-assistant/home-assistant_v2.db*"
       ],

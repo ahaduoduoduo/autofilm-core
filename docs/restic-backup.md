@@ -30,6 +30,8 @@ Backrest 首页使用大号容量数字、分隔式指标、编号内容目录�
 - `/volume1/web/HA` 中的 Home Assistant 配置；
 - `/volume1/web/live` 的直播代理 Compose、代码和频道配置；
 - `/volume1/web/autoaccount/data` 的配置与附件；
+- `/volume1/@appconf` 与 `/volume1/@appdata` 中的 DSM 套件配置，排除日志和 VMM
+  活动 etcd 数据；
 - DSM 证书目录；
 - 每次备份前生成的 DSM、Docker、Backrest 和应用数据库恢复资料。
 
@@ -46,7 +48,7 @@ SQLite 在线备份 API 生成并校验的一致副本。
 恢复资料位于 `/staging/recovery`：
 
 - `dsm/`：`dsm-config.dss`、版本、套件、用户/组、共享目录、ACL、网络、SMB、证书、
-  反向代理、防火墙、计划任务和恢复顺序；
+  反向代理、防火墙、计划任务、套件存储占用、VMM 状态和恢复顺序；
 - `docker/`：容器完整 inspect、镜像 digest、网络、卷、原项目渲染 Compose、全部容器
   生成 Compose、无 Compose 容器生成 Compose 和跨 NAS 根目录变量；
 - `databases/`：各应用的一致 SQLite 副本及校验结果；

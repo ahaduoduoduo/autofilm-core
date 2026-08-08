@@ -57,6 +57,10 @@ capture "$output_dir/network-routes.json" ip -j route show table all
 capture "$output_dir/listening-ports.txt" ss -lntup
 capture "$output_dir/scheduled-tasks.txt" /usr/syno/bin/synoschedtask --get
 capture "$output_dir/running-services.txt" /usr/syno/bin/synosystemctl list-units --type=service --state=running
+capture "$output_dir/package-storage-kib.txt" du -sk /volume1/@appconf/* /volume1/@appdata/*
+capture "$output_dir/special-storage-kib.txt" du -sk /volume1/@GuestImage /volume1/@iSCSI /volume1/@database /volume1/@config_backup
+capture "$output_dir/vmm-guests.txt" /usr/local/bin/virsh list --all
+capture "$output_dir/vmm-storage-pools.txt" /usr/local/bin/virsh pool-list --all
 
 capture_api "$output_dir/api/system-status.json" SYNO.Core.System.Status 1 get
 capture_api "$output_dir/api/network.json" SYNO.Core.Network 2 get
