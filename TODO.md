@@ -4,6 +4,10 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：为每次 Restic 备份增加主机请求与等待机制；原子生成 DSM 原生配置、
+  AI 可读系统重建资料、完整 Docker 运行清单、渲染与生成 Compose，以及 OpenList、
+  AutoFilm、Jellyfin、Subhub、LocalProxy、NAS Gateway Manager、AutoAccount 的一致
+  SQLite 副本；补充 Telegram 命名卷与 `/volume1/web/live` 数据范围。
 - [x] 2026-08-09：发现新的 115 HTTP 405 风控或凭据缺失状态时只创建一个扫码会话，将同一张
   二维码发送到全部管理员微信和 Telegram 身份；Telegram Adapter 改为读取 Core
   内部图片后通过 multipart 上传。

@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-08-06
+Updated: 2026-08-09
 
 ## 根目录
 
@@ -20,8 +20,14 @@ Updated: 2026-08-06
 - `docs/system-repositories.md`：六个源码仓库、上游、分支和修改边界。
 - `docs/communication.md`：容器通信、认证方式和用户交互流程。
 - `docs/restic-backup.md`：115 异地备份架构、数据范围、流量限制和恢复入口。
-- `scripts/prepare-restic-staging.sh`：导出 DSM 配置、套件与容器清单，并生成
-  OpenList SQLite 一致性副本。
+- `scripts/prepare-restic-staging.sh`：在主机上原子更新 DSM、Docker、数据库和
+  Backrest 恢复资料。
+- `scripts/service-restic-staging-request.sh`：处理 Backrest 前置命令创建的主机导出请求。
+- `scripts/request-restic-staging.sh`：由 Backrest 容器提交请求并等待主机导出完成。
+- `scripts/export-dsm-recovery.sh`：生成 DSM 原生配置和 AI 可读的系统重建资料。
+- `scripts/export-docker-recovery.py`：生成 Docker 原始清单、渲染后的 Compose、
+  无 Compose 容器恢复文件及跨 NAS 路径变量。
+- `scripts/export-sqlite-databases.py`：使用 SQLite 在线备份 API 生成应用数据库一致副本。
 - `scripts/configure-backrest.sh`：通过 Backrest API 配置 115 仓库、认证、自动配置
   备份计划和手动 Time Machine 计划。
 
