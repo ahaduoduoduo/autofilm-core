@@ -9,9 +9,9 @@ Docker Compose 编排仓库，其余五个仓库保持独立 fork，便于继续
 
 | 目录 | GitHub 仓库 | 上游 | 当前功能分支 | 职责 |
 | --- | --- | --- | --- | --- |
-| `autofilm-core` | `ahaduoduoduo/autofilm-core` | 新建项目，无上游 | `agent/initial-core` | Agent、成员、AI、任务、管理界面和 Compose |
-| `autofilm-openlist` | `ahaduoduoduo/autofilm-openlist` | `OpenListTeam/OpenList` | `feature/autofilm-remote-media` | 网盘文件、115、离线任务和 Jellyfin 专用路径接口 |
-| `autofilm-openlist-frontend` | `ahaduoduoduo/autofilm-openlist-frontend` | `OpenListTeam/OpenList-Frontend` | `feature/autofilm-remote-media` | 115 风控/扫码界面和手动扫描菜单 |
+| `autofilm-core` | `ahaduoduoduo/autofilm-core` | 新建项目，无上游 | `main`、`agent/restic-backup-deployment` | Agent、成员、AI、任务、管理界面和 Compose |
+| `autofilm-openlist` | `ahaduoduoduo/autofilm-openlist` | `OpenListTeam/OpenList` | `main`、`agent/restic-backup-gateway` | 网盘文件、115、离线任务、Restic 网关和 Jellyfin 专用路径接口 |
+| `autofilm-openlist-frontend` | `ahaduoduoduo/autofilm-openlist-frontend` | `OpenListTeam/OpenList-Frontend` | `main` | 115 风控/扫码界面和手动扫描菜单 |
 | `autofilm-jellyfin` | `ahaduoduoduo/autofilm-jellyfin` | `jellyfin/jellyfin` | `master` | 远端媒体、播放、字幕、删除和资源替换 |
 | `autofilm-jellyfin-web` | `ahaduoduoduo/autofilm-jellyfin-web` | `jellyfin/jellyfin-web` | `codex/autofilm-integrated-web` | OpenList 媒体库选择和远端目录扫描 |
 | `autofilm-weclaw` | `ahaduoduoduo/weclaw` | `fastclaw-ai/weclaw` | `agent/generic-native-services` | 通用微信 Adapter、多 Agent 和联系人权限 |
