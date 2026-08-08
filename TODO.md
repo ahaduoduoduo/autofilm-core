@@ -1,9 +1,11 @@
 # AutoFilm Core development status
 
-Updated: 2026-08-06
+Updated: 2026-08-08
 
 ## 已完成
 
+- [x] 2026-08-08：部署 OpenList 115 上传初始化响应解密重试修复；GitHub 单架构
+  构建和实际增量备份验证通过，异常响应由 OpenList 内部重试后返回 HTTP 200。
 - [x] 2026-08-06：按参考设计重构 Backrest 信息层级：使用大号容量数字、分隔式指标、
   编号内容目录和背景曲线；修正移动设备 viewport，手机导航改为完整页面，并增加
   iPhone 13 浏览器上下文下的首页、导航与全屏编辑器 E2E 验证。
