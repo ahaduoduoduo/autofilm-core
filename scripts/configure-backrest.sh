@@ -126,6 +126,7 @@ configured="$(printf '%s' "$current_config" | jq \
         "/source/docker/backrest/**",
         "/source/docker/alist/data.db*",
         "/source/docker/autofilm-core/autofilm.sqlite*",
+        "/source/web-live/data/**",
         "/source/docker/jellyfin/config/data/*.db*",
         "/source/docker/subhub/data/subhub.db*",
         "/source/docker/localproxy-data/localproxy.db*",
