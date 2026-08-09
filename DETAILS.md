@@ -29,7 +29,7 @@ Updated: 2026-08-09
   无 Compose 容器恢复文件及跨 NAS 路径变量。
 - `scripts/export-sqlite-databases.py`：使用 SQLite 在线备份 API 生成应用数据库一致副本。
 - `scripts/configure-backrest.sh`：通过 Backrest API 配置 115 仓库、认证、自动配置
-  备份计划和手动 Time Machine 计划。
+  备份计划和手动 Time Machine 计划，并为两者应用 Finder `.DS_Store` 排除规则。
 
 ## `packages/contracts`
 
