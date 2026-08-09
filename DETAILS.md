@@ -12,14 +12,14 @@ Updated: 2026-08-09
 - `compose.yaml`：从 GHCR 运行 Core 与可选 Adapter/搜索服务。
 - `compose.full.yaml`：从 GHCR 运行完整媒体系统；数据目录通过环境变量指定，
   可接管现有 OpenList/Jellyfin 持久化目录；Backrest 使用通过完整 GitHub 检查的
-  不可变提交哈希镜像。
+  不可变提交哈希镜像，并把 Restic 元数据缓存持久化到独立主机目录。
 - `compose.build.yaml`：仅在开发时加入相邻 fork 的本地构建上下文。
 - `.github/workflows/build-images.yml`：在 GitHub Actions 构建并发布五类 GHCR
   镜像，Jellyfin 同时提供公共版和个人版标签。
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
 - `docs/system-repositories.md`：六个源码仓库、上游、分支和修改边界。
 - `docs/communication.md`：容器通信、认证方式和用户交互流程。
-- `docs/restic-backup.md`：115 异地备份架构、数据范围、流量限制和恢复入口。
+- `docs/restic-backup.md`：115 异地备份架构、数据范围、元数据缓存、流量限制和恢复入口。
 - `scripts/prepare-restic-staging.sh`：在主机上原子更新 DSM、Docker、数据库和
   Backrest 恢复资料。
 - `scripts/service-restic-staging-request.sh`：处理 Backrest 前置命令创建的主机导出请求。
