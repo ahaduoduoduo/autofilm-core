@@ -56,39 +56,6 @@ services:
     networks:
       - autofilm
 
-  backrest:
-    image: ghcr.io/ahaduoduoduo/backrest:sha-257fbe2fabd545cbbe8ecc0022a0984d1331800b
-    pull_policy: always
-    restart: unless-stopped
-    depends_on:
-      - openlist
-    ports:
-      - "${BACKREST_PORT:-9898}:9898"
-    environment:
-      BACKREST_PORT: 0.0.0.0:9898
-      BACKREST_DATA: /data
-      BACKREST_CONFIG: /config/config.json
-      BACKREST_RESTIC_COMMAND: /bin/restic
-      XDG_CACHE_HOME: /cache
-      BACKREST_OPENLIST_URL: http://openlist:5244
-      BACKREST_OPENLIST_USERNAME: backrest
-      BACKREST_OPENLIST_PASSWORD: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
-      TZ: Asia/Shanghai
-    volumes:
-      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/data:/data"
-      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/config:/config"
-      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/cache:/cache"
-      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/staging:/staging"
-      - ./scripts:/recovery-scripts:ro
-      - "${BACKUP_DOCKER_ROOT:-/volume1/docker}:${BACKUP_DOCKER_ROOT:-/volume1/docker}:ro"
-      - "${BACKUP_WEB_ROOT:-/volume1/web}:${BACKUP_WEB_ROOT:-/volume1/web}:ro"
-      - /volume1/@appconf:/source/dsm-packages/appconf:ro
-      - /volume1/@appdata:/source/dsm-packages/appdata:ro
-      - /volume2/TimeMachine:/source/time-machine:ro
-      - /usr/syno/etc/certificate:/source/dsm-certificates:ro
-    networks:
-      - autofilm
-
   jellyfin:
     image: "${AUTOFILM_JELLYFIN_IMAGE:-ghcr.io/ahaduoduoduo/autofilm-jellyfin:latest}"
     pull_policy: always

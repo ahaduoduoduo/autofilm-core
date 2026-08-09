@@ -11,8 +11,7 @@ Updated: 2026-08-09
 - `Dockerfile.telegram`：构建独立 Telegram Adapter 镜像。
 - `compose.yaml`：从 GHCR 运行 Core 与可选 Adapter/搜索服务。
 - `compose.full.yaml`：从 GHCR 运行完整媒体系统；数据目录通过环境变量指定，
-  可接管现有 OpenList/Jellyfin 持久化目录；Backrest 使用通过完整 GitHub 检查的
-  不可变提交哈希镜像，并把 Restic 元数据缓存持久化到独立主机目录。
+  可接管现有 OpenList/Jellyfin 持久化目录。备份系统由独立仓库部署。
 - `compose.homeassistant.yaml`：以原容器名、host 网络和独立数据根目录重建
   Home Assistant。
 - `compose.build.yaml`：仅在开发时加入相邻 fork 的本地构建上下文。
@@ -21,20 +20,7 @@ Updated: 2026-08-09
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
 - `docs/system-repositories.md`：六个源码仓库、上游、分支和修改边界。
 - `docs/communication.md`：容器通信、认证方式和用户交互流程。
-- `docs/restic-backup.md`：115 异地备份架构、数据范围、元数据缓存、流量限制和恢复入口。
 - `docs/persistence-layout.md`：生产容器的一级持久化根目录、容器路径和备份入口。
-- `scripts/prepare-restic-staging.sh`：在主机上原子更新 DSM、Docker、数据库和
-  Backrest 恢复资料。
-- `scripts/service-restic-staging-request.sh`：处理 Backrest 前置命令创建的主机导出请求。
-- `scripts/request-restic-staging.sh`：由 Backrest 容器提交请求并等待主机导出完成。
-- `scripts/export-dsm-recovery.sh`：生成 DSM 原生配置和 AI 可读的系统重建资料。
-- `scripts/export-docker-recovery.py`：生成 Docker 原始清单、渲染后的 Compose、
-  无 Compose 容器恢复文件及跨 NAS 路径变量。
-- `scripts/export-sqlite-databases.py`：使用 SQLite 在线备份 API 生成应用、Home
-  Assistant 与 Backrest 数据库一致副本，并生成稳定路径清单和恢复顺序。
-- `scripts/configure-backrest.sh`：通过 Backrest API 配置 115 仓库、认证、自动配置
-  备份计划和手动 Time Machine 计划；Docker 与 Web 使用可配置的完整根目录，计划
-  统一应用跨系统索引与回收站排除规则。
 
 ## `packages/contracts`
 
