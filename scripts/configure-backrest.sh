@@ -105,6 +105,7 @@ configured="$(printf '%s' "$current_config" | jq \
       ],
       excludes: [
         "**/@eaDir/**",
+        "**/.DS_Store",
         "**/.cache/**",
         "**/.git/**",
         "**/.next/**",
@@ -155,7 +156,7 @@ configured="$(printf '%s' "$current_config" | jq \
       id: "time-machine",
       repo: "115-offsite",
       paths: ["/source/time-machine"],
-      excludes: ["**/@eaDir/**"],
+      excludes: ["**/@eaDir/**", "**/.DS_Store"],
       schedule: {disabled: true},
       retention: {policyKeepLastN: 2},
       hooks: [],

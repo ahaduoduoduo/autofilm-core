@@ -41,7 +41,8 @@ Backrest 收到成功结果才开始扫描。定时备份和界面手动备份�
 `scripts/configure-backrest.sh` 可重复应用仓库、认证、排除规则和两个计划。
 
 计划排除日志、缓存、临时目录、`node_modules`、Git 对象、Jellyfin 缓存、旧 rclone
-缓存和 Home Assistant 运行日志。OpenList、AutoFilm、Jellyfin、Subhub、LocalProxy、
+缓存、Finder 生成的 `.DS_Store` 和 Home Assistant 运行日志。该 Finder 规则同时应用
+于 `nas-config` 与 `time-machine`。OpenList、AutoFilm、Jellyfin、Subhub、LocalProxy、
 NAS Gateway Manager 与 AutoAccount 的在线 SQLite 文件不直接读取，改为备份前通过
 SQLite 在线备份 API 生成并校验的一致副本。
 
@@ -81,6 +82,9 @@ Backrest 将 Restic 缓存固定在容器内 `/cache`，并持久化到主机目
 
 仪表板每个计划提供“立即备份”。失败后再次点击会创建一次新的增量任务；仓库中已经
 提交的数据继续复用，不会从上次进度字节位置续传未提交的临时对象。
+重试成功后，年度备份日历按“当天已有可用备份”显示普通成功状态；任务卡片的 30 天
+状态条显示绿色并增加橙色外圈，保留当天曾失败后恢复的信息。操作历史仍保留每次失败
+与成功记录。手机端长错误通知限制在浏览器视口内，内容换行并可纵向滚动。
 
 ## 恢复
 
