@@ -33,7 +33,8 @@ Updated: 2026-08-09
 - `scripts/export-sqlite-databases.py`：使用 SQLite 在线备份 API 生成应用、Home
   Assistant 与 Backrest 数据库一致副本，并生成稳定路径清单和恢复顺序。
 - `scripts/configure-backrest.sh`：通过 Backrest API 配置 115 仓库、认证、自动配置
-  备份计划和手动 Time Machine 计划，并为两者应用跨系统索引与回收站排除规则。
+  备份计划和手动 Time Machine 计划；Docker 与 Web 使用可配置的完整根目录，计划
+  统一应用跨系统索引与回收站排除规则。
 
 ## `packages/contracts`
 

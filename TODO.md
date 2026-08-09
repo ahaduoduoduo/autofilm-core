@@ -4,6 +4,8 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：将 `/volume1/docker` 与 `/volume1/web` 改为完整根目录备份；新增
+  项目自动进入备份，不再按服务维护独立路径和前端开关。
 - [x] 2026-08-09：将 Home Assistant Recorder 历史与 Backrest 操作记录加入 SQLite
   一致性导出；缩小 Jellyfin 在线数据库排除范围，保留历史数据库副本，并排除 macOS、
   DSM 和 Windows 生成的索引、资源分叉、缩略图与回收站目录。

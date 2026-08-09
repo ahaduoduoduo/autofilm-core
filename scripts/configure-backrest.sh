@@ -14,8 +14,14 @@ set +a
 : "${AUTOFILM_ADMIN_PASSWORD:?AUTOFILM_ADMIN_PASSWORD is required}"
 
 ui_username="${AUTOFILM_ADMIN_USERNAME:-admin}"
+docker_root="${BACKUP_DOCKER_ROOT:-/volume1/docker}"
+web_root="${BACKUP_WEB_ROOT:-/volume1/web}"
 if [[ ! "$ui_username" =~ ^[A-Za-z0-9_-]+$ ]]; then
   ui_username="admin"
+fi
+if [[ "$docker_root" != /* || "$web_root" != /* ]]; then
+  printf 'Backup roots must be absolute paths\n' >&2
+  exit 1
 fi
 
 restic_exec=(
@@ -65,6 +71,8 @@ configured="$(printf '%s' "$current_config" | jq \
   --arg repository_guid "$repository_guid" \
   --arg ui_username "$ui_username" \
   --arg password_hash "$password_hash" \
+  --arg docker_root "$docker_root" \
+  --arg web_root "$web_root" \
   --arg snapshot_hook "$snapshot_hook" '
   def filesystem_metadata:
     [
@@ -122,12 +130,9 @@ configured="$(printf '%s' "$current_config" | jq \
       id: "nas-config",
       repo: "115-offsite",
       paths: [
-        "/source/docker",
-        "/source/docker-volumes/telegram-data",
+        $docker_root,
+        $web_root,
         "/source/dsm-packages",
-        "/source/home-assistant",
-        "/source/web-live",
-        "/source/web-autoaccount",
         "/source/dsm-certificates",
         "/staging"
       ],
@@ -145,26 +150,24 @@ configured="$(printf '%s' "$current_config" | jq \
         "**/tmp/**",
         "**/*.log",
         "**/*.log.*",
-        "/source/docker/homeassistant/**",
-        "/source/docker/telegram-data/**",
-        "/source/docker/SYNC/**",
-        "/source/docker/SYNC_BIU/**",
-        "/source/docker/backrest/**",
-        "/source/web-live/data/**",
-        "/source/docker/jellyfin/config/data/kodisyncqueue*.db",
+        ($docker_root + "/SYNC/**"),
+        ($docker_root + "/SYNC_BIU/**"),
+        ($docker_root + "/backrest/**"),
+        ($web_root + "/live/data/**"),
+        ($docker_root + "/jellyfin/config/data/kodisyncqueue*.db"),
         "/source/dsm-packages/appconf/Virtualization/ccc/etcd.data/**",
         "/staging/control/**"
       ]
-        + sqlite_runtime("/source/docker/alist/data.db")
-        + sqlite_runtime("/source/docker/autofilm-core/autofilm.sqlite")
-        + sqlite_runtime("/source/docker/jellyfin/config/data/jellyfin.db")
-        + sqlite_runtime("/source/docker/jellyfin/config/data/infuse_sync.db")
-        + sqlite_runtime("/source/docker/jellyfin/config/data/library.db")
-        + sqlite_runtime("/source/docker/subhub/data/subhub.db")
-        + sqlite_runtime("/source/docker/localproxy-data/localproxy.db")
-        + sqlite_runtime("/source/docker/nas-gateway-manager/data/manager.db")
-        + sqlite_runtime("/source/web-autoaccount/automation.db")
-        + sqlite_runtime("/source/home-assistant/home-assistant_v2.db")),
+        + sqlite_runtime($docker_root + "/alist/data.db")
+        + sqlite_runtime($docker_root + "/autofilm-core/autofilm.sqlite")
+        + sqlite_runtime($docker_root + "/jellyfin/config/data/jellyfin.db")
+        + sqlite_runtime($docker_root + "/jellyfin/config/data/infuse_sync.db")
+        + sqlite_runtime($docker_root + "/jellyfin/config/data/library.db")
+        + sqlite_runtime($docker_root + "/subhub/data/subhub.db")
+        + sqlite_runtime($docker_root + "/localproxy-data/localproxy.db")
+        + sqlite_runtime($docker_root + "/nas-gateway-manager/data/manager.db")
+        + sqlite_runtime($web_root + "/autoaccount/data/automation.db")
+        + sqlite_runtime($docker_root + "/homeassistant/home-assistant_v2.db")),
       schedule: {cron: "0 5 * * *"},
       retention: {
         policyTimeBucketed: {

@@ -358,7 +358,7 @@ def main() -> int:
     (output_dir / "RESTORE.md").write_text(
         """# Docker 恢复顺序
 
-1. 恢复 `/source/docker`、Web 服务目录、命名卷数据和 `/staging/recovery`。
+1. 恢复 `/volume1/docker`、`/volume1/web`、命名卷数据和 `/staging/recovery`。
 2. 修改 `.env.recovery.example` 中的根目录，使其符合目标 NAS。
 3. 优先使用 `projects/*/compose.rendered.yaml` 恢复原 Compose 项目。
 4. 使用 `compose.standalone.generated.yaml` 恢复原本没有 Compose 文件的容器。
