@@ -25,16 +25,17 @@ Backrest 首页使用大号容量数字、分隔式指标、编号内容目录�
 
 自动计划 `nas-config` 包含：
 
-- `/volume1/docker` 中的 Compose、服务配置和持久化数据；
-- `/volume1/docker/telegram-data` 中的 Telegram Adapter 状态；
-- `/volume1/docker/homeassistant` 中的 Home Assistant 配置；
-- `/volume1/web/live` 的直播代理 Compose 与代码，以及
-  `/volume1/docker/live-proxy` 中的频道配置；
-- `/volume1/web/autoaccount/data` 的配置与附件；
+- `/volume1/docker` 整个根目录中的 Compose、服务配置和持久化数据；
+- `/volume1/web` 整个根目录中的 Web 项目、配置和数据；
 - `/volume1/@appconf` 与 `/volume1/@appdata` 中的 DSM 套件配置，排除日志和 VMM
   活动 etcd 数据；
 - DSM 证书目录；
 - 每次备份前生成的 DSM、Docker、Backrest 和应用数据库恢复资料。
+
+Docker 和 Web 使用根目录备份。以后在这两个目录下新增服务或项目，会自然进入下一次
+备份，不需要增加服务名称、前端开关或 Restic 路径。在线数据库仍通过备份前一致副本
+处理，避免读取写入过程中的数据库文件。`BACKUP_DOCKER_ROOT` 与 `BACKUP_WEB_ROOT`
+可修改这两个根目录；容器内使用相同绝对路径，因此 Backrest 界面显示的就是宿主机路径。
 
 Backrest 的快照前置命令通过 `/staging/control/requests` 请求主机刷新恢复资料；DSM
 主机每分钟执行 `scripts/service-restic-staging-request.sh`，完成后写入对应结果文件，

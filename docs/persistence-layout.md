@@ -39,13 +39,12 @@ Xbox Speedup 和 Chijie 已经位于各自的 `/volume1/docker/<service>` 根目
 
 ## Backrest 入口
 
-Home Assistant 与 Telegram 数据物理上也位于 `/source/docker` 下。`nas-config` 在
-共享 Docker 根目录中排除这两个物理路径，再通过 `/source/home-assistant` 和
-`/source/docker-volumes/telegram-data` 各备份一次，从而保留独立内容开关且不产生
-重复快照路径。
+`nas-config` 直接备份 `/volume1/docker` 和 `/volume1/web` 两个完整根目录。Home
+Assistant、Telegram 以及以后新增的服务不再使用独立备份入口，也不依赖前端服务名称
+映射。根目录内新增内容会自然进入下一次备份。
 
-Backrest 原始运行目录 `/source/docker/backrest/**` 整体排除；同一 staging 目录通过
+Backrest 原始运行目录 `/volume1/docker/backrest/**` 整体排除；同一 staging 目录通过
 `/staging` 独立入口备份整理后的恢复资料。
 
-Live Proxy 频道数据通过 `/source/docker/live-proxy` 备份。源码目录中保留的旧
-`/source/web-live/data` 副本排除，避免同一频道配置上传两次。
+Live Proxy 频道数据通过 `/volume1/docker/live-proxy` 备份。Web 根目录中保留的旧
+`/volume1/web/live/data` 副本排除，避免同一频道配置上传两次。

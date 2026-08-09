@@ -80,11 +80,8 @@ services:
       - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/cache:/cache"
       - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/staging:/staging"
       - ./scripts:/recovery-scripts:ro
-      - /volume1/docker:/source/docker:ro
-      - "${HOMEASSISTANT_DATA_DIR:-/volume1/docker/homeassistant}:/source/home-assistant:ro"
-      - /volume1/web/live:/source/web-live:ro
-      - /volume1/web/autoaccount/data:/source/web-autoaccount:ro
-      - "${TELEGRAM_DATA_DIR:-/volume1/docker/telegram-data}:/source/docker-volumes/telegram-data:ro"
+      - "${BACKUP_DOCKER_ROOT:-/volume1/docker}:${BACKUP_DOCKER_ROOT:-/volume1/docker}:ro"
+      - "${BACKUP_WEB_ROOT:-/volume1/web}:${BACKUP_WEB_ROOT:-/volume1/web}:ro"
       - /volume1/@appconf:/source/dsm-packages/appconf:ro
       - /volume1/@appdata:/source/dsm-packages/appdata:ro
       - /volume2/TimeMachine:/source/time-machine:ro
