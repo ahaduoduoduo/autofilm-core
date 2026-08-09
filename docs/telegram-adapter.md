@@ -27,8 +27,8 @@ Telegram 更新。
 
 Core 会生成两组不同的随机服务令牌，并通过私有 Docker 网络把 Token 和服务令牌
 交给 Adapter。Adapter 先调用 Telegram `getMe` 验证机器人身份，成功后将配置保存到
-自己的 `telegram-data` 数据卷。Core 只保存服务令牌的哈希或加密值，不保存 Bot
-Token。
+`TELEGRAM_DATA_DIR` 指定的 bind mount。Core 只保存服务令牌的哈希或加密值，不保存
+Bot Token。
 
 环境变量初始化仍作为无界面部署的兼容方式保留，但不是管理界面的正常流程。
 

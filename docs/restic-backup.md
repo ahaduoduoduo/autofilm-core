@@ -26,8 +26,8 @@ Backrest 首页使用大号容量数字、分隔式指标、编号内容目录�
 自动计划 `nas-config` 包含：
 
 - `/volume1/docker` 中的 Compose、服务配置和持久化数据；
-- Telegram Adapter 的 Docker 命名卷；
-- `/volume1/web/HA` 中的 Home Assistant 配置；
+- `/volume1/docker/telegram-data` 中的 Telegram Adapter 状态；
+- `/volume1/docker/homeassistant` 中的 Home Assistant 配置；
 - `/volume1/web/live` 的直播代理 Compose、代码和频道配置；
 - `/volume1/web/autoaccount/data` 的配置与附件；
 - `/volume1/@appconf` 与 `/volume1/@appdata` 中的 DSM 套件配置，排除日志和 VMM
@@ -71,7 +71,7 @@ OpenList 网关默认限制为 4 MiB/s、80 GiB/日、1500 GiB/月。计量位�
 ### Restic 元数据缓存
 
 Backrest 将 Restic 缓存固定在容器内 `/cache`，并持久化到主机目录
-`/volume1/docker/autofilm-suite/autofilm-core/data/backrest/cache`。Restic 打开仓库时仍需
+`/volume1/docker/backrest/cache`。Restic 打开仓库时仍需
 列出远端 `index/` 目录，但已有索引从本地缓存读取，只下载新增或本地缺失的索引文件；
 容器更新和重建不会再次读取全部历史索引。
 

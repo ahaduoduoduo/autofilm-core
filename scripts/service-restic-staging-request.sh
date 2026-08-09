@@ -5,7 +5,7 @@ set -eu
 PATH="/usr/local/bin:/usr/syno/bin:/usr/syno/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PATH
 
-staging_dir="${RESTIC_STAGING_DIR:-/volume1/docker/autofilm-suite/autofilm-core/data/backrest/staging}"
+staging_dir="${RESTIC_STAGING_DIR:-/volume1/docker/backrest/staging}"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 request_dir="$staging_dir/control/requests"
 result_dir="$staging_dir/control/results"

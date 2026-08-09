@@ -171,7 +171,8 @@ autofilm-weclaw/
 [docs/native-adapters.md](docs/native-adapters.md)，Telegram 配置见
 [docs/telegram-adapter.md](docs/telegram-adapter.md)，OpenList/Restic/Backrest 异地
 备份范围、Restic 持久化元数据缓存和灾难恢复见
-[docs/restic-backup.md](docs/restic-backup.md)。
+[docs/restic-backup.md](docs/restic-backup.md)。生产容器数据目录见
+[docs/persistence-layout.md](docs/persistence-layout.md)。
 
 `.github/workflows/build-images.yml` 负责发布 Core、Telegram、OpenList、
 Jellyfin 公共版和 WeClaw 的 `linux/amd64` GHCR 镜像；个人 Jellyfin 构建项只保留
