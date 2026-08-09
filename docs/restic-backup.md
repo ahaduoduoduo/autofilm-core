@@ -41,11 +41,15 @@ Backrest 的快照前置命令通过 `/staging/control/requests` 请求主机刷
 Backrest 收到成功结果才开始扫描。定时备份和界面手动备份使用同一流程。
 `scripts/configure-backrest.sh` 可重复应用仓库、认证、排除规则和两个计划。
 
-计划排除日志、缓存、临时目录、`node_modules`、Git 对象、Jellyfin 缓存、旧 rclone
-缓存、Finder 生成的 `.DS_Store` 和 Home Assistant 运行日志。该 Finder 规则同时应用
-于 `nas-config` 与 `time-machine`。OpenList、AutoFilm、Jellyfin、Subhub、LocalProxy、
-NAS Gateway Manager 与 AutoAccount 的在线 SQLite 文件不直接读取，改为备份前通过
-SQLite 在线备份 API 生成并校验的一致副本。
+计划排除日志、缓存、临时目录、`node_modules`、Git 对象、Jellyfin 缓存、旧传输缓存，
+以及 macOS、DSM、Windows 生成的资源分叉、索引、缩略图和回收站目录。这些系统元数据
+规则同时应用于 `nas-config` 与 `time-machine`。
+
+OpenList、AutoFilm、Jellyfin、Subhub、LocalProxy、NAS Gateway Manager、AutoAccount、
+Home Assistant 和 Backrest 的在线 SQLite 文件不直接读取，改为备份前通过 SQLite
+在线备份 API 生成并校验的一致副本。Home Assistant 的 Recorder 历史、统计和日志簿
+数据因此可以恢复；Backrest 的操作历史和任务记录也保存在恢复资料中。Jellyfin 只排除
+正在使用的数据库及 WAL/SHM/Journal，`.bk`、`.old` 和迁移前副本继续作为普通文件备份。
 
 恢复资料位于 `/staging/recovery`：
 
@@ -53,8 +57,10 @@ SQLite 在线备份 API 生成并校验的一致副本。
   反向代理、防火墙、计划任务、套件存储占用、VMM 状态和恢复顺序；
 - `docker/`：容器完整 inspect、镜像 digest、网络、卷、原项目渲染 Compose、全部容器
   生成 Compose、无 Compose 容器生成 Compose 和跨 NAS 根目录变量；
-- `databases/`：各应用的一致 SQLite 副本及校验结果；
-- `backrest/`：仓库和计划配置。该文件包含仓库密码，只存在于加密 Restic 仓库中。
+- `databases/`：各应用、Home Assistant 和 Backrest 的一致 SQLite 副本、稳定恢复路径、
+  校验结果及 `RESTORE.md`；
+- `backrest/`：仓库和计划配置、会话签名密钥。配置文件包含仓库密码，只存在于加密
+  Restic 仓库中。
 
 `time-machine` 是独立手动计划。当前共享目录约 1.4 TB，且所在卷可用空间不足以长期
 保留新的 Btrfs 快照，因此部署阶段不自动执行。它仍以本地 Time Machine 硬盘作为日常

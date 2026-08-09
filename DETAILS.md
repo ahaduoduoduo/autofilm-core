@@ -30,9 +30,10 @@ Updated: 2026-08-09
 - `scripts/export-dsm-recovery.sh`：生成 DSM 原生配置和 AI 可读的系统重建资料。
 - `scripts/export-docker-recovery.py`：生成 Docker 原始清单、渲染后的 Compose、
   无 Compose 容器恢复文件及跨 NAS 路径变量。
-- `scripts/export-sqlite-databases.py`：使用 SQLite 在线备份 API 生成应用数据库一致副本。
+- `scripts/export-sqlite-databases.py`：使用 SQLite 在线备份 API 生成应用、Home
+  Assistant 与 Backrest 数据库一致副本，并生成稳定路径清单和恢复顺序。
 - `scripts/configure-backrest.sh`：通过 Backrest API 配置 115 仓库、认证、自动配置
-  备份计划和手动 Time Machine 计划，并为两者应用 Finder `.DS_Store` 排除规则。
+  备份计划和手动 Time Machine 计划，并为两者应用跨系统索引与回收站排除规则。
 
 ## `packages/contracts`
 

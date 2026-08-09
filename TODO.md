@@ -4,6 +4,9 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：将 Home Assistant Recorder 历史与 Backrest 操作记录加入 SQLite
+  一致性导出；缩小 Jellyfin 在线数据库排除范围，保留历史数据库副本，并排除 macOS、
+  DSM 和 Windows 生成的索引、资源分叉、缩略图与回收站目录。
 - [x] 2026-08-09：排除 Live Proxy 源码目录中的旧数据副本，频道运行数据只从
   `/volume1/docker/live-proxy` 上传一次。
 - [x] 2026-08-09：部署 AutoFilm Core、Backrest、WeClaw、Telegram Adapter、Home
