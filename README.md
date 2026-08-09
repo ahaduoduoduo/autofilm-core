@@ -169,9 +169,9 @@ autofilm-weclaw/
 
 部署参数见 [docs/deployment.md](docs/deployment.md)，WeClaw 配置见
 [docs/native-adapters.md](docs/native-adapters.md)，Telegram 配置见
-[docs/telegram-adapter.md](docs/telegram-adapter.md)，OpenList/Restic/Backrest 异地
-备份范围、Restic 持久化元数据缓存和灾难恢复见
-[docs/restic-backup.md](docs/restic-backup.md)。生产容器数据目录见
+[docs/telegram-adapter.md](docs/telegram-adapter.md)。异地备份已经拆分到独立的
+[`ahaduoduoduo/nas-backup`](https://github.com/ahaduoduoduo/nas-backup) 项目。
+生产容器数据目录见
 [docs/persistence-layout.md](docs/persistence-layout.md)。
 
 `.github/workflows/build-images.yml` 负责发布 Core、Telegram、OpenList、

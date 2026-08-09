@@ -4,6 +4,8 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：将 Backrest、Btrfs 快照、DSM/Docker 恢复资料和备份调度迁移到
+  独立 `ahaduoduoduo/nas-backup` 项目；Core 仅继续运行共享的 OpenList 存储接口。
 - [x] 2026-08-09：将 `/volume1/docker` 与 `/volume1/web` 改为完整根目录备份；新增
   项目自动进入备份，不再按服务维护独立路径和前端开关。
 - [x] 2026-08-09：将 Home Assistant Recorder 历史与 Backrest 操作记录加入 SQLite

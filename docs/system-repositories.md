@@ -1,20 +1,22 @@
 # System repositories and upstreams
 
-Updated: 2026-08-06
+Updated: 2026-08-09
 
-AutoFilm 媒体系统由六个相邻源码仓库组成。`autofilm-core` 是业务入口和
+AutoFilm 媒体系统由六个相邻源码仓库组成。`autofilm-core` 是业务入口和媒体系统
 Docker Compose 编排仓库，其余五个仓库保持独立 fork，便于继续跟踪上游更新。
+NAS 备份是第七个独立项目，不属于 AutoFilm 运行依赖。
 
 ## 仓库关系
 
 | 目录 | GitHub 仓库 | 上游 | 当前功能分支 | 职责 |
 | --- | --- | --- | --- | --- |
-| `autofilm-core` | `ahaduoduoduo/autofilm-core` | 新建项目，无上游 | `main`、`agent/restic-backup-deployment` | Agent、成员、AI、任务、管理界面和 Compose |
+| `autofilm-core` | `ahaduoduoduo/autofilm-core` | 新建项目，无上游 | `main` | Agent、成员、AI、任务、管理界面和媒体系统 Compose |
 | `autofilm-openlist` | `ahaduoduoduo/autofilm-openlist` | `OpenListTeam/OpenList` | `main`、`agent/restic-backup-gateway` | 网盘文件、115、离线任务、Restic 网关和 Jellyfin 专用路径接口 |
 | `autofilm-openlist-frontend` | `ahaduoduoduo/autofilm-openlist-frontend` | `OpenListTeam/OpenList-Frontend` | `main` | 115 风控/扫码界面和手动扫描菜单 |
 | `autofilm-jellyfin` | `ahaduoduoduo/autofilm-jellyfin` | `jellyfin/jellyfin` | `master` | 远端媒体、播放、字幕、删除和资源替换 |
 | `autofilm-jellyfin-web` | `ahaduoduoduo/autofilm-jellyfin-web` | `jellyfin/jellyfin-web` | `codex/autofilm-integrated-web` | OpenList 媒体库选择和远端目录扫描 |
 | `autofilm-weclaw` | `ahaduoduoduo/weclaw` | `fastclaw-ai/weclaw` | `agent/generic-native-services` | 通用微信 Adapter、多 Agent 和联系人权限 |
+| `nas-backup` | `ahaduoduoduo/nas-backup` | 新建项目，无上游 | `main` | 独立 Backrest 部署、Btrfs 快照、DSM/Docker 恢复资料和灾难恢复文档 |
 
 OpenList、Jellyfin 和 Jellyfin Web fork 会保留上游创建的维护分支；上表只列出
 AutoFilm 当前使用和继续开发的分支。Jellyfin 前后端的

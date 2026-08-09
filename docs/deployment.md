@@ -153,13 +153,10 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 | `OPENLIST_JELLYFIN_TOKEN` | OpenList 与 Jellyfin 受限服务令牌 |
 | `JELLYFIN_API_KEY` | Core/OpenList 调用 Jellyfin 的 API Key |
 | `AUTOFILM_CORE_DATA_DIR` | Core 数据库、WAL 和运行数据目录 |
-| `BACKREST_ROOT_DIR` | Backrest 的 data、config、cache 和 staging 根目录 |
 | `WECLAW_DATA_DIR` | WeClaw 登录状态和配置目录 |
 | `TELEGRAM_DATA_DIR` | Telegram Adapter 的 Bot 配置和 Update offset 目录 |
 | `HOMEASSISTANT_DATA_DIR` | Home Assistant 配置和持久化数据目录 |
 | `OPENLIST_DATA_DIR` | OpenList 持久化目录 |
-| `BACKUP_DOCKER_ROOT` | `nas-config` 自动备份的 Docker 根目录 |
-| `BACKUP_WEB_ROOT` | `nas-config` 自动备份的 Web 根目录 |
 | `JELLYFIN_CONFIG_DIR` | Jellyfin 配置和数据库目录 |
 | `JELLYFIN_CACHE_DIR` | Jellyfin 缓存目录 |
 | `JELLYFIN_MEDIA_DIR` | 本地媒体根目录 |

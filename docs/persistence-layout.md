@@ -16,10 +16,6 @@ named volume、DSM Web 目录和容器运行数据不再互相嵌套。
 | 服务 | 宿主机目录 | 容器目录 |
 | --- | --- | --- |
 | AutoFilm Core | `/volume1/docker/autofilm-core` | `/data` |
-| Backrest | `/volume1/docker/backrest/data` | `/data` |
-| Backrest 配置 | `/volume1/docker/backrest/config` | `/config` |
-| Restic 缓存 | `/volume1/docker/backrest/cache` | `/cache` |
-| 恢复资料 | `/volume1/docker/backrest/staging` | `/staging` |
 | WeClaw | `/volume1/docker/weclaw` | `/root/.weclaw` |
 | Telegram Adapter | `/volume1/docker/telegram-data` | `/data` |
 | Home Assistant | `/volume1/docker/homeassistant` | `/config` |
@@ -34,17 +30,5 @@ OpenList、Jellyfin、Jackett、Subhub、Danmu API、NAS Gateway Manager、Local
 Xbox Speedup 和 Chijie 已经位于各自的 `/volume1/docker/<service>` 根目录。Live Proxy
 代码仍位于 `/volume1/web/live`，频道运行数据位于 `/volume1/docker/live-proxy`。
 
-媒体目录、Time Machine、DSM 套件目录和系统证书属于业务数据或只读输入，不视为
-容器自身持久化目录。
-
-## Backrest 入口
-
-`nas-config` 直接备份 `/volume1/docker` 和 `/volume1/web` 两个完整根目录。Home
-Assistant、Telegram 以及以后新增的服务不再使用独立备份入口，也不依赖前端服务名称
-映射。根目录内新增内容会自然进入下一次备份。
-
-Backrest 原始运行目录 `/volume1/docker/backrest/**` 整体排除；同一 staging 目录通过
-`/staging` 独立入口备份整理后的恢复资料。
-
-Live Proxy 频道数据通过 `/volume1/docker/live-proxy` 备份。Web 根目录中保留的旧
-`/volume1/web/live/data` 副本排除，避免同一频道配置上传两次。
+媒体目录属于业务数据，不视为容器自身持久化目录。NAS 异地备份、Btrfs 快照、Time
+Machine 和系统恢复资料由独立的 `ahaduoduoduo/nas-backup` 项目管理。
