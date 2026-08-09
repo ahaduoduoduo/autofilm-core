@@ -46,3 +46,6 @@ Home Assistant 与 Telegram 数据物理上也位于 `/source/docker` 下。`nas
 
 Backrest 原始运行目录 `/source/docker/backrest/**` 整体排除；同一 staging 目录通过
 `/staging` 独立入口备份整理后的恢复资料。
+
+Live Proxy 频道数据通过 `/source/docker/live-proxy` 备份。源码目录中保留的旧
+`/source/web-live/data` 副本排除，避免同一频道配置上传两次。

@@ -28,7 +28,8 @@ Backrest 首页使用大号容量数字、分隔式指标、编号内容目录�
 - `/volume1/docker` 中的 Compose、服务配置和持久化数据；
 - `/volume1/docker/telegram-data` 中的 Telegram Adapter 状态；
 - `/volume1/docker/homeassistant` 中的 Home Assistant 配置；
-- `/volume1/web/live` 的直播代理 Compose、代码和频道配置；
+- `/volume1/web/live` 的直播代理 Compose 与代码，以及
+  `/volume1/docker/live-proxy` 中的频道配置；
 - `/volume1/web/autoaccount/data` 的配置与附件；
 - `/volume1/@appconf` 与 `/volume1/@appdata` 中的 DSM 套件配置，排除日志和 VMM
   活动 etcd 数据；

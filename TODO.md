@@ -4,6 +4,8 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：排除 Live Proxy 源码目录中的旧数据副本，频道运行数据只从
+  `/volume1/docker/live-proxy` 上传一次。
 - [x] 2026-08-09：部署 AutoFilm Core、Backrest、WeClaw、Telegram Adapter、Home
   Assistant 和 Live Proxy 的 `/volume1/docker` 一级服务目录；Telegram 改用普通 bind
   mount，Home Assistant 改由可复现的 Compose 管理，恢复资料已按新路径重新生成。
