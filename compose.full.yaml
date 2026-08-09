@@ -48,8 +48,8 @@ services:
       RESTIC_USERNAME: backrest
       RESTIC_PASSWORD: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
       RESTIC_TIMEZONE: Asia/Shanghai
-      RESTIC_UPLOAD_MIB_PER_SECOND: "4"
-      RESTIC_DAILY_UPLOAD_GIB: "80"
+      RESTIC_UPLOAD_MIB_PER_SECOND: "0"
+      RESTIC_DAILY_UPLOAD_GIB: "50"
       RESTIC_MONTHLY_UPLOAD_GIB: "1500"
     volumes:
       - "${OPENLIST_DATA_DIR:-./data/openlist}:/opt/openlist/data"
