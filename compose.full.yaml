@@ -57,7 +57,7 @@ services:
       - autofilm
 
   backrest:
-    image: ghcr.io/ahaduoduoduo/backrest:sha-3659cf6982b0641ab72cdcb0efc294cfce69b328
+    image: ghcr.io/ahaduoduoduo/backrest:sha-e0088f1e13a737720c9c89ba606c89d24de6656d
     pull_policy: always
     restart: unless-stopped
     depends_on:
@@ -69,6 +69,7 @@ services:
       BACKREST_DATA: /data
       BACKREST_CONFIG: /config/config.json
       BACKREST_RESTIC_COMMAND: /bin/restic
+      XDG_CACHE_HOME: /cache
       BACKREST_OPENLIST_URL: http://openlist:5244
       BACKREST_OPENLIST_USERNAME: backrest
       BACKREST_OPENLIST_PASSWORD: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
@@ -76,6 +77,7 @@ services:
     volumes:
       - ./data/backrest/data:/data
       - ./data/backrest/config:/config
+      - ./data/backrest/cache:/cache
       - ./data/backrest/staging:/staging
       - ./scripts:/recovery-scripts:ro
       - /volume1/docker:/source/docker:ro
