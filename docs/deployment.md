@@ -1,6 +1,6 @@
 # Deployment
 
-Updated: 2026-07-30
+Updated: 2026-08-09
 
 ## 目录和权限
 
@@ -42,7 +42,7 @@ WeClaw 数据保存在 `weclaw/` 并挂载为容器内的 `/root/.weclaw`。容�
 用于读取 WeClaw 保存为 `0640` 的配置文件；服务进程仍以非 root 用户运行。
 
 Telegram 容器只在内部网络监听 `18012`，不映射宿主机端口。Bot Token
-在管理界面填写，并保存在独立 `telegram-data` 数据卷。无界面部署仍可使用
+在管理界面填写，并保存在 `TELEGRAM_DATA_DIR` 指定的 bind mount。无界面部署仍可使用
 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CORE_TOKEN` 和
 `TELEGRAM_OUTBOUND_TOKEN` 环境变量。
 
@@ -132,12 +132,12 @@ Jellyfin 返回给播放客户端的是后者，所以必须是 Infuse 能访问
 
 | 服务 | 默认状态 | 宿主机端口 | 数据 |
 | --- | --- | --- | --- |
-| `autofilm-core` | 启动 | `AUTOFILM_PORT` → `3100` | `./data` |
+| `autofilm-core` | 启动 | `AUTOFILM_PORT` → `3100` | `AUTOFILM_CORE_DATA_DIR` |
 | `openlist` | 启动 | `OPENLIST_PORT` → `5244` | `OPENLIST_DATA_DIR` |
 | `jellyfin` | 启动 | `JELLYFIN_PORT` → `8096` | Jellyfin 配置、缓存和媒体目录 |
-| `telegram-adapter` | 启动 | 不发布 | `telegram-data` 命名卷 |
-| `weclaw` | `wechat` profile | `WECLAW_PORT` → `18011` | `./weclaw` |
-| `jackett` | `search` profile | 默认不发布 | `./data/jackett` |
+| `telegram-adapter` | 启动 | 不发布 | `TELEGRAM_DATA_DIR` |
+| `weclaw` | `wechat` profile | `WECLAW_PORT` → `18011` | `WECLAW_DATA_DIR` |
+| `jackett` | `search` profile | 默认不发布 | `JACKETT_CONFIG_DIR` |
 | `flaresolverr` | `search` profile | 默认不发布 | 无业务数据库 |
 
 已有 Jackett/FlareSolverr 时不启用 `search` profile，在 Core 管理界面配置现有
@@ -152,10 +152,16 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 | `AUTOFILM_MASTER_KEY` | Core 数据库中敏感配置的加密主密钥 |
 | `OPENLIST_JELLYFIN_TOKEN` | OpenList 与 Jellyfin 受限服务令牌 |
 | `JELLYFIN_API_KEY` | Core/OpenList 调用 Jellyfin 的 API Key |
+| `AUTOFILM_CORE_DATA_DIR` | Core 数据库、WAL 和运行数据目录 |
+| `BACKREST_ROOT_DIR` | Backrest 的 data、config、cache 和 staging 根目录 |
+| `WECLAW_DATA_DIR` | WeClaw 登录状态和配置目录 |
+| `TELEGRAM_DATA_DIR` | Telegram Adapter 的 Bot 配置和 Update offset 目录 |
+| `HOMEASSISTANT_DATA_DIR` | Home Assistant 配置和持久化数据目录 |
 | `OPENLIST_DATA_DIR` | OpenList 持久化目录 |
 | `JELLYFIN_CONFIG_DIR` | Jellyfin 配置和数据库目录 |
 | `JELLYFIN_CACHE_DIR` | Jellyfin 缓存目录 |
 | `JELLYFIN_MEDIA_DIR` | 本地媒体根目录 |
+| `JACKETT_CONFIG_DIR` | Jackett 配置目录 |
 
 `.env`、数据库、Cookie、扫码状态和真实服务密钥不能加入 Git。
 

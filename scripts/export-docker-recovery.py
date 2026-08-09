@@ -342,7 +342,6 @@ def main() -> int:
             }
         ),
         "named_volume_backup_map": {
-            "autofilm-core_telegram-data": "/source/docker-volumes/telegram-data",
             "backrest_backrest-webui-node-modules": "omitted: development dependency cache",
             "backrest_backrest-webui-pnpm-store": "omitted: development package cache",
         },

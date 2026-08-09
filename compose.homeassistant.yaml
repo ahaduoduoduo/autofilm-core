@@ -1,0 +1,10 @@
+services:
+  homeassistant:
+    image: homeassistant/home-assistant:latest
+    container_name: homeassistant
+    restart: always
+    network_mode: host
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - "${HOMEASSISTANT_DATA_DIR:-/volume1/docker/homeassistant}:/config"

@@ -11,9 +11,7 @@ import sys
 
 DATABASES = {
     "openlist/data.db": "/volume1/docker/alist/data.db",
-    "autofilm/autofilm.sqlite": (
-        "/volume1/docker/autofilm-suite/autofilm-core/data/autofilm.sqlite"
-    ),
+    "autofilm/autofilm.sqlite": "/volume1/docker/autofilm-core/autofilm.sqlite",
     "subhub/subhub.db": "/volume1/docker/subhub/data/subhub.db",
     "localproxy/localproxy.db": "/volume1/docker/localproxy-data/localproxy.db",
     "nas-gateway-manager/manager.db": (
@@ -86,11 +84,11 @@ def main() -> int:
         "databases": records,
         "intentionally_omitted": [
             {
-                "source": "/volume1/web/HA/home-assistant_v2.db",
+                "source": "/volume1/docker/homeassistant/home-assistant_v2.db",
                 "reason": "Home Assistant recorder history is excluded by backup policy",
             },
             {
-                "source": "/volume1/docker/autofilm-suite/autofilm-core/data/backrest/data",
+                "source": "/volume1/docker/backrest/data",
                 "reason": "Backrest operation logs and cache are not recovery-critical",
             },
             {

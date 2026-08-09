@@ -21,8 +21,8 @@ services:
       AUTOFILM_ADMIN_USERNAME: "${AUTOFILM_ADMIN_USERNAME:-}"
       AUTOFILM_ADMIN_PASSWORD: "${AUTOFILM_ADMIN_PASSWORD:-}"
     volumes:
-      - ./data:/data
-      - ./weclaw:/weclaw:ro
+      - "${AUTOFILM_CORE_DATA_DIR:-./data}:/data"
+      - "${WECLAW_DATA_DIR:-./weclaw}:/weclaw:ro"
     healthcheck:
       test:
         - CMD
@@ -51,7 +51,7 @@ services:
     ports:
       - "${WECLAW_PORT:-18011}:18011"
     volumes:
-      - ./weclaw:/root/.weclaw
+      - "${WECLAW_DATA_DIR:-./weclaw}:/root/.weclaw"
     networks:
       - autofilm
 
@@ -70,7 +70,7 @@ services:
       TELEGRAM_PROVIDER_INSTANCE_ID: "${TELEGRAM_PROVIDER_INSTANCE_ID:-telegram-main}"
       TELEGRAM_DATA_DIR: /data
     volumes:
-      - telegram-data:/data
+      - "${TELEGRAM_DATA_DIR:-./data/telegram}:/data"
     healthcheck:
       test:
         - CMD
@@ -90,7 +90,7 @@ services:
     image: lscr.io/linuxserver/jackett:latest
     restart: unless-stopped
     volumes:
-      - ./jackett:/config
+      - "${JACKETT_CONFIG_DIR:-./jackett}:/config"
     networks:
       - autofilm
 
@@ -105,6 +105,3 @@ services:
 networks:
   autofilm:
     name: autofilm
-
-volumes:
-  telegram-data:

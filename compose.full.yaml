@@ -19,8 +19,8 @@ services:
       AUTOFILM_WATCHLIST_INTERVAL_SECONDS: "${AUTOFILM_WATCHLIST_INTERVAL_SECONDS:-21600}"
       AUTOFILM_MASTER_KEY: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
     volumes:
-      - ./data:/data
-      - ./weclaw:/weclaw:ro
+      - "${AUTOFILM_CORE_DATA_DIR:-/volume1/docker/autofilm-core}:/data"
+      - "${WECLAW_DATA_DIR:-/volume1/docker/weclaw}:/weclaw:ro"
     healthcheck:
       test:
         - CMD
@@ -57,7 +57,7 @@ services:
       - autofilm
 
   backrest:
-    image: ghcr.io/ahaduoduoduo/backrest:sha-4ad53312531ad97035c370202cafab65663f0382
+    image: ghcr.io/ahaduoduoduo/backrest:sha-67ec585580a82fe4d5596407a43616dcbaec9dee
     pull_policy: always
     restart: unless-stopped
     depends_on:
@@ -75,16 +75,16 @@ services:
       BACKREST_OPENLIST_PASSWORD: "${AUTOFILM_MASTER_KEY:?set AUTOFILM_MASTER_KEY}"
       TZ: Asia/Shanghai
     volumes:
-      - ./data/backrest/data:/data
-      - ./data/backrest/config:/config
-      - ./data/backrest/cache:/cache
-      - ./data/backrest/staging:/staging
+      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/data:/data"
+      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/config:/config"
+      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/cache:/cache"
+      - "${BACKREST_ROOT_DIR:-/volume1/docker/backrest}/staging:/staging"
       - ./scripts:/recovery-scripts:ro
       - /volume1/docker:/source/docker:ro
-      - /volume1/web/HA:/source/home-assistant:ro
+      - "${HOMEASSISTANT_DATA_DIR:-/volume1/docker/homeassistant}:/source/home-assistant:ro"
       - /volume1/web/live:/source/web-live:ro
       - /volume1/web/autoaccount/data:/source/web-autoaccount:ro
-      - /volume1/@docker/volumes/autofilm-core_telegram-data/_data:/source/docker-volumes/telegram-data:ro
+      - "${TELEGRAM_DATA_DIR:-/volume1/docker/telegram-data}:/source/docker-volumes/telegram-data:ro"
       - /volume1/@appconf:/source/dsm-packages/appconf:ro
       - /volume1/@appdata:/source/dsm-packages/appdata:ro
       - /volume2/TimeMachine:/source/time-machine:ro
@@ -129,7 +129,7 @@ services:
     ports:
       - "${WECLAW_PORT:-18011}:18011"
     volumes:
-      - ./weclaw:/root/.weclaw
+      - "${WECLAW_DATA_DIR:-/volume1/docker/weclaw}:/root/.weclaw"
     networks:
       - autofilm
 
@@ -148,7 +148,7 @@ services:
       TELEGRAM_PROVIDER_INSTANCE_ID: "${TELEGRAM_PROVIDER_INSTANCE_ID:-telegram-main}"
       TELEGRAM_DATA_DIR: /data
     volumes:
-      - telegram-data:/data
+      - "${TELEGRAM_DATA_DIR:-/volume1/docker/telegram-data}:/data"
     healthcheck:
       test:
         - CMD
@@ -168,7 +168,7 @@ services:
     image: lscr.io/linuxserver/jackett:latest
     restart: unless-stopped
     volumes:
-      - ./data/jackett:/config
+      - "${JACKETT_CONFIG_DIR:-/volume1/docker/Jackett}:/config"
     networks:
       - autofilm
 
@@ -183,6 +183,3 @@ services:
 networks:
   autofilm:
     name: autofilm
-
-volumes:
-  telegram-data:

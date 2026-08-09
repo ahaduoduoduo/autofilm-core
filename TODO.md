@@ -4,6 +4,9 @@ Updated: 2026-08-09
 
 ## 已完成
 
+- [x] 2026-08-09：增加 AutoFilm Core、Backrest、WeClaw、Telegram Adapter、Home
+  Assistant 和 Live Proxy 使用 `/volume1/docker` 一级服务目录所需的 Compose 与路径
+  配置；Telegram 改用普通 bind mount，并保存可复现的 Home Assistant Compose。
 - [x] 2026-08-09：部署 Backrest 手机错误通知修复和失败后恢复状态；年度日历在重试
   成功后显示正常，任务条以绿色加橙色外圈记录已恢复，并使现有与新增任务排除
   Finder 生成的 `.DS_Store`。
