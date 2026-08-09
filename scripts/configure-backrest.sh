@@ -66,6 +66,34 @@ configured="$(printf '%s' "$current_config" | jq \
   --arg ui_username "$ui_username" \
   --arg password_hash "$password_hash" \
   --arg snapshot_hook "$snapshot_hook" '
+  def filesystem_metadata:
+    [
+      "**/@eaDir/**",
+      "**/@tmp/**",
+      "**/#recycle/**",
+      "**/@Recycle/**",
+      "**/@SynoResource/**",
+      "**/.SynologyWorkingDirectory/**",
+      "**/@Recently-Snapshot/**",
+      "**/@sharesnap/**",
+      "**/.DS_Store",
+      "**/._*",
+      "**/.AppleDouble/**",
+      "**/.Spotlight-V100/**",
+      "**/.Trashes/**",
+      "**/.Trash/**",
+      "**/.Trash-*/**",
+      "**/.TemporaryItems/**",
+      "**/.DocumentRevisions-V100/**",
+      "**/.fseventsd/**",
+      "**/Thumbs.db",
+      "**/thumbs.db",
+      "**/ehthumbs.db",
+      "**/desktop.ini",
+      "**/Desktop.ini"
+    ];
+  def sqlite_runtime($path):
+    [$path, ($path + "-wal"), ($path + "-shm"), ($path + "-journal")];
   .instance = "Synology-115-Offsite" |
   .repos = [
     {
@@ -103,9 +131,7 @@ configured="$(printf '%s' "$current_config" | jq \
         "/source/dsm-certificates",
         "/staging"
       ],
-      excludes: [
-        "**/@eaDir/**",
-        "**/.DS_Store",
+      excludes: (filesystem_metadata + [
         "**/.cache/**",
         "**/.git/**",
         "**/.next/**",
@@ -124,18 +150,21 @@ configured="$(printf '%s' "$current_config" | jq \
         "/source/docker/SYNC/**",
         "/source/docker/SYNC_BIU/**",
         "/source/docker/backrest/**",
-        "/source/docker/alist/data.db*",
-        "/source/docker/autofilm-core/autofilm.sqlite*",
         "/source/web-live/data/**",
-        "/source/docker/jellyfin/config/data/*.db*",
-        "/source/docker/subhub/data/subhub.db*",
-        "/source/docker/localproxy-data/localproxy.db*",
-        "/source/docker/nas-gateway-manager/data/manager.db*",
-        "/source/web-autoaccount/automation.db*",
+        "/source/docker/jellyfin/config/data/kodisyncqueue*.db",
         "/source/dsm-packages/appconf/Virtualization/ccc/etcd.data/**",
-        "/staging/control/**",
-        "/source/home-assistant/home-assistant_v2.db*"
-      ],
+        "/staging/control/**"
+      ]
+        + sqlite_runtime("/source/docker/alist/data.db")
+        + sqlite_runtime("/source/docker/autofilm-core/autofilm.sqlite")
+        + sqlite_runtime("/source/docker/jellyfin/config/data/jellyfin.db")
+        + sqlite_runtime("/source/docker/jellyfin/config/data/infuse_sync.db")
+        + sqlite_runtime("/source/docker/jellyfin/config/data/library.db")
+        + sqlite_runtime("/source/docker/subhub/data/subhub.db")
+        + sqlite_runtime("/source/docker/localproxy-data/localproxy.db")
+        + sqlite_runtime("/source/docker/nas-gateway-manager/data/manager.db")
+        + sqlite_runtime("/source/web-autoaccount/automation.db")
+        + sqlite_runtime("/source/home-assistant/home-assistant_v2.db")),
       schedule: {cron: "0 5 * * *"},
       retention: {
         policyTimeBucketed: {
@@ -159,7 +188,7 @@ configured="$(printf '%s' "$current_config" | jq \
       id: "time-machine",
       repo: "115-offsite",
       paths: ["/source/time-machine"],
-      excludes: ["**/@eaDir/**", "**/.DS_Store"],
+      excludes: filesystem_metadata,
       schedule: {disabled: true},
       retention: {policyKeepLastN: 2},
       hooks: [],

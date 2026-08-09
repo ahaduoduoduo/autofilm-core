@@ -43,6 +43,9 @@ trap on_error HUP INT TERM EXIT
 
 mkdir -p "$new_dir/backrest"
 cp -p "$staging_dir/../config/config.json" "$new_dir/backrest/config.json"
+if [ -f "$staging_dir/../data/jwt-secret" ]; then
+  cp -p "$staging_dir/../data/jwt-secret" "$new_dir/backrest/jwt-secret"
+fi
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 (
@@ -67,7 +70,7 @@ jq -n \
       dsm: "DSM configuration and AI-readable reconstruction facts",
       docker: "Docker runtime inventory and generated recovery Compose files",
       databases: "transaction-consistent SQLite copies",
-      backrest: "Backrest repository and plan configuration"
+      backrest: "Backrest repository, plan configuration, and session signing secret"
     }
   }' >"$new_dir/manifest.json"
 

@@ -22,6 +22,15 @@ DATABASES = {
     "jellyfin/infuse_sync.db": (
         "/volume1/docker/jellyfin/config/data/infuse_sync.db"
     ),
+    "jellyfin/library.db": "/volume1/docker/jellyfin/config/data/library.db",
+    "homeassistant/home-assistant_v2.db": (
+        "/volume1/docker/homeassistant/home-assistant_v2.db"
+    ),
+    "backrest/oplog.sqlite": "/volume1/docker/backrest/data/oplog.sqlite",
+    "backrest/kvdb.sqlite": "/volume1/docker/backrest/data/kvdb.sqlite",
+    "backrest/tasklogs/logs.sqlite": (
+        "/volume1/docker/backrest/data/tasklogs/logs.sqlite"
+    ),
 }
 
 
@@ -29,10 +38,14 @@ def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
 
 
-def backup_database(source: pathlib.Path, target: pathlib.Path) -> dict[str, object]:
+def backup_database(
+    source: pathlib.Path,
+    target: pathlib.Path,
+    recovery_path: pathlib.Path,
+) -> dict[str, object]:
     record: dict[str, object] = {
         "source": str(source),
-        "target": str(target),
+        "recovery_path": recovery_path.as_posix(),
         "started_at": utc_now(),
     }
     if not source.is_file():
@@ -72,24 +85,25 @@ def main() -> int:
     output_dir = pathlib.Path(sys.argv[1])
     output_dir.mkdir(parents=True, exist_ok=False)
 
-    records = []
+    records: list[dict[str, object]] = []
     for relative_target, source_name in DATABASES.items():
+        recovery_path = pathlib.Path(relative_target)
         records.append(
-            backup_database(pathlib.Path(source_name), output_dir / relative_target)
+            backup_database(
+                pathlib.Path(source_name),
+                output_dir / recovery_path,
+                recovery_path,
+            )
         )
 
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": utc_now(),
         "databases": records,
         "intentionally_omitted": [
             {
-                "source": "/volume1/docker/homeassistant/home-assistant_v2.db",
-                "reason": "Home Assistant recorder history is excluded by backup policy",
-            },
-            {
-                "source": "/volume1/docker/backrest/data",
-                "reason": "Backrest operation logs and cache are not recovery-critical",
+                "source": "/volume1/docker/backrest/data/processlogs",
+                "reason": "Backrest text process logs are not recovery-critical",
             },
             {
                 "source": "/volume1/docker/jellyfin/config/data/kodisyncqueue*.db",
@@ -99,6 +113,27 @@ def main() -> int:
     }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    restore_lines = [
+        "# SQLite 数据库恢复",
+        "",
+        "1. 停止使用目标数据库的容器。",
+        "2. 将状态为 `ok` 的一致副本复制到对应原路径，并保留所有者和权限。",
+        "3. 不复制旧的 `-wal`、`-shm` 或 `-journal`；一致副本已经包含提交的数据。",
+        "4. 启动容器并检查数据库迁移、健康状态和应用日志。",
+        "",
+        "| 恢复资料 | 原路径 | 状态 |",
+        "| --- | --- | --- |",
+    ]
+    for record in records:
+        restore_lines.append(
+            f"| `{record['recovery_path']}` | `{record['source']}` | "
+            f"`{record['status']}` |"
+        )
+    (output_dir / "RESTORE.md").write_text(
+        "\n".join(restore_lines) + "\n",
         encoding="utf-8",
     )
 

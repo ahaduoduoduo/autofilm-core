@@ -364,7 +364,7 @@ def main() -> int:
 4. 使用 `compose.standalone.generated.yaml` 恢复原本没有 Compose 文件的容器。
 5. `compose.all.generated.yaml` 是全部容器的运行时快照，适合核对端口、环境变量、挂载和启动策略。
 6. 按 `raw/volumes.json` 恢复命名卷数据，按 `raw/networks.json` 创建外部网络。
-7. 数据库文件使用相邻的 `databases` 目录中的一致性副本，不使用在线数据库原文件。
+7. 数据库文件使用相邻 `databases/RESTORE.md` 列出的一致性副本，不使用在线数据库原文件。
 
 生成的 Compose 含运行时环境变量，属于加密灾备资料。跨系统恢复时需要调整 UID/GID、
 路径、证书目录和仅 DSM 存在的挂载。
