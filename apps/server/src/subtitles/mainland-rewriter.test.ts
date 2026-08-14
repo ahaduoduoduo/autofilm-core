@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GenerateRequest } from "../ai/types.js";
+import type { AiTransportConfig, GenerateRequest } from "../ai/types.js";
 import type { ConfigStore } from "../db/config-store.js";
 import type { PromptStore } from "../db/prompt-store.js";
 import { SubtitleMainlandRewriter } from "./mainland-rewriter.js";
@@ -9,14 +9,19 @@ const source = `[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, Margi
 describe("mainland subtitle rewriter", () => {
   it("uses one isolated full-subtitle request and applies only returned Chinese", async () => {
     const requests: GenerateRequest[] = [];
-    const rewriter = fixture(requests, {
-      changes: [
-        {
-          id: 0,
-          chinese_segments: [{ index: 0, text: "我一直在考虑这件事" }],
-        },
-      ],
-    });
+    const transports: AiTransportConfig[] = [];
+    const rewriter = fixture(
+      requests,
+      {
+        changes: [
+          {
+            id: 0,
+            chinese_segments: [{ index: 0, text: "我一直在考虑这件事" }],
+          },
+        ],
+      },
+      transports,
+    );
 
     const result = await rewriter.rewrite("episode.ass", Buffer.from(source));
 
@@ -26,6 +31,9 @@ describe("mainland subtitle rewriter", () => {
       "user",
     ]);
     expect(requests[0]?.tools).toBeUndefined();
+    expect(transports).toEqual([
+      expect.objectContaining({ requestTimeoutMs: 10 * 60_000 }),
+    ]);
     expect(requests[0]?.messages[1]?.content).toContain(
       "I've been thinking about it.",
     );
@@ -58,6 +66,7 @@ describe("mainland subtitle rewriter", () => {
 function fixture(
   requests: GenerateRequest[],
   response: Record<string, unknown>,
+  transports: AiTransportConfig[] = [],
 ): SubtitleMainlandRewriter {
   const configs = {
     defaultModel: () => ({
@@ -91,16 +100,19 @@ function fixture(
   return new SubtitleMainlandRewriter(
     configs,
     prompts,
-    () => ({
-      generate: async (request) => {
-        requests.push(request);
-        return {
-          content: JSON.stringify(response),
-          toolCalls: [],
-          usage: { inputTokens: 100, outputTokens: 50 },
-          rawStopReason: "stop",
-        };
-      },
-    }),
+    (_protocol, config) => {
+      transports.push(config);
+      return {
+        generate: async (request) => {
+          requests.push(request);
+          return {
+            content: JSON.stringify(response),
+            toolCalls: [],
+            usage: { inputTokens: 100, outputTokens: 50 },
+            rawStopReason: "stop",
+          };
+        },
+      };
+    },
   );
 }

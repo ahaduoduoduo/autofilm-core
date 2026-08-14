@@ -6,6 +6,7 @@ import type { PromptStore } from "../db/prompt-store.js";
 import { SubtitleDocument } from "./subtitle-document.js";
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
+const SUBTITLE_REWRITE_REQUEST_TIMEOUT_MS = 10 * 60_000;
 
 export interface MainlandRewriteResult {
   data: Buffer;
@@ -59,6 +60,7 @@ export class SubtitleMainlandRewriter {
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       headers: provider.customHeaders,
+      requestTimeoutMs: SUBTITLE_REWRITE_REQUEST_TIMEOUT_MS,
     });
     const messages = [
       {

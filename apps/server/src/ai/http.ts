@@ -1,5 +1,7 @@
 import type { AiTransportConfig } from "./types.js";
 
+const DEFAULT_AI_REQUEST_TIMEOUT_MS = 120_000;
+
 export class AiProviderError extends Error {
   readonly status?: number;
   readonly retryAfterMs?: number;
@@ -112,7 +114,7 @@ async function postText(
       ...extraHeaders,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(requestTimeoutMs(config)),
   });
   const text = await response.text();
   if (!response.ok) {
@@ -130,6 +132,15 @@ async function postText(
     );
   }
   return text;
+}
+
+function requestTimeoutMs(config: AiTransportConfig): number {
+  const configured = config.requestTimeoutMs;
+  return typeof configured === "number" &&
+    Number.isFinite(configured) &&
+    configured > 0
+    ? Math.floor(configured)
+    : DEFAULT_AI_REQUEST_TIMEOUT_MS;
 }
 
 function looksLikeEventStream(text: string): boolean {
