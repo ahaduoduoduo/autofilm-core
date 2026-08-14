@@ -27,6 +27,8 @@ import { SubtitleWorkspaceStore } from "./subtitles/workspace-store.js";
 import { CaptchaRecognizer } from "./subtitles/captcha-recognizer.js";
 import { SubtitleDownloadService } from "./subtitles/download-service.js";
 import { SubtitleCleaner } from "./subtitles/cleaner.js";
+import { SubtitleMainlandRewriter } from "./subtitles/mainland-rewriter.js";
+import { SubtitleProcessor } from "./subtitles/processor.js";
 import { SecretVault } from "./security/vault.js";
 import { WeClawRegistration } from "./integrations/weclaw-registration.js";
 import { PromptStore } from "./db/prompt-store.js";
@@ -70,7 +72,10 @@ export async function buildApp(config: AppConfig) {
     subhd,
     new CaptchaRecognizer(configs, prompts),
   );
-  const subtitleCleaner = new SubtitleCleaner(configs, prompts);
+  const subtitleProcessor = new SubtitleProcessor(
+    new SubtitleCleaner(configs, prompts),
+    new SubtitleMainlandRewriter(configs, prompts),
+  );
   const agent = new AgentService({
     configs,
     prompts,
@@ -87,7 +92,7 @@ export async function buildApp(config: AppConfig) {
     watchlists,
     subtitleWorkspaces,
     subtitleDownloads,
-    subtitleCleaner,
+    subtitleProcessor,
     users,
     outbox,
     media,
@@ -109,7 +114,7 @@ export async function buildApp(config: AppConfig) {
     watchlists,
     subtitleWorkspaces,
     subtitleDownloads,
-    subtitleCleaner,
+    subtitleProcessor,
     weClawRegistration,
     tmdb,
     jackett,

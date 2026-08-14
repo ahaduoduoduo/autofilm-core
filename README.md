@@ -17,9 +17,10 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   - Anthropic Messages。
   - Gemini GenerateContent。
 - New API 可作为任意供应方配置，不是特殊代码路径。
-- 主 Agent、会话压缩、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
-  管理界面修改并恢复当前版本的系统默认内容；修改在下一次模型请求时生效。
-- 39 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
+- 主 Agent、会话压缩、验证码 OCR、字幕广告清理、字幕大陆用词转换和追更判断提示词
+  保存在 SQLite 中，可从管理界面修改并恢复当前版本的系统默认内容；修改在下一次
+  模型请求时生效。
+- 49 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
   ASS 样式和按成员追更；管理员聊天另有 OpenList 扫码工具。
 - Jellyfin 电影按实际视频流分辨率分页查询，不访问 OpenList；重复电影分为
   Provider ID 确定重复和标题年份疑似重复，并返回每个实际版本的画质、音轨与路径。
@@ -48,8 +49,13 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - 字幕与 Jellyfin Movie/Episode ID 配对；新增、替换和删除统一使用 Jellyfin
   字幕接口和摘要字幕引用，不向 Agent 暴露可变化的流序号。本地媒体由 Jellyfin
   写入本地目录，远端媒体由 Jellyfin 上传 OpenList。
-- 文本字幕逐文件使用独立 AI 请求分析全部事件并清理广告；SUP/PGS 原样上传。
-  同一放置计划最多并发处理 8 个映射，清理、流式上传和单项状态互相隔离。
+- 下载得到的文本字幕仍在放置前逐文件使用独立 AI 请求分析全部事件并清理广告；
+  清理完成后才上传，SUP/PGS 原样上传。同一放置计划最多并发处理 8 个映射，清理、
+  流式上传和单项状态互相隔离。
+- 成员观看后可明确要求处理一条或多条现有 OpenList 外挂字幕：字幕导入同一个临时
+  工作区，每个文件以完整双语内容发起一次独立 AI 请求，只允许替换中文汉字段，
+  最终新增 `chs` 字幕并保留原字幕。广告清理、大陆用词转换和 ASS 样式共用字幕
+  处理器与文档解析组件。
 - Jellyfin 当前图片、远程图片、图片设置、条目刷新、分集和媒体流查询。
 - Jellyfin Movie/Episode 精确版本删除；Core 先核对条目、路径和媒体流，再通过
   Jellyfin 删除本地或 OpenList 实际文件。字幕删除继续使用不可变摘要引用。

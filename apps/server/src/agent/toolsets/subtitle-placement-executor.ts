@@ -94,14 +94,16 @@ async function executePlacementMapping(
           workspaceId,
           mapping.fileId,
         );
-        const cleaned = await deps.subtitleCleaner.clean(
+        const processed = await deps.subtitleProcessor.process(
           buffered.metadata.filename,
           buffered.data,
+          [{ type: "remove_ads" }],
         );
-        uploadStream = Readable.from([cleaned.data]);
-        contentLength = cleaned.data.byteLength;
+        const cleaned = processed.operations[0]!;
+        uploadStream = Readable.from([processed.data]);
+        contentLength = processed.data.byteLength;
         cleaning = {
-          removed: cleaned.removed,
+          removed: cleaned.removedEvents ?? 0,
           summary: cleaned.summary,
         };
       } else {

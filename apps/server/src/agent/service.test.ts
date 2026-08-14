@@ -5,9 +5,11 @@ describe("main agent subtitle batching rules", () => {
   it("requires one workspace and one placement batch per request", () => {
     const prompt = promptDefinition("agent.main");
 
-    expect(prompt?.version).toBe(23);
+    expect(prompt?.version).toBe(24);
     expect(prompt?.content).toContain("必须共用一个 workspace");
     expect(prompt?.content).toContain("一次提交完整映射列表");
+    expect(prompt?.content).toContain("不得在搜索、下载、入库或 place_subtitles 阶段自动");
+    expect(prompt?.content).toContain("原字幕始终保留");
     expect(prompt?.content).toContain("不要重复创建");
     expect(prompt?.content).toContain("离线下载提交成功");
     expect(prompt?.content).toContain("不得再说“正在提交”");

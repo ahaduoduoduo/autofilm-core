@@ -4,18 +4,12 @@ import type {
   OpenListObject,
 } from "../integrations/openlist.js";
 import type { JellyfinItem } from "../integrations/jellyfin.js";
+import {
+  openListPathFromUri,
+  toOpenListUri,
+} from "../integrations/openlist-path.js";
 
-export function openListPathFromUri(value: unknown): string {
-  const uri = String(value ?? "");
-  if (!uri.startsWith("openlist:///")) {
-    throw new Error("升级项缺少 OpenList 路径");
-  }
-  return `/${uri.slice("openlist:///".length)}`;
-}
-
-export function toOpenListUri(value: string): string {
-  return `openlist:///${value.replace(/^\/+/, "")}`;
-}
+export { openListPathFromUri, toOpenListUri };
 
 export function hasVideoStream(item: JellyfinItem): boolean {
   const streams =

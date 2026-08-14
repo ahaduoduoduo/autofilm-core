@@ -82,6 +82,7 @@ const promptKeySchema = z.enum([
   "subtitle.captcha.system",
   "subtitle.captcha.user",
   "subtitle.cleaner",
+  "subtitle.mainland_rewriter",
   "watchlist.evaluator",
 ]);
 

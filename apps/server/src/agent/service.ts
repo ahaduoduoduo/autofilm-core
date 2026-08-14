@@ -28,7 +28,7 @@ import type { SubHDClient } from "../integrations/subhd.js";
 import type { WatchlistStore } from "../db/watchlist-store.js";
 import type { SubtitleWorkspaceStore } from "../subtitles/workspace-store.js";
 import type { SubtitleDownloadService } from "../subtitles/download-service.js";
-import type { SubtitleCleaner } from "../subtitles/cleaner.js";
+import type { SubtitleProcessor } from "../subtitles/processor.js";
 import { createAgentTools } from "./tools.js";
 import { executeToolCalls } from "./tool-executor.js";
 import { ConversationQueue } from "./conversation-queue.js";
@@ -55,7 +55,7 @@ export interface AgentDependencies {
   watchlists: WatchlistStore;
   subtitleWorkspaces: SubtitleWorkspaceStore;
   subtitleDownloads: SubtitleDownloadService;
-  subtitleCleaner: SubtitleCleaner;
+  subtitleProcessor: SubtitleProcessor;
   users: UserStore;
   outbox: OutboxStore;
   media: EphemeralMediaStore;
@@ -485,7 +485,7 @@ export class AgentService {
       watchlists: this.deps.watchlists,
       subtitleWorkspaces: this.deps.subtitleWorkspaces,
       subtitleDownloads: this.deps.subtitleDownloads,
-      subtitleCleaner: this.deps.subtitleCleaner,
+      subtitleProcessor: this.deps.subtitleProcessor,
       outbox: this.deps.outbox,
       media: this.deps.media,
       mediaBaseUrl: this.deps.mediaBaseUrl,

@@ -76,6 +76,9 @@ Updated: 2026-08-14
   重复使用和 Jellyfin 目标，并处理部分失败重试。
 - `toolsets/subtitle-placement-executor.ts`：以最多 8 个工作协程并发执行字幕清理、
   流式上传和可选旧字幕删除；每个映射独立记录完成或失败状态。
+- `toolsets/subtitle-processing.ts`：把用户观看后选中的一条或多条 OpenList 外挂字幕
+  导入同一个工作区，批量执行大陆用词转换，按项重试并新增 `chs` 字幕；不返回字幕
+  正文，也不删除源字幕。
 - `prompt.ts`：可迁移的旧版 Agent 行为、当前远端媒体规则，以及各独立 AI
   上下文的默认提示词和版本。
 
@@ -115,7 +118,10 @@ Updated: 2026-08-14
 ### `integrations`、`tasks`、`channels`
 
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
-  内存任务状态、精确对象移动、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
+  内存任务状态、受大小限制的字幕对象读取、精确对象移动、调度器和扫码会话，并读取
+  电影/电视剧媒体库根目录配置。
+- `integrations/openlist-path.ts`：在 `openlist:///` Jellyfin URI 与 OpenList 绝对路径
+  之间进行严格转换。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
   Movie/MediaSource 分页清单、BoxSet 成员媒体详情、`RemoteRefresh`、Movie/Episode
   精确删除、字幕读取
@@ -156,8 +162,8 @@ Updated: 2026-08-14
   拒绝分辨率下降、更新原 Jellyfin Item ID、自动检查条目路径和视频流，再移动旧文件
   并写入终态。带有会话续接信息的新任务由下载完成 Worker 调用 Agent；历史任务仍使用
   独立结果通知。
-- `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
-  公共函数；能继续旧版改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
+- `tasks/media-upgrade-files.ts`：视频流检查和可恢复的精确移动公共函数；能继续旧版
+  改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
   不存在时执行一层、唯一且受大小限制的分隔符差异匹配。
 - `tasks/media-upgrade-check-worker.ts`：每批领取 8 个待检查电影，以标题和年份查询
   Jackett；只保存目标分辨率命中结果，完成后恢复原聊天并发送分页结果通知。
@@ -188,15 +194,23 @@ Updated: 2026-08-14
   全局等待状态。
 - `extract.ts`：7z/unzip/unrar 多级解压、UTF-8/UTF-16/GB18030 编码归一化和
   字幕格式限制。
-- `cleaner.ts`：每个文本字幕使用独立 AI 请求分析全部事件，不做正则预筛选。
+- `subtitle-document.ts`：ASS/SSA/SRT/VTT 的共享事件模型与序列化器；广告操作可删除
+  完整事件，大陆用词操作只能替换解析出的中文汉字段，英文、标签、时间轴、标点、
+  空格和换行不在可写范围内。
+- `processor.ts`：顺序执行 `remove_ads`、`mainland_wording` 和 `ass_style` 的统一字幕
+  操作入口，供下载放置、现有字幕处理和样式工具复用。
+- `cleaner.ts`：通过共享字幕文档，对每个下载文本字幕使用独立 AI 请求分析全部事件；
+  不做正则预筛选，请求失败时保留原字幕。
+- `mainland-rewriter.ts`：每个现有字幕使用一次独立的完整文件请求，只接受有变化的事件
+  ID、中文片段 ID 和纯汉字替换内容；不继承主对话、系统提示词、成员记忆或其他文件。
 - `ass-style.ts`：旧版 ASS 样式分析、行内标签和黑边特效坐标处理。
 - `hints.ts`：从解压相对路径推断集号、语言和 Jellyfin 语言标签；短语言代码只按
   完整文件名标记识别，避免作品名称中的普通字符被误判为语言。
-- `workspace-store.ts`：一个任务累计多个字幕包、文件和验证码的成员级临时工作区；
-  文件只使用 UUID，并保存不可变放置计划和逐项执行状态；摘要按固定大小分块计算，
-  SUP/PGS 可直接打开文件读取流。
+- `workspace-store.ts`：一个任务累计多个 SubHD 字幕包、OpenList 现有字幕、验证码和
+  逐项处理状态的成员级临时工作区；文件只使用 UUID，并保存不可变放置计划和处理
+  结果；摘要按固定大小分块计算，SUP/PGS 可直接打开文件读取流。
 - `references.ts`：为 Jellyfin 外挂字幕生成摘要引用，并在删除或替换前解析当前流。
-- `types.ts`：字幕搜索、验证码、提取文件、放置计划和临时工作区类型。
+- `types.ts`：字幕搜索、验证码、提取文件、来源类型、放置计划、处理项和临时工作区类型。
 
 ## `apps/web/src`
 
