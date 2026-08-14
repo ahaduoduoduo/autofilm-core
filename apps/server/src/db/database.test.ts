@@ -132,6 +132,11 @@ describe("database migrations", () => {
       ).get(),
     ).toBeTruthy();
     expect(
+      db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='native_request_jobs'",
+      ).get(),
+    ).toBeTruthy();
+    expect(
       db.prepare("PRAGMA table_info(model_profiles)").all().some(
         (column) =>
           (column as { name: string }).name === "context_window_tokens",

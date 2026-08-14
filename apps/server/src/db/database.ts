@@ -408,6 +408,29 @@ const migrations = [
   FROM conversation_compactions_v10;
   DROP TABLE conversation_compactions_v10;
   `,
+  `
+  CREATE TABLE native_request_jobs (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    provider_instance_id TEXT NOT NULL,
+    external_conversation_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (
+      event_type IN ('message.created', 'conversation.reset')
+    ),
+    text TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'pending' CHECK (
+      state IN ('pending', 'running', 'completed', 'failed')
+    ),
+    last_error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+  );
+  CREATE INDEX native_request_jobs_work_idx
+    ON native_request_jobs(state, sequence);
+  `,
 ];
 
 export type AppDatabase = Database.Database;

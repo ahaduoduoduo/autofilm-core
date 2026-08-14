@@ -1,6 +1,6 @@
 # Architecture
 
-Updated: 2026-08-14
+Updated: 2026-08-15
 
 ## 职责
 
@@ -31,6 +31,8 @@ sequenceDiagram
     U->>A: 观影请求
     A->>C: Native message.created
     C->>C: 验证 Adapter 与成员身份
+    C-->>A: HTTP 202，已持久化接收
+    C->>C: Native 请求 Worker 领取任务
     C->>P: 按模型所选协议请求
     P->>C: 工具调用
     par 同轮只读工具
@@ -38,7 +40,8 @@ sequenceDiagram
     end
     C->>P: 工具结果
     P->>C: 最终回复
-    C->>A: 结构化消息
+    C->>C: 最终结果写入 Outbox
+    C->>A: POST /v1/messages 结构化消息
     A->>U: 平台消息
 ```
 
@@ -48,6 +51,10 @@ Jackett 搜索先取得完整结果并按文件大小降序排列，再以每页
 
 新聊天身份先保存为 `pending`，Core 返回未授权提示。管理员绑定成员并改为
 `active` 后才能进入 Agent。
+
+已绑定成员的 Native 请求不会在入站 HTTP 连接中等待 Agent。Core 认证、去重并写入
+SQLite 后返回 `202`，后台 Worker 执行模型重试和工具操作，最终通过 Outbox 主动发送。
+因此 Adapter 的请求超时只限制接收阶段，不限制完整 Agent 或字幕处理时长。
 
 ## 下载与媒体更新
 
@@ -85,7 +92,7 @@ OpenList 只在真实 115 请求返回 HTTP 405 时记录风控状态，不执�
 后续真实 115 请求成功后，
 OpenList 清除标记，Core 也允许后续新的 405 再次发送通知。
 
-任务进入完成、失败或取消状态时，Core 写入 Outbox。主动消息 Worker
+Native Agent 回复以及任务进入完成、失败或取消状态时，Core 写入 Outbox。主动消息 Worker
 以指数退避向原聊天 Adapter 发送结果，因此 Adapter 暂时离线不会丢失通知。
 
 ## 数据

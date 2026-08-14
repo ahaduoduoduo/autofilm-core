@@ -57,7 +57,12 @@ export async function registerNativeRoutes(
     }
 
     const cached = context.conversations.processedEvent(event.event_id);
-    if (cached) return JSON.parse(cached) as NativeEventResponse;
+    if (cached) {
+      const response = JSON.parse(cached) as NativeEventResponse;
+      return context.nativeRequests.get(event.event_id)
+        ? reply.code(202).send(response)
+        : response;
+    }
 
     const identity = context.users.ensurePendingIdentity({
       channel: event.provider,
@@ -75,6 +80,28 @@ export async function registerNativeRoutes(
           },
         ],
       };
+    } else if (
+      canRespondAsynchronously(channel) &&
+      (event.event_type === "conversation.reset" || eventText(event))
+    ) {
+      response = { messages: [] };
+      const userId = identity.userId;
+      context.db.transaction(() => {
+        context.nativeRequests.enqueue({
+          eventId: event.event_id,
+          userId,
+          channel: event.provider,
+          providerInstanceId: event.provider_instance_id,
+          externalConversationId: event.conversation_id,
+          eventType: event.event_type,
+          text: eventText(event),
+        });
+        context.conversations.saveProcessedEvent(
+          event.event_id,
+          JSON.stringify(response),
+        );
+      })();
+      return reply.code(202).send(response);
     } else if (event.event_type === "conversation.reset") {
       await context.agent.reset({
         userId: identity.userId,
@@ -127,6 +154,13 @@ export async function registerNativeRoutes(
     );
     return response;
   });
+}
+
+function canRespondAsynchronously(channel: {
+  baseUrl: string;
+  outboundToken: string;
+}): boolean {
+  return Boolean(channel.baseUrl && channel.outboundToken);
 }
 
 function authorized(request: FastifyRequest, expectedHash: string): boolean {

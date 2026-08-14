@@ -35,6 +35,7 @@ import { PromptStore } from "./db/prompt-store.js";
 import { MediaUpgradeStore } from "./db/media-upgrade-store.js";
 import { MediaUpgradeCheckStore } from "./db/media-upgrade-check-store.js";
 import { UserMemoryStore } from "./db/user-memory-store.js";
+import { NativeRequestStore } from "./db/native-request-store.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -60,6 +61,7 @@ export async function buildApp(config: AppConfig) {
   const mediaUpgradeChecks = new MediaUpgradeCheckStore(db);
   const userMemories = new UserMemoryStore(db);
   const outbox = new OutboxStore(db);
+  const nativeRequests = new NativeRequestStore(db);
   const media = new EphemeralMediaStore(db);
   const watchlists = new WatchlistStore(db);
   const tmdb = new TmdbClient(configs);
@@ -110,6 +112,7 @@ export async function buildApp(config: AppConfig) {
     mediaUpgradeChecks,
     userMemories,
     outbox,
+    nativeRequests,
     media,
     watchlists,
     subtitleWorkspaces,

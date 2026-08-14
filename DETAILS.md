@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-08-14
+Updated: 2026-08-15
 
 ## 根目录
 
@@ -29,7 +29,8 @@ Updated: 2026-08-14
 
 ## `apps/server/src`
 
-- `index.ts`：进程入口，启动任务进度、OpenList 鉴权、追更、Outbox 和清理定时器。
+- `index.ts`：进程入口，启动 Native 请求、任务进度、OpenList 鉴权、追更、Outbox
+  和清理定时器。
 - `app.ts`：组装数据库、服务、路由和静态前端。
 - `config.ts`：环境变量校验和数据目录。
 - `bootstrap.ts`：可选环境变量所有者与首个 AI 供应方初始化。
@@ -86,7 +87,8 @@ Updated: 2026-08-14
 
 - `auth.ts`、`auth-routes.ts`：Cookie 会话、首次初始化和登录。
 - `admin-routes.ts`：管理界面 API、服务测试和 OpenList 扫码代理。
-- `native-routes.ts`：WeClaw 事件认证、去重、身份审批和 Agent 回复。
+- `native-routes.ts`：WeClaw 事件认证、去重和身份审批；有主动回传配置的成员请求写入
+  后台队列并立即返回 `202`，缺少回传配置时保留同步兼容行为。
 
 ### `db`
 
@@ -107,6 +109,8 @@ Updated: 2026-08-14
 - `user-memory-store.ts`：按成员隔离的长期偏好、限制、资料和备注；生成受长度限制的
   系统上下文，不属于会话重置范围。
 - `outbox-store.ts`：主动聊天通知和指数退避。
+- `native-request-store.ts`：按 Native `event_id` 持久化待执行的消息与会话重置请求，
+  原子领取任务，记录完成、失败和服务重启中断状态。
 - `media-store.ts`：短期、限次读取的二维码和影片封面媒体。
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
 - `prompt-store.ts`：提示词初始化、读取、自定义和恢复默认值；系统升级只替换
@@ -172,6 +176,9 @@ Updated: 2026-08-14
   渠道中的 owner/admin 身份发送，并在有效期内读取扫码状态以完成 Cookie 更新；
   同一次鉴权状态不重复发送。
 - `tasks/watchlist-worker.ts`：按间隔读取 TMDB 并调用只读 Agent 检查追更条件。
+- `tasks/native-request-worker.ts`：有限并发执行已接收的 Native 请求；同一会话由 Agent
+  现有队列保持顺序，最终回复和状态更新在同一数据库事务中写入 Outbox。重启中断的
+  请求只通知失败，不自动重放可能产生副作用的工具操作。
 - `channels/outbound.ts`：向 Native Adapter 发送主动消息；Adapter 因缺少当前会话
   令牌返回 409 时延后投递，不消耗失败次数。
 - `channels/agent-messages.ts`：把 Agent 最终文本中的 Core 临时媒体 URL 提取为

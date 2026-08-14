@@ -21,6 +21,7 @@ import type { PromptStore } from "./db/prompt-store.js";
 import type { MediaUpgradeStore } from "./db/media-upgrade-store.js";
 import type { MediaUpgradeCheckStore } from "./db/media-upgrade-check-store.js";
 import type { UserMemoryStore } from "./db/user-memory-store.js";
+import type { NativeRequestStore } from "./db/native-request-store.js";
 
 export interface AppContext {
   config: AppConfig;
@@ -34,6 +35,7 @@ export interface AppContext {
   mediaUpgradeChecks: MediaUpgradeCheckStore;
   userMemories: UserMemoryStore;
   outbox: OutboxStore;
+  nativeRequests: NativeRequestStore;
   media: EphemeralMediaStore;
   watchlists: WatchlistStore;
   subtitleWorkspaces: SubtitleWorkspaceStore;
