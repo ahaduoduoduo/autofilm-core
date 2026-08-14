@@ -54,7 +54,8 @@ Updated: 2026-08-15
   TMDB 封面媒体生成、只读追更检查和管理员扫码工具。
 - `runtime-context.ts`：每次主模型调用重新组合数据库系统提示词、当前时间和成员长期
   记忆。
-- `context-compactor.ts`：将旧检查点与移出近期 Token 尾部的消息前缀合并为新检查点。
+- `context-compactor.ts`：单分块直接将旧检查点与移出近期 Token 尾部的消息合并；
+  超大前缀使用最多 3 个并发的可恢复临时分块摘要，最后生成唯一正式检查点。
 - `conversation-transcript.ts`：为分块上下文压缩生成受限会话片段。
 - `conversation-queue.ts`：同一会话按提交顺序执行，不同会话互不等待。
 - `catalog-poster.ts`：从本次 TMDB 搜索结果和最终回复中确定唯一条目，不猜测
@@ -96,7 +97,8 @@ Updated: 2026-08-15
 - `user-store.ts`：成员、会话和外部身份。
 - `config-store.ts`：AI、模型、渠道和媒体服务配置。
 - `conversation-store.ts`：保留全部原始消息，计算近期 Token 边界，并读取或写入唯一
-  滚动压缩检查点；同时处理 Native 事件去重。
+  滚动压缩检查点；缓存不进入主模型视图的临时分块草稿，并在正式检查点保存或会话
+  重置时删除；同时处理 Native 事件去重。
 - `conversation-compaction.ts`：压缩检查点数据类型和替代消息格式。
 - `task-store.ts`：任务生命周期。
 - `media-upgrade-store.ts`：升级批次、逐条状态、候选、下载任务、替换路径、备份和
@@ -117,7 +119,8 @@ Updated: 2026-08-15
   未自定义的旧版本。
 - `conversation_compactions` 每个会话只保存一个滚动检查点。未压缩时模型读取全部
   原始消息；压缩后读取检查点与截止序号之后的近期原始消息。数据库迁移会删除旧主题
-  表和额外用户原话字段。
+  表和额外用户原话字段。`conversation_compaction_chunks` 只保存未完成压缩的可恢复
+  临时草稿，不进入主模型历史；正式检查点保存、会话重置或过期清理时删除。
 
 ### `integrations`、`tasks`、`channels`
 

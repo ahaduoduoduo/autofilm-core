@@ -173,10 +173,27 @@ describe("conversation history", () => {
       summaryTokenEstimate: 5,
       compactionCount: 1,
     });
+    conversations.saveCompactionChunk({
+      conversationId,
+      sourceHash: "draft-before-reset",
+      summary: "未完成的临时分块",
+      sourceTokenEstimate: 20,
+      summaryTokenEstimate: 10,
+    });
 
     conversations.reset(identity);
     expect(conversations.modelHistory(conversationId)).toEqual([]);
     expect(rawMessageCount(database, conversationId)).toBe(0);
+    expect(
+      (
+        database
+          .prepare(
+            `SELECT COUNT(*) AS total FROM conversation_compaction_chunks
+             WHERE conversation_id = ?`,
+          )
+          .get(conversationId) as { total: number }
+      ).total,
+    ).toBe(0);
     database.close();
   });
 });

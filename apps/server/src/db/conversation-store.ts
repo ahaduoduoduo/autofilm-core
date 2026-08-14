@@ -105,6 +105,11 @@ export class ConversationStore {
         )
         .run(row.id);
       this.db
+        .prepare(
+          "DELETE FROM conversation_compaction_chunks WHERE conversation_id = ?",
+        )
+        .run(row.id);
+      this.db
         .prepare("DELETE FROM messages WHERE conversation_id = ?")
         .run(row.id);
     })();
@@ -190,30 +195,90 @@ export class ConversationStore {
 
   saveCompaction(input: ConversationCompactionInput): void {
     const now = new Date().toISOString();
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO conversation_compactions
+            (conversation_id, through_sequence, summary, source_token_estimate,
+             summary_token_estimate, compaction_count, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(conversation_id) DO UPDATE SET
+             through_sequence=excluded.through_sequence,
+             summary=excluded.summary,
+             source_token_estimate=excluded.source_token_estimate,
+             summary_token_estimate=excluded.summary_token_estimate,
+             compaction_count=excluded.compaction_count,
+             updated_at=excluded.updated_at`,
+        )
+        .run(
+          input.conversationId,
+          input.throughSequence,
+          input.summary.trim(),
+          input.sourceTokenEstimate,
+          input.summaryTokenEstimate,
+          input.compactionCount,
+          now,
+          now,
+        );
+      this.db
+        .prepare(
+          "DELETE FROM conversation_compaction_chunks WHERE conversation_id = ?",
+        )
+        .run(input.conversationId);
+    })();
+  }
+
+  compactionChunk(
+    conversationId: string,
+    sourceHash: string,
+  ): string | undefined {
+    return (
+      this.db
+        .prepare(
+          `SELECT summary FROM conversation_compaction_chunks
+           WHERE conversation_id = ? AND source_hash = ?`,
+        )
+        .get(conversationId, sourceHash) as { summary: string } | undefined
+    )?.summary;
+  }
+
+  saveCompactionChunk(input: {
+    conversationId: string;
+    sourceHash: string;
+    summary: string;
+    sourceTokenEstimate: number;
+    summaryTokenEstimate: number;
+  }): void {
+    const now = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO conversation_compactions
-          (conversation_id, through_sequence, summary, source_token_estimate,
-           summary_token_estimate, compaction_count, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(conversation_id) DO UPDATE SET
-           through_sequence=excluded.through_sequence,
+        `INSERT INTO conversation_compaction_chunks
+          (conversation_id, source_hash, summary, source_token_estimate,
+           summary_token_estimate, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(conversation_id, source_hash) DO UPDATE SET
            summary=excluded.summary,
            source_token_estimate=excluded.source_token_estimate,
            summary_token_estimate=excluded.summary_token_estimate,
-           compaction_count=excluded.compaction_count,
            updated_at=excluded.updated_at`,
       )
       .run(
         input.conversationId,
-        input.throughSequence,
+        input.sourceHash,
         input.summary.trim(),
         input.sourceTokenEstimate,
         input.summaryTokenEstimate,
-        input.compactionCount,
         now,
         now,
       );
+  }
+
+  deleteCompactionChunksBefore(timestamp: string): void {
+    this.db
+      .prepare(
+        "DELETE FROM conversation_compaction_chunks WHERE updated_at < ?",
+      )
+      .run(timestamp);
   }
 
   processedEvent(eventId: string): string | undefined {

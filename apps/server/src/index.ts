@@ -91,6 +91,9 @@ const mediaCleanupTimer = setInterval(
     context.nativeRequests.deleteFinishedBefore(
       new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString(),
     );
+    context.conversations.deleteCompactionChunksBefore(
+      new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString(),
+    );
   },
   60 * 60_000,
 );

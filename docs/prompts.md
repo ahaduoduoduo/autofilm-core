@@ -1,6 +1,6 @@
 # 数据库提示词
 
-Updated: 2026-08-14
+Updated: 2026-08-15
 
 AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。代码内仍保留
 每类提示词的系统默认模板，作用仅限首次初始化、默认版本升级和“恢复默认值”。
@@ -11,7 +11,7 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 | Key | 使用位置 | 上下文 |
 | --- | --- | --- |
 | `agent.main` | 成员日常聊天、媒体搜索与操作 | Token 预算管理的活动会话 |
-| `conversation.compactor` | 接近模型窗口时生成替代历史 | 独立无工具分块请求 |
+| `conversation.compactor` | 接近模型窗口时生成替代历史 | 独立无工具分块请求和最终合并请求 |
 | `subtitle.captcha.system` | SubHD 验证码识别系统指令 | 独立单次视觉请求 |
 | `subtitle.captcha.user` | 随验证码图片发送的识别要求 | 独立单次视觉请求 |
 | `subtitle.cleaner` | 字幕广告判断 | 独立单次请求 |

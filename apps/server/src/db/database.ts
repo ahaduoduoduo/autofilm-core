@@ -431,6 +431,21 @@ const migrations = [
   CREATE INDEX native_request_jobs_work_idx
     ON native_request_jobs(state, sequence);
   `,
+  `
+  CREATE TABLE conversation_compaction_chunks (
+    conversation_id TEXT NOT NULL
+      REFERENCES conversations(id) ON DELETE CASCADE,
+    source_hash TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    source_token_estimate INTEGER NOT NULL,
+    summary_token_estimate INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(conversation_id, source_hash)
+  );
+  CREATE INDEX conversation_compaction_chunks_updated_idx
+    ON conversation_compaction_chunks(updated_at);
+  `,
 ];
 
 export type AppDatabase = Database.Database;
