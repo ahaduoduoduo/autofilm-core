@@ -97,19 +97,4 @@ describe("agent tool registry", () => {
       ),
     ).toBe(true);
   });
-
-  it("exposes topic switching only inside a persistent conversation", () => {
-    expect(
-      createAgentTools(dependencies()).some(
-        (tool) => tool.definition.name === "set_active_media_topic",
-      ),
-    ).toBe(false);
-    const deps = dependencies();
-    deps.mediaTopic = { activate: async () => ({ changed: true }) };
-    expect(
-      createAgentTools(deps).some(
-        (tool) => tool.definition.name === "set_active_media_topic",
-      ),
-    ).toBe(true);
-  });
 });

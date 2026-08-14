@@ -4,25 +4,6 @@ import {
   truncateTextToTokenBudget,
 } from "../ai/token-budget.js";
 
-export function formatConversationTranscript(
-  messages: CanonicalMessage[],
-  maximumCharacters = 100_000,
-): string {
-  const blocks = messages.map(formatMessageBlock);
-  const selected: string[] = [];
-  let total = 0;
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    const block = blocks[index]!;
-    if (total + block.length > maximumCharacters) {
-      selected.unshift("[较早内容因摘要输入上限省略]");
-      break;
-    }
-    selected.unshift(block);
-    total += block.length;
-  }
-  return selected.join("\n\n");
-}
-
 export function splitConversationTranscript(
   messages: CanonicalMessage[],
   maximumChunkTokens: number,

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ConversationStore } from "./conversation-store.js";
-import { openDatabase } from "./database.js";
+import { openDatabase, type AppDatabase } from "./database.js";
 import { UserStore } from "./user-store.js";
 
 const directories: string[] = [];
@@ -15,83 +15,24 @@ afterEach(() => {
 });
 
 describe("conversation history", () => {
-  it("expands a numeric limit to preserve the complete user tool turn", () => {
-    const directory = mkdtempSync(
-      path.join(os.tmpdir(), "autofilm-conversation-"),
-    );
-    directories.push(directory);
-    const database = openDatabase(path.join(directory, "test.sqlite"));
-    const users = new UserStore(database);
-    const conversations = new ConversationStore(database);
-    const user = users.create({
-      username: "history-member",
-      displayName: "History Member",
-      role: "member",
-    });
-    const conversationId = conversations.getOrCreate({
-      userId: user.id,
-      channel: "wechat",
-      providerInstanceId: "wechat-main",
-      externalConversationId: "member@wechat",
-    });
-    conversations.append(conversationId, {
-      role: "user",
-      content: "find a movie",
-    });
-    conversations.append(conversationId, {
-      role: "assistant",
-      content: "",
-      toolCalls: [{
-        id: "call-catalog",
-        name: "search_catalog",
-        arguments: { query: "movie" },
-      }],
-    });
-    conversations.append(conversationId, {
-      role: "tool",
-      toolCallId: "call-catalog",
-      content: "[]",
-    });
+  it("keeps the complete raw history until token compaction is written", () => {
+    const { database, conversations, conversationId } = fixture("complete");
+    for (let index = 0; index < 90; index += 1) {
+      conversations.append(conversationId, {
+        role: index % 2 === 0 ? "user" : "assistant",
+        content: `message-${index}`,
+      });
+    }
 
-    expect(conversations.history(conversationId, 1)).toEqual([
-      { role: "user", content: "find a movie" },
-      {
-        role: "assistant",
-        content: "",
-        toolCalls: [{
-          id: "call-catalog",
-          name: "search_catalog",
-          arguments: { query: "movie" },
-        }],
-      },
-      {
-        role: "tool",
-        content: "[]",
-        toolCallId: "call-catalog",
-      },
-    ]);
+    const history = conversations.modelHistory(conversationId);
+    expect(history).toHaveLength(90);
+    expect(history[0]?.content).toBe("message-0");
+    expect(history.at(-1)?.content).toBe("message-89");
     database.close();
   });
 
   it("uses insertion order when timestamps are identical", () => {
-    const directory = mkdtempSync(
-      path.join(os.tmpdir(), "autofilm-conversation-"),
-    );
-    directories.push(directory);
-    const database = openDatabase(path.join(directory, "test.sqlite"));
-    const users = new UserStore(database);
-    const conversations = new ConversationStore(database);
-    const user = users.create({
-      username: "ordered-member",
-      displayName: "Ordered Member",
-      role: "member",
-    });
-    const conversationId = conversations.getOrCreate({
-      userId: user.id,
-      channel: "wechat",
-      providerInstanceId: "wechat-main",
-      externalConversationId: "ordered@wechat",
-    });
+    const { database, conversations, conversationId } = fixture("ordered");
     conversations.append(conversationId, { role: "user", content: "one" });
     conversations.append(conversationId, {
       role: "assistant",
@@ -105,168 +46,182 @@ describe("conversation history", () => {
       .run("2026-07-30T00:00:00.000Z", conversationId);
 
     expect(
-      conversations.history(conversationId).map((message) => message.content),
+      conversations.modelHistory(conversationId).map((item) => item.content),
     ).toEqual(["one", "two", "three"]);
     database.close();
   });
 
-  it("keeps raw messages while replacing an archived media topic with a summary", () => {
-    const directory = mkdtempSync(
-      path.join(os.tmpdir(), "autofilm-conversation-"),
-    );
-    directories.push(directory);
-    const database = openDatabase(path.join(directory, "test.sqlite"));
-    const users = new UserStore(database);
-    const conversations = new ConversationStore(database);
-    const user = users.create({
-      username: "memory-member",
-      displayName: "Memory Member",
-      role: "member",
-    });
-    const conversationId = conversations.getOrCreate({
-      userId: user.id,
-      channel: "wechat",
-      providerInstanceId: "wechat-main",
-      externalConversationId: "memory@wechat",
-    });
-    const first = conversations.append(conversationId, {
-      role: "user",
-      content: "讨论电影 A",
-    });
-    conversations.commitTopicSwitch(
-      conversationId,
-      {
-        mediaType: "movie",
-        tmdbId: 1,
-        title: "电影 A",
-        productionYear: 2020,
-      },
-      first.id,
-    );
-    conversations.append(conversationId, {
-      role: "assistant",
-      content: "电影 A 已经下载完成",
-    });
-    const second = conversations.append(conversationId, {
-      role: "user",
-      content: "接下来讨论电影 B",
-    });
-    const plan = conversations.planTopicSwitch(
-      conversationId,
-      {
-        mediaType: "movie",
-        tmdbId: 2,
-        title: "电影 B",
-        productionYear: 2021,
-      },
-      second.id,
-    );
-
-    expect(plan.messages.map((message) => message.content)).toEqual([
-      "讨论电影 A",
-      "电影 A 已经下载完成",
-    ]);
-    conversations.commitTopicSwitch(
-      conversationId,
-      {
-        mediaType: "movie",
-        tmdbId: 2,
-        title: "电影 B",
-        productionYear: 2021,
-      },
-      second.id,
-      {
-        ...plan.previous!,
-        summary: "已完成：电影 A 已下载。",
-      },
-    );
-
-    const context = conversations.modelHistory(conversationId);
-    expect(context.messages.map((message) => message.content)).toEqual([
-      "接下来讨论电影 B",
-    ]);
-    expect(context.memory).toContain("电影 A");
-    expect(context.memory).toContain("已下载");
-    expect(conversations.history(conversationId)).toHaveLength(3);
-    conversations.reset({
-      userId: user.id,
-      channel: "wechat",
-      providerInstanceId: "wechat-main",
-      externalConversationId: "memory@wechat",
-    });
-    expect(conversations.modelHistory(conversationId)).toEqual({
-      messages: [],
-      memory: "",
-    });
-    database.close();
-  });
-
-  it("keeps raw messages while using a persistent compacted model view", () => {
-    const directory = mkdtempSync(
-      path.join(os.tmpdir(), "autofilm-conversation-"),
-    );
-    directories.push(directory);
-    const database = openDatabase(path.join(directory, "test.sqlite"));
-    const users = new UserStore(database);
-    const conversations = new ConversationStore(database);
-    const user = users.create({
-      username: "compact-member",
-      displayName: "Compact Member",
-      role: "member",
-    });
-    const identity = {
-      userId: user.id,
-      channel: "wechat",
-      providerInstanceId: "wechat-main",
-      externalConversationId: "compact@wechat",
-    };
-    const conversationId = conversations.getOrCreate(identity);
+  it("rolls the checkpoint forward while keeping the recent token tail raw", () => {
+    const { database, conversations, conversationId } = fixture("rolling");
     conversations.append(conversationId, {
       role: "user",
-      content: "升级电影 A，并在成功后放置字幕。",
+      content: `旧目标 ${"甲".repeat(2_000)}`,
     });
     conversations.append(conversationId, {
       role: "assistant",
       content: "",
       toolCalls: [{
-        id: "call-upgrade",
-        name: "start_media_upgrades",
-        arguments: { id: "upgrade-one" },
+        id: "call-old",
+        name: "search_catalog",
+        arguments: { query: "电影 A" },
       }],
     });
-    const last = conversations.append(conversationId, {
+    const oldTool = conversations.append(conversationId, {
       role: "tool",
-      toolCallId: "call-upgrade",
-      content: JSON.stringify({ state: "running", id: "upgrade-one" }),
+      toolCallId: "call-old",
+      content: JSON.stringify({ id: 1, title: "电影 A" }),
+    });
+    conversations.append(conversationId, {
+      role: "user",
+      content: `近期原话 ${"乙".repeat(1_500)}`,
     });
 
+    const firstPlan = conversations.compactionPlan(conversationId, {
+      keepRecentTokens: 1_000,
+      toolOutputTokenLimit: 500,
+    });
+    expect(firstPlan?.messages).toHaveLength(3);
+    expect(firstPlan?.targetSequence).toBe(oldTool.sequence);
     conversations.saveCompaction({
       conversationId,
-      throughSequence: last.sequence,
-      summary: "当前目标：升级电影 A。关键状态：upgrade-one 正在运行。",
-      retainedUserMessages: ["升级电影 A，并在成功后放置字幕。"],
-      sourceTokenEstimate: 200,
-      summaryTokenEstimate: 40,
+      throughSequence: firstPlan!.targetSequence,
+      summary: "目标：电影 A。关键标识：TMDB 1。",
+      sourceTokenEstimate: 2_100,
+      summaryTokenEstimate: 20,
       compactionCount: 1,
+    });
+
+    let view = conversations.modelHistory(conversationId);
+    expect(view).toHaveLength(2);
+    expect(view[0]?.content).toContain("TMDB 1");
+    expect(view[1]?.content).toContain("近期原话");
+
+    conversations.append(conversationId, {
+      role: "assistant",
+      content: `处理中 ${"丙".repeat(1_500)}`,
+    });
+    conversations.append(conversationId, {
+      role: "user",
+      content: `最新原话 ${"丁".repeat(1_500)}`,
+    });
+    const secondPlan = conversations.compactionPlan(conversationId, {
+      keepRecentTokens: 1_000,
+      toolOutputTokenLimit: 500,
+    });
+    expect(secondPlan?.previousSummary).toContain("TMDB 1");
+    expect(secondPlan?.messages[0]?.content).toContain("近期原话");
+    expect(secondPlan?.messages[1]?.content).toContain("处理中");
+    conversations.saveCompaction({
+      conversationId,
+      throughSequence: secondPlan!.targetSequence,
+      summary: "目标：电影 A。进度：处理中。",
+      sourceTokenEstimate: 3_000,
+      summaryTokenEstimate: 20,
+      compactionCount: 2,
+    });
+
+    view = conversations.modelHistory(conversationId);
+    expect(view).toHaveLength(2);
+    expect(view[0]?.content).toContain("进度：处理中");
+    expect(view[1]?.content).toContain("最新原话");
+    expect(rawMessageCount(database, conversationId)).toBe(6);
+    database.close();
+  });
+
+  it("never starts the retained tail with an isolated tool result", () => {
+    const { database, conversations, conversationId } = fixture("tool-pair");
+    conversations.append(conversationId, {
+      role: "user",
+      content: "查询电影 A",
     });
     conversations.append(conversationId, {
       role: "assistant",
-      content: "升级完成后继续。",
+      content: "",
+      toolCalls: [{
+        id: "call-1",
+        name: "search_catalog",
+        arguments: { query: "电影 A" },
+      }],
+    });
+    conversations.append(conversationId, {
+      role: "tool",
+      toolCallId: "call-1",
+      content: "结".repeat(2_000),
     });
 
-    const model = conversations.modelHistory(conversationId, {
-      toolOutputTokenLimit: 1_000,
+    const plan = conversations.compactionPlan(conversationId, {
+      keepRecentTokens: 1_000,
+      toolOutputTokenLimit: 2_000,
     });
-    expect(model.messages).toHaveLength(2);
-    expect(model.messages[0]?.content).toContain("upgrade-one 正在运行");
-    expect(model.messages[0]?.content).toContain(
-      "升级电影 A，并在成功后放置字幕。",
-    );
-    expect(model.messages[1]?.content).toBe("升级完成后继续。");
-    expect(conversations.history(conversationId)).toHaveLength(4);
+    expect(plan?.messages).toEqual([{ role: "user", content: "查询电影 A" }]);
+    expect(plan?.splitTurn).toBe(true);
+    database.close();
+  });
+
+  it("clears both raw history and its checkpoint", () => {
+    const { database, conversations, conversationId, identity } =
+      fixture("reset");
+    const message = conversations.append(conversationId, {
+      role: "user",
+      content: "旧消息",
+    });
+    conversations.saveCompaction({
+      conversationId,
+      throughSequence: message.sequence,
+      summary: "旧检查点",
+      sourceTokenEstimate: 10,
+      summaryTokenEstimate: 5,
+      compactionCount: 1,
+    });
 
     conversations.reset(identity);
-    expect(conversations.modelHistory(conversationId).messages).toEqual([]);
+    expect(conversations.modelHistory(conversationId)).toEqual([]);
+    expect(rawMessageCount(database, conversationId)).toBe(0);
     database.close();
   });
 });
+
+function fixture(label: string): {
+  database: AppDatabase;
+  conversations: ConversationStore;
+  conversationId: string;
+  identity: {
+    userId: string;
+    channel: string;
+    providerInstanceId: string;
+    externalConversationId: string;
+  };
+} {
+  const directory = mkdtempSync(
+    path.join(os.tmpdir(), `autofilm-conversation-${label}-`),
+  );
+  directories.push(directory);
+  const database = openDatabase(path.join(directory, "test.sqlite"));
+  const users = new UserStore(database);
+  const user = users.create({
+    username: `${label}-member`,
+    displayName: `${label} Member`,
+    role: "member",
+  });
+  const identity = {
+    userId: user.id,
+    channel: "wechat",
+    providerInstanceId: "wechat-main",
+    externalConversationId: `${label}@wechat`,
+  };
+  const conversations = new ConversationStore(database);
+  return {
+    database,
+    conversations,
+    conversationId: conversations.getOrCreate(identity),
+    identity,
+  };
+}
+
+function rawMessageCount(database: AppDatabase, conversationId: string): number {
+  return (
+    database
+      .prepare("SELECT COUNT(*) AS total FROM messages WHERE conversation_id = ?")
+      .get(conversationId) as { total: number }
+  ).total;
+}

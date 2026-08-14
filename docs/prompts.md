@@ -1,6 +1,6 @@
 # 数据库提示词
 
-Updated: 2026-08-05
+Updated: 2026-08-14
 
 AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。代码内仍保留
 每类提示词的系统默认模板，作用仅限首次初始化、默认版本升级和“恢复默认值”。
@@ -12,7 +12,6 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 | --- | --- | --- |
 | `agent.main` | 成员日常聊天、媒体搜索与操作 | Token 预算管理的活动会话 |
 | `conversation.compactor` | 接近模型窗口时生成替代历史 | 独立无工具分块请求 |
-| `conversation.summarizer` | 切换作品时整理上一影视主题 | 独立无工具请求 |
 | `subtitle.captcha.system` | SubHD 验证码识别系统指令 | 独立单次视觉请求 |
 | `subtitle.captcha.user` | 随验证码图片发送的识别要求 | 独立单次视觉请求 |
 | `subtitle.cleaner` | 字幕广告判断 | 独立单次请求 |
@@ -56,7 +55,9 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 
 ## 运行时附加信息
 
-Core 在数据库主提示词之外动态加入当前服务器时间和已保存的较早影视主题摘要。
-服务器时间每次请求重新生成，不属于可编辑行为规则。主题摘要本身由
-`conversation.summarizer` 生成。通用上下文达到阈值时由 `conversation.compactor`
-生成替代历史。两类提示词都在数据库和管理页面中维护。
+Core 在每次主模型调用时，在数据库主提示词之外重新加入当前服务器时间和当前成员
+长期记忆。这些固定上下文不进入会话压缩检查点，不会因长对话或多次滚动压缩丢失。
+
+会话接近 Token 阈值时，`conversation.compactor` 将旧检查点与刚移出近期原始窗口的
+消息前缀合并为新检查点。近期消息仍保留原文。项目不再使用按影视主题生成的第二层
+摘要提示词。详细规则见 `context-management.md`。

@@ -1,6 +1,6 @@
 # Architecture
 
-Updated: 2026-07-31
+Updated: 2026-08-14
 
 ## 职责
 
@@ -12,7 +12,7 @@ AutoFilm Core 只处理业务状态：
 - 下载任务、进度和通知。
 - OpenList、Jellyfin、Jackett、TMDB、SubHD 的 API 调用。
 - 字幕临时处理和按成员追更。
-- Jellyfin 电影版本清单、重复项分析和影视主题摘要。
+- Jellyfin 电影版本清单、重复项分析和 Pi 式滚动会话检查点。
 
 聊天 Adapter 处理平台登录、加密媒体和消息投递。OpenList
 处理网盘驱动、Cookie、限速、文件操作与显式扫描。Jellyfin 处理媒体元数据、播放和
@@ -100,16 +100,14 @@ Core；它们继续保留媒体条目、播放历史、存储和文件状态。C
 Cookie Jar，请求开始遵守统一间隔，但不同任务可以同时等待网络和 OCR 响应。追更条件
 与分集状态需要跨重启保留，因此存入 Core SQLite。
 
-会话原始消息和工具原始结果始终保存在 `messages`。主 Agent 模型视图按模型配置的
-工具输出预算限制单项结果，并在上下文使用量达到默认 80% 时执行本地分块压缩，最新
-替代历史保存到 `conversation_compactions`。压缩可发生在同一任务的工具调用过程中，
-不会覆盖原始消息。详细规则见 `docs/context-management.md`。
+会话原始消息和工具原始结果始终保存在 `messages`。主 Agent 只使用 Pi 式滚动上下文：
+较早消息前缀由 `conversation_compactions` 中的唯一检查点替代，近期消息按 Token 预算
+保留原文。默认在距离模型窗口 16,384 Token 时触发压缩，并保留约 20,000 Token 的
+近期原始历史。工具输出预算只限制模型视图，不覆盖数据库原文。
 
-当前影视主题使用 TMDB ID 标识；Agent 明确
-切换作品后，Core 使用独立无工具请求生成上一主题摘要，保存到
-`conversation_topic_summaries`。发给模型的历史由较早主题摘要、通用压缩替代历史、
-压缩后的新增消息和当前服务器时间组成。两类摘要都不删除原始消息，也不拆分一次
-工具调用及其结果。
+`agent.main`、当前服务器时间和当前成员长期记忆在每次主模型调用时重新注入，不写入
+压缩检查点。项目不维护影视主题摘要、固定消息条数截断或额外用户原话副本。详细规则
+见 `docs/context-management.md`。
 
 Telegram 与 WeClaw 都在独立 Adapter 进程中。Telegram Adapter 使用 long polling，
 Core 只接收统一事件并通过统一 `/v1/messages` 接口发送结果。

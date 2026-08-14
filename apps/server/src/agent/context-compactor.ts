@@ -1,19 +1,17 @@
 import type { ModelProfile } from "@autofilm/contracts";
-import type { AiClient, CanonicalMessage } from "../ai/types.js";
+import type { AiClient } from "../ai/types.js";
 import {
   type ContextBudgetPolicy,
   estimateMessageTokens,
   estimateTextTokens,
-  truncateTextToTokenBudget,
 } from "../ai/token-budget.js";
 import type { ConversationStore } from "../db/conversation-store.js";
 import type { PromptStore } from "../db/prompt-store.js";
 import { recoverToolHistory } from "../ai/history.js";
 import { splitConversationTranscript } from "./conversation-transcript.js";
 
-const MAX_RETAINED_USER_MESSAGE_TOKENS = 20_000;
 const MAX_COMPACTION_CHUNK_TOKENS = 48_000;
-const MAX_COMPACTION_OUTPUT_TOKENS = 4_000;
+const MAX_COMPACTION_OUTPUT_TOKENS = 8_000;
 
 export interface CompactionResult {
   compacted: boolean;
@@ -35,7 +33,10 @@ export class LocalContextCompactor {
     model: ModelProfile;
     policy: ContextBudgetPolicy;
   }): Promise<CompactionResult> {
-    const plan = this.conversations.compactionPlan(input.conversationId);
+    const plan = this.conversations.compactionPlan(input.conversationId, {
+      keepRecentTokens: input.policy.compactKeepRecentTokens,
+      toolOutputTokenLimit: input.policy.toolOutputTokenLimit,
+    });
     if (!plan) return { compacted: false };
 
     const messages = recoverToolHistory(plan.messages);
@@ -48,6 +49,7 @@ export class LocalContextCompactor {
     );
     const chunks = splitConversationTranscript(messages, chunkTokenLimit);
     if (chunks.length === 0) return { compacted: false };
+
     let summary = plan.previousSummary;
     for (const [index, chunk] of chunks.entries()) {
       const result = await input.client.generate({
@@ -60,49 +62,32 @@ export class LocalContextCompactor {
           {
             role: "user",
             content:
-              `此前压缩摘要：\n${summary.trim() || "无"}\n\n` +
-              `新增会话片段 ${index + 1}/${chunks.length}：\n${chunk}`,
+              `此前压缩检查点：\n${summary.trim() || "无"}\n\n` +
+              `新增的较早会话前缀 ${index + 1}/${chunks.length}：\n${chunk}` +
+              (plan.splitTurn
+                ? "\n\n注意：近期原始消息从一次尚未完整结束的交互中间开始，" +
+                  "检查点必须保留该交互前半段的目标、工具调用原因和必要标识。"
+                : ""),
           },
         ],
         temperature: 0,
-        maxOutputTokens: Math.min(
-          input.model.maxOutputTokens ?? MAX_COMPACTION_OUTPUT_TOKENS,
-          MAX_COMPACTION_OUTPUT_TOKENS,
-        ),
+        maxOutputTokens: compactionOutputTokens(input.model, input.policy),
       });
       summary = result.content.trim();
-      if (!summary) throw new Error("会话本地压缩模型没有返回摘要");
+      if (!summary) throw new Error("会话压缩模型没有返回检查点");
     }
 
-    const retainedUserMessages = selectRetainedUserMessages(
-      [
-        ...plan.previousRetainedUserMessages,
-        ...messages
-          .filter((message) => message.role === "user")
-          .map((message) => message.content),
-      ],
-      Math.min(
-        MAX_RETAINED_USER_MESSAGE_TOKENS,
-        Math.max(1_000, Math.floor(input.policy.contextWindowTokens * 0.15)),
-      ),
-    );
     const sourceTokenEstimate =
       estimateTextTokens(plan.previousSummary) +
       messages.reduce(
         (total, message) => total + estimateMessageTokens(message),
         0,
       );
-    const summaryTokenEstimate =
-      estimateTextTokens(summary) +
-      retainedUserMessages.reduce(
-        (total, message) => total + estimateTextTokens(message),
-        0,
-      );
+    const summaryTokenEstimate = estimateTextTokens(summary);
     this.conversations.saveCompaction({
       conversationId: input.conversationId,
       throughSequence: plan.targetSequence,
       summary,
-      retainedUserMessages,
       sourceTokenEstimate,
       summaryTokenEstimate,
       compactionCount: plan.compactionCount,
@@ -117,24 +102,13 @@ export class LocalContextCompactor {
   }
 }
 
-function selectRetainedUserMessages(
-  messages: string[],
-  tokenLimit: number,
-): string[] {
-  const selected: string[] = [];
-  let remaining = tokenLimit;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (remaining <= 0) break;
-    const message = messages[index]!.trim();
-    if (!message) continue;
-    const tokens = estimateTextTokens(message);
-    if (tokens <= remaining) {
-      selected.unshift(message);
-      remaining -= tokens;
-      continue;
-    }
-    selected.unshift(truncateTextToTokenBudget(message, remaining));
-    break;
-  }
-  return selected;
+function compactionOutputTokens(
+  model: ModelProfile,
+  policy: ContextBudgetPolicy,
+): number {
+  return Math.min(
+    model.maxOutputTokens ?? MAX_COMPACTION_OUTPUT_TOKENS,
+    MAX_COMPACTION_OUTPUT_TOKENS,
+    Math.max(1_000, Math.floor(policy.compactionReserveTokens * 0.75)),
+  );
 }

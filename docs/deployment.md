@@ -1,6 +1,6 @@
 # Deployment
 
-Updated: 2026-08-09
+Updated: 2026-08-14
 
 ## 目录和权限
 
@@ -63,6 +63,40 @@ Telegram 容器只在内部网络监听 `18012`，不映射宿主机端口。Bot
 推送 Core 的应用、Dockerfile 或工作流变更时，Actions 自动构建 Core 和 Telegram。
 其他镜像使用 Actions 页面的 `Build container images` 手动任务，可选择组件和每个
 fork 的 ref。选择 `all` 会并行构建全部镜像，包括 Jellyfin 公共版和个人版。
+
+## 强制发布流程
+
+本项目所有可部署产物只允许由 GitHub Actions 构建。本机和群晖生产主机禁止执行
+`npm run build`、`pnpm run build`、`go build`、`dotnet publish`、`docker build`、
+`docker compose build` 以及任何等价的本地镜像构建命令。
+
+Core 正式更新使用以下固定流程：
+
+1. 本机只执行类型检查和对应测试，不生成 `dist` 或本地镜像。
+2. 明确排除工作区中的无关修改，将应用代码提交到 `agent/initial-core` 并推送 GitHub。
+3. 等待 `Build container images` 工作流的 `core` 矩阵全部成功，核对工作流提交 SHA
+   与本次提交一致。
+4. 拉取 `ghcr.io/ahaduoduoduo/autofilm-core:latest`，核对镜像 revision 标签和远端
+   digest。
+5. 涉及数据库迁移时，先停止旧 Core，并对 SQLite 生成一致性备份；随后用新镜像启动
+   Core，由启动迁移执行数据库升级。
+6. 只替换本次变化的服务，核对容器健康状态、运行镜像 ID、数据库版本和关键数据数量。
+7. 删除本次产生的本地 `dist`、测试缓存和已被替换的旧 Core 镜像；不得清理其他服务
+   正在使用的镜像或共享构建缓存。
+
+GitHub CLI 位于 `/volume1/@root-runtime/bin/gh`，仓库使用活动账号
+`ahaduoduoduo`。查看并等待构建：
+
+```bash
+/volume1/@root-runtime/bin/gh run list \
+  --repo ahaduoduoduo/autofilm-core \
+  --workflow build-images.yml \
+  --branch agent/initial-core \
+  --limit 1
+/volume1/@root-runtime/bin/gh run watch RUN_ID \
+  --repo ahaduoduoduo/autofilm-core \
+  --exit-status
+```
 
 命令行触发完整构建：
 
@@ -181,75 +215,10 @@ Jackett 地址。FlareSolverr 仍由 Jackett 自己使用。
 
 ## 本地开发检查
 
-正式部署不执行本地镜像编译。开发阶段只运行当前组件的类型检查、单元测试或目标构建；
-需要验证容器产物时触发 GitHub Actions 的对应组件任务，不在群晖上构建完整系统。
-`compose.build.yaml` 仅保留为其他开发主机的调试参考，不用于本项目的生产更新。
-
-## 单仓库编译参考
-
-下面命令只用于开发检查和定位单个镜像问题。
-
-### Core 和 Telegram Adapter
-
-```bash
-cd autofilm-core
-npm ci
-npm run typecheck
-npm test
-npm run build
-docker build -t autofilm-core:local .
-docker build -f Dockerfile.telegram -t autofilm-telegram-adapter:local .
-```
-
-### OpenList 前端和组合镜像
-
-```bash
-cd autofilm-openlist-frontend
-corepack enable
-pnpm install --frozen-lockfile
-pnpm run lint
-pnpm run build
-
-cd ..
-docker build \
-  -f autofilm-openlist/Dockerfile.autofilm \
-  --build-context autofilm_frontend=./autofilm-openlist-frontend \
-  -t autofilm-openlist:local \
-  ./autofilm-openlist
-```
-
-组合镜像使用 Go 1.26 和 Node 24 构建，并把前端 `dist` 放入 OpenList 可执行文件
-使用的静态资源目录。
-
-### Jellyfin Web 和组合镜像
-
-```bash
-cd autofilm-jellyfin-web
-npm ci
-npm run build:check
-npm test
-npm run build:production
-
-cd ..
-docker build \
-  -f autofilm-jellyfin/Dockerfile.autofilm \
-  --build-context autofilm_web=./autofilm-jellyfin-web \
-  --build-arg TARGET_RUNTIME=linux-x64 \
-  -t autofilm-jellyfin:local \
-  ./autofilm-jellyfin
-```
-
-组合镜像使用 .NET 10 自包含发布，并把修改版 Jellyfin Web 复制到最终镜像。
-其他 CPU 架构需要把 `TARGET_RUNTIME` 改为对应 .NET Runtime Identifier。
-
-### WeClaw
-
-```bash
-cd autofilm-weclaw
-go test ./...
-go build -o weclaw .
-docker build -t autofilm-weclaw:local .
-```
+本机只运行不会生成发布产物的检查，例如各 workspace 的 `typecheck` 和直接测试命令。
+根目录 `npm test` 会先构建 contracts，因此生产主机不使用该命令；服务端测试直接执行
+`npm run test -w @autofilm/server`。需要验证任何编译或镜像产物时，通过 GitHub Actions
+执行。`compose.build.yaml` 仅保留为历史调试参考，不属于当前发布流程。
 
 ## 升级与重新部署
 

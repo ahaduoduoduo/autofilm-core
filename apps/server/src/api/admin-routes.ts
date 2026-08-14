@@ -41,18 +41,37 @@ const modelSchema = z
       .max(1_800_000)
       .nullable()
       .optional(),
+    compactKeepRecentTokens: z
+      .number()
+      .int()
+      .min(1_000)
+      .max(500_000)
+      .optional(),
     toolOutputTokenLimit: z.number().int().min(512).max(100_000).optional(),
   })
   .superRefine((input, context) => {
     const contextWindowTokens = input.contextWindowTokens ?? 128_000;
+    const maximumCompactLimit = contextWindowTokens - 4_096;
     if (
       input.autoCompactTokenLimit &&
-      input.autoCompactTokenLimit > Math.floor(contextWindowTokens * 0.9)
+      input.autoCompactTokenLimit > maximumCompactLimit
     ) {
       context.addIssue({
         code: "custom",
         path: ["autoCompactTokenLimit"],
-        message: "自动压缩阈值不能超过上下文窗口的 90%",
+        message: "自动压缩阈值必须至少为模型输出预留 4096 Token",
+      });
+    }
+    const compactLimit = input.autoCompactTokenLimit ??
+      Math.max(4_096, contextWindowTokens - 16_384);
+    if (
+      input.compactKeepRecentTokens &&
+      input.compactKeepRecentTokens >= compactLimit
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["compactKeepRecentTokens"],
+        message: "近期原始历史预算必须小于自动压缩阈值",
       });
     }
   });
@@ -60,7 +79,6 @@ const modelSchema = z
 const promptKeySchema = z.enum([
   "agent.main",
   "conversation.compactor",
-  "conversation.summarizer",
   "subtitle.captcha.system",
   "subtitle.captcha.user",
   "subtitle.cleaner",

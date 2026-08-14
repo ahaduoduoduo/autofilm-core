@@ -46,6 +46,7 @@ export interface ModelProfile {
   maxOutputTokens: number | null;
   contextWindowTokens: number;
   autoCompactTokenLimit: number | null;
+  compactKeepRecentTokens: number;
   toolOutputTokenLimit: number;
   createdAt: string;
   updatedAt: string;

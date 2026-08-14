@@ -54,6 +54,10 @@ describe("local conversation context compaction", () => {
       toolCallId: "call-1",
       content: JSON.stringify({ state: "running", taskId: "task-1" }),
     });
+    conversations.append(conversationId, {
+      role: "user",
+      content: `近期原始要求：继续等待任务完成。${"近".repeat(1_500)}`,
+    });
     const requests: string[] = [];
     const client: AiClient = {
       async generate(request) {
@@ -78,6 +82,7 @@ describe("local conversation context compaction", () => {
       contextWindowTokens: 128_000,
       autoCompactTokenLimit: null,
       toolOutputTokenLimit: 12_000,
+      compactKeepRecentTokens: 1_000,
       createdAt: "now",
       updatedAt: "now",
     };
@@ -91,17 +96,24 @@ describe("local conversation context compaction", () => {
       policy: {
         contextWindowTokens: 128_000,
         autoCompactTokenLimit: 100_000,
+        compactionReserveTokens: 28_000,
+        compactKeepRecentTokens: 1_000,
         toolOutputTokenLimit: 12_000,
       },
     });
 
     expect(result.compacted).toBe(true);
     expect(requests[0]).toContain("task-1");
-    expect(conversations.history(conversationId)).toHaveLength(3);
+    expect(
+      (database
+        .prepare("SELECT COUNT(*) AS total FROM messages WHERE conversation_id = ?")
+        .get(conversationId) as { total: number }).total,
+    ).toBe(4);
     const view = conversations.modelHistory(conversationId);
-    expect(view.messages).toHaveLength(1);
-    expect(view.messages[0]?.content).toContain("task-1 正在运行");
-    expect(view.messages[0]?.content).toContain("完成后继续放置字幕");
+    expect(view).toHaveLength(2);
+    expect(view[0]?.content).toContain("task-1 正在运行");
+    expect(view[0]?.content).toContain("放置字幕");
+    expect(view[1]?.content).toContain("近期原始要求");
     database.close();
   });
 });

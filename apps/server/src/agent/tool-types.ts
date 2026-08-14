@@ -48,12 +48,4 @@ export interface ToolDependencies {
   storageAuth?: {
     start(): Promise<unknown>;
   };
-  mediaTopic?: {
-    activate(input: {
-      mediaType: "movie" | "tv";
-      tmdbId: number;
-      title: string;
-      productionYear?: number;
-    }): Promise<unknown>;
-  };
 }

@@ -154,7 +154,7 @@ describe("authentication and administration routes", () => {
       cookies,
     });
     expect(initial.statusCode).toBe(200);
-    expect(initial.json()).toHaveLength(7);
+    expect(initial.json()).toHaveLength(6);
     expect(initial.json()[0].key).toBe("agent.main");
     expect(initial.json()[0].content).toContain("资源评估");
     expect(initial.json()[0].customized).toBe(false);

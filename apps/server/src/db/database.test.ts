@@ -63,6 +63,16 @@ describe("database migrations", () => {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE conversations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        channel TEXT NOT NULL,
+        provider_instance_id TEXT NOT NULL,
+        external_conversation_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(user_id, channel, provider_instance_id, external_conversation_id)
+      );
       CREATE TABLE channel_configs (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -127,6 +137,118 @@ describe("database migrations", () => {
           (column as { name: string }).name === "context_window_tokens",
       ),
     ).toBe(true);
+    expect(
+      db.prepare("PRAGMA table_info(model_profiles)").all().some(
+        (column) =>
+          (column as { name: string }).name === "compact_keep_recent_tokens",
+      ),
+    ).toBe(true);
+    expect(
+      db.prepare("PRAGMA table_info(conversation_compactions)").all().some(
+        (column) =>
+          (column as { name: string }).name === "retained_user_messages_json",
+      ),
+    ).toBe(false);
+    expect(
+      db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'conversation_topic_%'",
+      ).all(),
+    ).toEqual([]);
+    db.close();
+  });
+
+  it("replaces the legacy layered context schema with one checkpoint", () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "autofilm-db-v10-"));
+    directories.push(directory);
+    const filename = path.join(directory, "autofilm.sqlite");
+    const legacy = new Database(filename);
+    legacy.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations VALUES
+        (1, '2026-08-01'), (2, '2026-08-01'), (3, '2026-08-01'),
+        (4, '2026-08-01'), (5, '2026-08-01'), (6, '2026-08-01'),
+        (7, '2026-08-01'), (8, '2026-08-01'), (9, '2026-08-01'),
+        (10, '2026-08-01');
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE conversations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE TABLE model_profiles (
+        id TEXT PRIMARY KEY,
+        context_window_tokens INTEGER NOT NULL DEFAULT 128000,
+        auto_compact_token_limit INTEGER,
+        tool_output_token_limit INTEGER NOT NULL DEFAULT 12000
+      );
+      CREATE TABLE prompt_configs (
+        key TEXT PRIMARY KEY,
+        content TEXT NOT NULL,
+        customized INTEGER NOT NULL DEFAULT 0,
+        default_version INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE conversation_topic_state (
+        conversation_id TEXT PRIMARY KEY,
+        topic_key TEXT NOT NULL
+      );
+      CREATE TABLE conversation_topic_summaries (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        summary TEXT NOT NULL
+      );
+      CREATE TABLE conversation_compactions (
+        conversation_id TEXT PRIMARY KEY
+          REFERENCES conversations(id) ON DELETE CASCADE,
+        through_sequence INTEGER NOT NULL,
+        summary TEXT NOT NULL,
+        retained_user_messages_json TEXT NOT NULL DEFAULT '[]',
+        source_token_estimate INTEGER NOT NULL DEFAULT 0,
+        summary_token_estimate INTEGER NOT NULL DEFAULT 0,
+        compaction_count INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO users VALUES ('user-1');
+      INSERT INTO conversations VALUES ('conversation-1', 'user-1');
+      INSERT INTO conversation_compactions VALUES
+        ('conversation-1', 42, '保留的检查点', '["旧原话副本"]', 1000, 50, 2,
+         '2026-08-01', '2026-08-01');
+      INSERT INTO conversation_topic_state VALUES
+        ('conversation-1', 'movie:tmdb:1');
+      INSERT INTO conversation_topic_summaries VALUES
+        ('summary-1', 'conversation-1', '旧主题摘要');
+      INSERT INTO prompt_configs VALUES
+        ('conversation.summarizer', '旧提示词', 0, 1, '2026-08-01');
+    `);
+    legacy.close();
+
+    const db = openDatabase(filename);
+    expect(
+      db.prepare("SELECT summary FROM conversation_compactions").get(),
+    ).toEqual({ summary: "保留的检查点" });
+    expect(
+      db.prepare("PRAGMA table_info(conversation_compactions)").all().map(
+        (column) => (column as { name: string }).name,
+      ),
+    ).not.toContain("retained_user_messages_json");
+    expect(
+      db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'conversation_topic_%'",
+      ).all(),
+    ).toEqual([]);
+    expect(
+      db.prepare(
+        "SELECT key FROM prompt_configs WHERE key='conversation.summarizer'",
+      ).get(),
+    ).toBeUndefined();
+    expect(
+      db.prepare("PRAGMA table_info(model_profiles)").all().map(
+        (column) => (column as { name: string }).name,
+      ),
+    ).toContain("compact_keep_recent_tokens");
     db.close();
   });
 });

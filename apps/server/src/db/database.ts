@@ -263,34 +263,7 @@ const migrations = [
   DROP TABLE channel_configs_v6;
   `,
   `
-  CREATE TABLE conversation_topic_state (
-    conversation_id TEXT PRIMARY KEY
-      REFERENCES conversations(id) ON DELETE CASCADE,
-    topic_key TEXT NOT NULL,
-    media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
-    tmdb_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    production_year INTEGER,
-    started_message_id TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-
-  CREATE TABLE conversation_topic_summaries (
-    id TEXT PRIMARY KEY,
-    conversation_id TEXT NOT NULL
-      REFERENCES conversations(id) ON DELETE CASCADE,
-    topic_key TEXT NOT NULL,
-    media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
-    tmdb_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    production_year INTEGER,
-    summary TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(conversation_id, topic_key)
-  );
-  CREATE INDEX conversation_topic_summaries_recent_idx
-    ON conversation_topic_summaries(conversation_id, updated_at DESC);
+  SELECT 1;
   `,
   `
   CREATE TABLE media_upgrade_jobs (
@@ -399,13 +372,41 @@ const migrations = [
       REFERENCES conversations(id) ON DELETE CASCADE,
     through_sequence INTEGER NOT NULL,
     summary TEXT NOT NULL,
-    retained_user_messages_json TEXT NOT NULL DEFAULT '[]',
     source_token_estimate INTEGER NOT NULL DEFAULT 0,
     summary_token_estimate INTEGER NOT NULL DEFAULT 0,
     compaction_count INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  `,
+  `
+  ALTER TABLE model_profiles
+    ADD COLUMN compact_keep_recent_tokens INTEGER NOT NULL DEFAULT 20000;
+
+  DROP TABLE IF EXISTS conversation_topic_summaries;
+  DROP TABLE IF EXISTS conversation_topic_state;
+  DELETE FROM prompt_configs WHERE key = 'conversation.summarizer';
+
+  ALTER TABLE conversation_compactions
+    RENAME TO conversation_compactions_v10;
+  CREATE TABLE conversation_compactions (
+    conversation_id TEXT PRIMARY KEY
+      REFERENCES conversations(id) ON DELETE CASCADE,
+    through_sequence INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    source_token_estimate INTEGER NOT NULL DEFAULT 0,
+    summary_token_estimate INTEGER NOT NULL DEFAULT 0,
+    compaction_count INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  INSERT INTO conversation_compactions
+    (conversation_id, through_sequence, summary, source_token_estimate,
+     summary_token_estimate, compaction_count, created_at, updated_at)
+  SELECT conversation_id, through_sequence, summary, source_token_estimate,
+         summary_token_estimate, compaction_count, created_at, updated_at
+  FROM conversation_compactions_v10;
+  DROP TABLE conversation_compactions_v10;
   `,
 ];
 
