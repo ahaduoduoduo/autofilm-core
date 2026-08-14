@@ -15,7 +15,7 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 | `subtitle.captcha.system` | SubHD 验证码识别系统指令 | 独立单次视觉请求 |
 | `subtitle.captcha.user` | 随验证码图片发送的识别要求 | 独立单次视觉请求 |
 | `subtitle.cleaner` | 字幕广告判断 | 独立单次请求 |
-| `subtitle.mainland_rewriter` | 现有字幕大陆用词转换 | 每个字幕一次独立完整文件请求 |
+| `subtitle.mainland_rewriter` | 现有字幕大陆用词转换 | 每个字幕一次独立完整文件请求，重点识别粤语口语直写、半文半白翻译腔及港台非大陆用词、名词和句式 |
 | `watchlist.evaluator` | 定时追更条件判断 | 独立只读工具会话 |
 
 管理界面的“提示词”页面显示当前内容、是否自定义、默认版本和更新时间。保存后，
