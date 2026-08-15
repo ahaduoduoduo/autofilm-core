@@ -62,9 +62,6 @@ export interface ExtractedSubtitle {
 
 export interface WorkspaceFile {
   id: string;
-  archiveId: string;
-  subtitleId: string;
-  archiveName: string;
   filename: string;
   relativePath: string;
   format: string;
@@ -72,6 +69,23 @@ export interface WorkspaceFile {
   episodeHint?: number;
   languageHint: string;
   storageName: string;
+  source:
+    | {
+        type: "subhd";
+        archiveId: string;
+        subtitleId: string;
+        archiveName: string;
+      }
+    | {
+        type: "jellyfin_openlist";
+        jellyfinItemId: string;
+        jellyfinItemName: string;
+        subtitleRef: string;
+        openListPath: string;
+        language: string;
+        isForced: boolean;
+        isHearingImpaired: boolean;
+      };
 }
 
 export interface WorkspaceArchive {
@@ -119,6 +133,24 @@ export interface WorkspacePlacementPlan {
   readonly createdAt: string;
 }
 
+export interface WorkspaceProcessingEntry {
+  id: string;
+  fileId: string;
+  operation: "mainland_wording";
+  outputLanguage: "chs";
+  state: "pending" | "processing" | "uploaded" | "completed" | "failed";
+  beforeSubtitleRefs: string[];
+  eligibleEvents?: number;
+  rewrittenEvents?: number;
+  rewrittenSegments?: number;
+  outputSubtitleRef?: string;
+  uploadedAt?: string;
+  completedAt?: string;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SubtitleWorkspace {
   id: string;
   userId: string;
@@ -126,6 +158,7 @@ export interface SubtitleWorkspace {
   captchas: WorkspaceCaptcha[];
   files: WorkspaceFile[];
   placementPlans: WorkspacePlacementPlan[];
+  processingEntries: WorkspaceProcessingEntry[];
   expiresAt: string;
   createdAt: string;
   updatedAt: string;

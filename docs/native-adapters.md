@@ -1,6 +1,6 @@
 # Native chat adapters
 
-Updated: 2026-07-29
+Updated: 2026-08-15
 
 Core 实现 WeClaw `Native Message Service 2026-07-01`。完整通用协议也记录在
 WeClaw fork 的 `docs/native-services.md`。
@@ -54,13 +54,24 @@ WeClaw 发送扁平事件字段：
 - `message_id`、`message_type`、`text`
 - `attachments`、`timestamp`、`capabilities`
 
-Core 以 `event_id` 去重。重复请求返回第一次保存的响应。
+Core 以 `event_id` 去重。未知或未绑定身份仍同步返回权限提示；已绑定成员且渠道具有
+主动回传配置时，Core 将消息或重置请求写入 `native_request_jobs`，立即返回
+HTTP `202` 和空消息列表。Adapter 不需要保持连接等待 Agent 完成。
+
+后台 Worker 有限并发领取请求，Agent 现有会话队列确保同一会话按接收顺序执行。
+模型临时错误仍由统一 AI 客户端自动重试；最终回复或重试耗尽后的失败信息写入持久化
+Outbox，再通过 Adapter 的 `POST /v1/messages` 发送。重复 `event_id` 不会创建第二个
+后台任务。
+
+请求状态与最终 Outbox 写入使用 SQLite 事务。Core 在请求执行期间重启时，会把该请求
+标记为失败并通知成员重新发送，不自动重新执行整个 Agent 请求，因为其中的媒体或字幕
+工具可能已经成功产生外部变化。尚未开始的 `pending` 请求会在重启后继续执行。
 
 发送 `/clear` 可清除当前聊天对应的 AutoFilm 上下文。WeClaw 也接受 `/new`，
 Telegram Adapter 也接受 `/reset`；Adapter 会把这些命令转换为
 `conversation.reset`，Core 删除该会话的历史消息。
 
-Agent 最终回复可能同时包含文字和 Core 短期媒体 URL。Core 在返回 Adapter 前提取
+Agent 最终回复可能同时包含文字和 Core 短期媒体 URL。Core 在写入 Outbox 前提取
 `AUTOFILM_MEDIA_BASE_URL/v1/media/{token}`，生成独立的 `image` 消息，并从文字
 消息中移除该容器地址。外部网页链接不受影响。
 
@@ -70,7 +81,8 @@ Telegram 服务器读取。Adapter 不需要解析 Agent 的自然语言或识�
 
 ## 主动消息
 
-Core 调用 Adapter 的 `POST /v1/messages`。任务完成通知经过持久化 Outbox。
+Core 调用 Adapter 的 `POST /v1/messages`。Agent 最终回复和任务完成通知都经过
+持久化 Outbox。
 115 二维码使用短期随机 URL，读取次数按管理员通知目标数量分配，过期后自动清理。
 
 `AUTOFILM_MEDIA_BASE_URL` 必须是 Adapter 容器能够访问的 Core URL。

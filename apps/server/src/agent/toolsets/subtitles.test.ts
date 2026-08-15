@@ -192,11 +192,12 @@ function fixture(): {
   const dependencies = {
     userId: "user-1",
     subtitleWorkspaces: store,
-    subtitleCleaner: {
-      clean: async (_filename: string, data: Buffer) => ({
+    subtitleProcessor: {
+      process: async (_filename: string, data: Buffer) => ({
         data,
-        removed: 0,
-        summary: "clean",
+        operations: [
+          { type: "remove_ads", removedEvents: 0, summary: "clean" },
+        ],
       }),
     },
     jellyfin: {
@@ -275,7 +276,21 @@ function concurrencyFixture(count: number): {
   const dependencies = {
     userId: "user-1",
     subtitleWorkspaces: store,
-    subtitleCleaner: { clean },
+    subtitleProcessor: {
+      process: async (filename: string, data: Buffer) => {
+        const result = await clean(filename, data);
+        return {
+          data: result.data,
+          operations: [
+            {
+              type: "remove_ads",
+              removedEvents: result.removed,
+              summary: result.summary,
+            },
+          ],
+        };
+      },
+    },
     jellyfin: {
       item: async (id: string) => ({
         Id: id,

@@ -24,6 +24,7 @@ export class PromptStore {
       .prepare("SELECT * FROM prompt_configs ORDER BY key")
       .all() as PromptRow[];
     return rows
+      .filter((row) => Boolean(promptDefinition(row.key)))
       .map((row) => this.summary(row))
       .sort(
         (left, right) =>

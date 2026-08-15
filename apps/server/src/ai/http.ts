@@ -1,5 +1,42 @@
 import type { AiTransportConfig } from "./types.js";
 
+const DEFAULT_AI_REQUEST_TIMEOUT_MS = 120_000;
+
+export class AiProviderError extends Error {
+  readonly status?: number;
+  readonly retryAfterMs?: number;
+  readonly retryable: boolean;
+
+  constructor(
+    message: string,
+    options: {
+      status?: number;
+      retryAfterMs?: number;
+      retryable?: boolean;
+    } = {},
+  ) {
+    super(message);
+    this.name = "AiProviderError";
+    this.status = options.status;
+    this.retryAfterMs = options.retryAfterMs;
+    this.retryable = options.retryable ?? false;
+  }
+}
+
+export function isTransientProviderMessage(message: string): boolean {
+  const transient =
+    /fetch failed|network error|timed? ?out|temporar(?:y|ily)|overloaded/i;
+  const providerFailure =
+    /server(?:s)? (?:had|has) an error|error occurred while processing your request/i;
+  const retryInstruction =
+    /try again later|rate.?limit|AI provider stream failed/i;
+  return (
+    transient.test(message) ||
+    providerFailure.test(message) ||
+    retryInstruction.test(message)
+  );
+}
+
 export async function postJson<T>(
   config: AiTransportConfig,
   endpoint: string,
@@ -77,17 +114,58 @@ async function postText(
       ...extraHeaders,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(requestTimeoutMs(config)),
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(
+    throw new AiProviderError(
       `AI provider returned HTTP ${response.status}: ${safeErrorText(text)}`,
+      {
+        status: response.status,
+        retryAfterMs: retryAfterMilliseconds(
+          response.headers.get("retry-after"),
+        ),
+        retryable:
+          retryableHttpStatus(response.status) &&
+          !isPermanentQuotaError(text),
+      },
     );
   }
   return text;
 }
 
+function requestTimeoutMs(config: AiTransportConfig): number {
+  const configured = config.requestTimeoutMs;
+  return typeof configured === "number" &&
+    Number.isFinite(configured) &&
+    configured > 0
+    ? Math.floor(configured)
+    : DEFAULT_AI_REQUEST_TIMEOUT_MS;
+}
+
 function looksLikeEventStream(text: string): boolean {
   return /(^|\r?\n)(event|data):/.test(text);
+}
+
+function retryableHttpStatus(status: number): boolean {
+  return (
+    status === 408 ||
+    status === 409 ||
+    status === 425 ||
+    status === 429 ||
+    status >= 500
+  );
+}
+
+function isPermanentQuotaError(text: string): boolean {
+  return /insufficient_quota|spend_limit|usage_limit|billing|credit/i.test(text);
+}
+
+function retryAfterMilliseconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return undefined;
+  return Math.max(0, timestamp - Date.now());
 }

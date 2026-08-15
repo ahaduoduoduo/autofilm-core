@@ -1,6 +1,6 @@
 # Communication and interaction model
 
-Updated: 2026-07-30
+Updated: 2026-08-15
 
 本系统只使用 HTTP、Docker DNS、SQLite 和本地挂载目录。容器之间不使用固定
 局域网 IP；宿主机端口和公开域名只供浏览器、Infuse 和反向代理访问。
@@ -51,8 +51,9 @@ OpenList -> Jellyfin        http://jellyfin:8096
 1. 成员在微信、Telegram 或其他 Adapter 中发送请求。
 2. Adapter 把平台消息转换为统一 Native 事件。
 3. Core 校验 Adapter、外部身份和成员权限。
-4. 同一会话的新消息等待上一条完整结束；不同会话继续并行。Core 调用选定模型，
-   模型可在同一轮并行搜索 TMDB、Jackett 和 SubHD。
+4. Core 将已绑定成员的请求持久化并立即向 Adapter 返回 `202`；Native 请求 Worker
+   后台领取任务。同一会话的新消息等待上一条完整结束，不同会话继续并行。Core 调用
+   选定模型，模型可在同一轮并行搜索 TMDB、Jackett 和 SubHD。
 5. Jackett 返回完整结果；Core 只按文件大小降序分页，不写死质量评分和过滤规则。
 6. TMDB 身份唯一确定后，Core 获取对应封面；Adapter 先发送封面，再发送 Agent
    的作品和资源说明。
@@ -67,6 +68,11 @@ OpenList -> Jellyfin        http://jellyfin:8096
 10. 成功后 Core 显式调用 Jellyfin `RemoteRefresh`。Jellyfin 导入完成后，Core
     恢复原 Agent 会话，执行此前已经约定的可选字幕操作，最后通过原 Adapter
     通知成员。没有字幕计划时不强制搜索或上传字幕。
+
+普通 Agent 最终回复同样通过持久化 Outbox 调用 Adapter 的 `/v1/messages`，不依赖
+入站 HTTP 连接持续存活。模型自动重试或字幕全量处理超过 Adapter 超时时间时，后台
+任务继续执行。Core 重启后继续尚未开始的请求；已经执行中的请求不做整体重放，避免
+重复运行产生外部变化的工具，并向成员发送中断通知。
 
 资源升级不执行第 10 步的 `RemoteRefresh`。媒体升级 Worker 更新原 Jellyfin Item
 并完成自动检查后，下载完成 Worker 把升级终态写入该条目发起时的 Agent 会话。每个

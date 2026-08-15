@@ -43,6 +43,7 @@ export interface AiTransportConfig {
   baseUrl: string;
   apiKey: string;
   headers?: Record<string, string>;
+  requestTimeoutMs?: number;
 }
 
 export interface AiClient {

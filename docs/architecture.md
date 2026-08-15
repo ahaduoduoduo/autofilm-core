@@ -1,6 +1,6 @@
 # Architecture
 
-Updated: 2026-07-31
+Updated: 2026-08-15
 
 ## 职责
 
@@ -12,7 +12,7 @@ AutoFilm Core 只处理业务状态：
 - 下载任务、进度和通知。
 - OpenList、Jellyfin、Jackett、TMDB、SubHD 的 API 调用。
 - 字幕临时处理和按成员追更。
-- Jellyfin 电影版本清单、重复项分析和影视主题摘要。
+- Jellyfin 电影版本清单、重复项分析和 Pi 式滚动会话检查点。
 
 聊天 Adapter 处理平台登录、加密媒体和消息投递。OpenList
 处理网盘驱动、Cookie、限速、文件操作与显式扫描。Jellyfin 处理媒体元数据、播放和
@@ -31,6 +31,8 @@ sequenceDiagram
     U->>A: 观影请求
     A->>C: Native message.created
     C->>C: 验证 Adapter 与成员身份
+    C-->>A: HTTP 202，已持久化接收
+    C->>C: Native 请求 Worker 领取任务
     C->>P: 按模型所选协议请求
     P->>C: 工具调用
     par 同轮只读工具
@@ -38,7 +40,8 @@ sequenceDiagram
     end
     C->>P: 工具结果
     P->>C: 最终回复
-    C->>A: 结构化消息
+    C->>C: 最终结果写入 Outbox
+    C->>A: POST /v1/messages 结构化消息
     A->>U: 平台消息
 ```
 
@@ -48,6 +51,10 @@ Jackett 搜索先取得完整结果并按文件大小降序排列，再以每页
 
 新聊天身份先保存为 `pending`，Core 返回未授权提示。管理员绑定成员并改为
 `active` 后才能进入 Agent。
+
+已绑定成员的 Native 请求不会在入站 HTTP 连接中等待 Agent。Core 认证、去重并写入
+SQLite 后返回 `202`，后台 Worker 执行模型重试和工具操作，最终通过 Outbox 主动发送。
+因此 Adapter 的请求超时只限制接收阶段，不限制完整 Agent 或字幕处理时长。
 
 ## 下载与媒体更新
 
@@ -68,12 +75,13 @@ provider task ID 和 provider 接受时间。进度 Worker 每 2 秒读取受限
 和原始标题。Core 选中候选后在内网读取 `.torrent` 并转换为 v1 magnet，OpenList
 不接收 Jackett 内网 URL。
 任务真实结束后，OpenList 同一快照返回 115 最终生成的 `result_path`；Core 只将
-这个精确路径交给 Jellyfin。电影任务同时提供 TMDB ID 和
-`provider_target=movie`，使 Jellyfin 将身份绑定到结果目录中的单个视频。旧版
+这个精确路径交给 Jellyfin。电影和电视剧任务同时提供 TMDB ID 以及
+`provider_target=movie|series`。Jellyfin 先核对通知类型与媒体库类型，再将身份
+绑定到 Movie 或 Series；类型冲突时拒绝导入，不把 ID 写给错误条目。旧版
 OpenList 未提供结果路径时才使用原有刷新目标。
 
 任务完成后，Core 按 Jellyfin 刷新目录合并同一批次的请求，调用
-`RemoteRefresh`。电视剧统一刷新剧集根目录并携带 TMDB ID；失败状态保存在
+`RemoteRefresh`。电视剧统一刷新剧集根目录并携带 TMDB ID 与 Series 类型；失败状态保存在
 任务元数据中，并按退避间隔重试。Jellyfin 导入完成后，Core 向原会话写入后台
 事件，Agent 继续此前已经约定的字幕操作；没有字幕计划时只报告视频入库。
 OpenList 普通文件变更不会自动修改 Jellyfin。
@@ -85,7 +93,7 @@ OpenList 只在真实 115 请求返回 HTTP 405 时记录风控状态，不执�
 后续真实 115 请求成功后，
 OpenList 清除标记，Core 也允许后续新的 405 再次发送通知。
 
-任务进入完成、失败或取消状态时，Core 写入 Outbox。主动消息 Worker
+Native Agent 回复以及任务进入完成、失败或取消状态时，Core 写入 Outbox。主动消息 Worker
 以指数退避向原聊天 Adapter 发送结果，因此 Adapter 暂时离线不会丢失通知。
 
 ## 数据
@@ -93,23 +101,23 @@ OpenList 清除标记，Core 也允许后续新的 405 再次发送通知。
 SQLite 使用 WAL、外键和版本迁移。Jellyfin 和 OpenList 的既有数据库不迁入
 Core；它们继续保留媒体条目、播放历史、存储和文件状态。Core 只保存新业务数据。
 
-字幕下载包、验证码和待放置文件不是长期业务数据。每个成员任务使用一个可累计多个
-压缩包的 workspace，进程内状态保存文件 UUID、来源、完整相对目录和不可变 Jellyfin
-映射计划，文件位于 `/data/tmp/subtitles`；过期、全部放置成功或重启后删除。
+字幕下载包、验证码和待处理文件不是长期业务数据。每个成员任务使用一个可累计多个
+SubHD 压缩包或 OpenList 现有字幕的 workspace，进程内状态保存文件 UUID、来源、完整
+相对目录、不可变 Jellyfin 映射计划和逐项处理状态，文件位于 `/data/tmp/subtitles`；
+过期、全部下载字幕放置成功或重启后删除。现有字幕大陆用词转换完成后，工作区保留到
+过期，以便同一批文件查询状态或跳过重复执行。
 验证码按成员、workspace 和下载请求隔离。每个 SubHD 下载还具有独立 session 与
 Cookie Jar，请求开始遵守统一间隔，但不同任务可以同时等待网络和 OCR 响应。追更条件
 与分集状态需要跨重启保留，因此存入 Core SQLite。
 
-会话原始消息和工具原始结果始终保存在 `messages`。主 Agent 模型视图按模型配置的
-工具输出预算限制单项结果，并在上下文使用量达到默认 80% 时执行本地分块压缩，最新
-替代历史保存到 `conversation_compactions`。压缩可发生在同一任务的工具调用过程中，
-不会覆盖原始消息。详细规则见 `docs/context-management.md`。
+会话原始消息和工具原始结果始终保存在 `messages`。主 Agent 只使用 Pi 式滚动上下文：
+较早消息前缀由 `conversation_compactions` 中的唯一检查点替代，近期消息按 Token 预算
+保留原文。默认在距离模型窗口 16,384 Token 时触发压缩，并保留约 20,000 Token 的
+近期原始历史。工具输出预算只限制模型视图，不覆盖数据库原文。
 
-当前影视主题使用 TMDB ID 标识；Agent 明确
-切换作品后，Core 使用独立无工具请求生成上一主题摘要，保存到
-`conversation_topic_summaries`。发给模型的历史由较早主题摘要、通用压缩替代历史、
-压缩后的新增消息和当前服务器时间组成。两类摘要都不删除原始消息，也不拆分一次
-工具调用及其结果。
+`agent.main`、当前服务器时间和当前成员长期记忆在每次主模型调用时重新注入，不写入
+压缩检查点。项目不维护影视主题摘要、固定消息条数截断或额外用户原话副本。详细规则
+见 `docs/context-management.md`。
 
 Telegram 与 WeClaw 都在独立 Adapter 进程中。Telegram Adapter 使用 long polling，
 Core 只接收统一事件并通过统一 `/v1/messages` 接口发送结果。

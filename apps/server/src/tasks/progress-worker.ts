@@ -22,7 +22,7 @@ interface JellyfinRefreshTarget {
     refresh?: boolean;
     forceProbe?: boolean;
     providerIds?: Record<string, string>;
-    providerTarget?: "movie";
+    providerTarget?: "movie" | "series";
   }): Promise<void>;
 }
 
@@ -34,7 +34,7 @@ interface JellyfinRefreshState {
   completedAt?: string;
   error?: string;
   providerIds?: Record<string, string>;
-  providerTarget?: "movie";
+  providerTarget?: "movie" | "series";
 }
 
 export class ProgressWorker {
@@ -205,9 +205,12 @@ export class ProgressWorker {
     const providerIds = parseProviderIds(
       task.metadata.jellyfinProviderIds,
     );
-    const providerTarget = taskMediaType(task) === "movie"
+    const mediaType = taskMediaType(task);
+    const providerTarget = mediaType === "movie"
       ? "movie"
-      : undefined;
+      : mediaType === "tv"
+        ? "series"
+        : undefined;
     return {
       jellyfinRefresh: {
         state: "pending",

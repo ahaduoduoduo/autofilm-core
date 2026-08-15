@@ -27,12 +27,15 @@ import { SubtitleWorkspaceStore } from "./subtitles/workspace-store.js";
 import { CaptchaRecognizer } from "./subtitles/captcha-recognizer.js";
 import { SubtitleDownloadService } from "./subtitles/download-service.js";
 import { SubtitleCleaner } from "./subtitles/cleaner.js";
+import { SubtitleMainlandRewriter } from "./subtitles/mainland-rewriter.js";
+import { SubtitleProcessor } from "./subtitles/processor.js";
 import { SecretVault } from "./security/vault.js";
 import { WeClawRegistration } from "./integrations/weclaw-registration.js";
 import { PromptStore } from "./db/prompt-store.js";
 import { MediaUpgradeStore } from "./db/media-upgrade-store.js";
 import { MediaUpgradeCheckStore } from "./db/media-upgrade-check-store.js";
 import { UserMemoryStore } from "./db/user-memory-store.js";
+import { NativeRequestStore } from "./db/native-request-store.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -58,6 +61,7 @@ export async function buildApp(config: AppConfig) {
   const mediaUpgradeChecks = new MediaUpgradeCheckStore(db);
   const userMemories = new UserMemoryStore(db);
   const outbox = new OutboxStore(db);
+  const nativeRequests = new NativeRequestStore(db);
   const media = new EphemeralMediaStore(db);
   const watchlists = new WatchlistStore(db);
   const tmdb = new TmdbClient(configs);
@@ -70,7 +74,10 @@ export async function buildApp(config: AppConfig) {
     subhd,
     new CaptchaRecognizer(configs, prompts),
   );
-  const subtitleCleaner = new SubtitleCleaner(configs, prompts);
+  const subtitleProcessor = new SubtitleProcessor(
+    new SubtitleCleaner(configs, prompts),
+    new SubtitleMainlandRewriter(configs, prompts),
+  );
   const agent = new AgentService({
     configs,
     prompts,
@@ -87,7 +94,7 @@ export async function buildApp(config: AppConfig) {
     watchlists,
     subtitleWorkspaces,
     subtitleDownloads,
-    subtitleCleaner,
+    subtitleProcessor,
     users,
     outbox,
     media,
@@ -105,11 +112,12 @@ export async function buildApp(config: AppConfig) {
     mediaUpgradeChecks,
     userMemories,
     outbox,
+    nativeRequests,
     media,
     watchlists,
     subtitleWorkspaces,
     subtitleDownloads,
-    subtitleCleaner,
+    subtitleProcessor,
     weClawRegistration,
     tmdb,
     jackett,

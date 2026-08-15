@@ -173,6 +173,7 @@ export function AiPage() {
                 isDefault: models.length === 0,
                 contextWindowTokens: 128_000,
                 autoCompactTokenLimit: null,
+                compactKeepRecentTokens: 20_000,
                 toolOutputTokenLimit: 12_000,
               })
             }
@@ -423,6 +424,9 @@ function ModelModal({
     maxOutputTokens: value.maxOutputTokens?.toString() ?? "",
     contextWindowTokens: (value.contextWindowTokens ?? 128_000).toString(),
     autoCompactTokenLimit: value.autoCompactTokenLimit?.toString() ?? "",
+    compactKeepRecentTokens: (
+      value.compactKeepRecentTokens ?? 20_000
+    ).toString(),
     toolOutputTokenLimit: (value.toolOutputTokenLimit ?? 12_000).toString(),
     isDefault: value.isDefault ?? false,
     enabled: value.enabled ?? true,
@@ -445,6 +449,7 @@ function ModelModal({
           autoCompactTokenLimit: form.autoCompactTokenLimit
             ? Number(form.autoCompactTokenLimit)
             : null,
+          compactKeepRecentTokens: Number(form.compactKeepRecentTokens),
           toolOutputTokenLimit: Number(form.toolOutputTokenLimit),
           isDefault: form.isDefault,
           enabled: form.enabled,
@@ -497,7 +502,7 @@ function ModelModal({
           </Field>
           <Field
             label="自动压缩 Token 阈值"
-            hint="留空使用窗口的 80%；最高允许 90%"
+            hint="留空时在上下文窗口末尾预留 16384 Token"
           >
             <Input
               type="number"
@@ -508,19 +513,34 @@ function ModelModal({
             />
           </Field>
         </div>
-        <Field
-          label="单工具输出 Token 预算"
-          hint="只限制发送给模型的视图；SQLite 保留工具原始结果"
-        >
-          <Input
-            type="number"
-            min="512"
-            max="100000"
-            value={form.toolOutputTokenLimit}
-            onChange={(e) => change("toolOutputTokenLimit", e.target.value)}
-            required
-          />
-        </Field>
+        <div className="form-grid">
+          <Field
+            label="近期原始历史 Token"
+            hint="压缩后保留的完整近期消息，默认 20000"
+          >
+            <Input
+              type="number"
+              min="1000"
+              max="500000"
+              value={form.compactKeepRecentTokens}
+              onChange={(e) => change("compactKeepRecentTokens", e.target.value)}
+              required
+            />
+          </Field>
+          <Field
+            label="单工具输出 Token 预算"
+            hint="只限制发送给模型的视图；SQLite 保留工具原始结果"
+          >
+            <Input
+              type="number"
+              min="512"
+              max="100000"
+              value={form.toolOutputTokenLimit}
+              onChange={(e) => change("toolOutputTokenLimit", e.target.value)}
+              required
+            />
+          </Field>
+        </div>
         <Field label="模型 ID" hint="填写供应方接口实际接受的 model 值">
           <Input
             value={form.model}

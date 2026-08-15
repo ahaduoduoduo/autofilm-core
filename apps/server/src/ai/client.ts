@@ -4,6 +4,7 @@ import { GeminiGenerateContentClient } from "./gemini.js";
 import { OpenAiChatClient } from "./openai-chat.js";
 import { OpenAiResponsesClient } from "./openai-responses.js";
 import { recoverToolHistory } from "./history.js";
+import { withAutomaticRetry } from "./retry.js";
 import type {
   AiClient,
   AiTransportConfig,
@@ -30,7 +31,7 @@ export function createAiClient(
       client = new GeminiGenerateContentClient(config);
       break;
   }
-  return withRecoverableHistory(client);
+  return withRecoverableHistory(withAutomaticRetry(client));
 }
 
 export function withRecoverableHistory(client: AiClient): AiClient {

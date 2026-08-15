@@ -1,10 +1,6 @@
 import type { ModelProfile } from "@autofilm/contracts";
 import type { ConfigStore } from "../db/config-store.js";
-import type {
-  ConversationStore,
-  MediaTopic,
-  TopicSummary,
-} from "../db/conversation-store.js";
+import type { ConversationStore } from "../db/conversation-store.js";
 import type { TaskStore } from "../db/task-store.js";
 import type { UserStore } from "../db/user-store.js";
 import type { OutboxStore } from "../db/outbox-store.js";
@@ -32,12 +28,12 @@ import type { SubHDClient } from "../integrations/subhd.js";
 import type { WatchlistStore } from "../db/watchlist-store.js";
 import type { SubtitleWorkspaceStore } from "../subtitles/workspace-store.js";
 import type { SubtitleDownloadService } from "../subtitles/download-service.js";
-import type { SubtitleCleaner } from "../subtitles/cleaner.js";
+import type { SubtitleProcessor } from "../subtitles/processor.js";
 import { createAgentTools } from "./tools.js";
 import { executeToolCalls } from "./tool-executor.js";
 import { ConversationQueue } from "./conversation-queue.js";
 import { LocalContextCompactor } from "./context-compactor.js";
-import { formatConversationTranscript } from "./conversation-transcript.js";
+import { runtimeSystemPrompt } from "./runtime-context.js";
 import {
   rememberCatalogResults,
   selectedCatalogItem,
@@ -59,7 +55,7 @@ export interface AgentDependencies {
   watchlists: WatchlistStore;
   subtitleWorkspaces: SubtitleWorkspaceStore;
   subtitleDownloads: SubtitleDownloadService;
-  subtitleCleaner: SubtitleCleaner;
+  subtitleProcessor: SubtitleProcessor;
   users: UserStore;
   outbox: OutboxStore;
   media: EphemeralMediaStore;
@@ -109,10 +105,7 @@ export class AgentService {
       role: "user",
       content: input.text,
     };
-    const currentTurn = this.deps.conversations.append(
-      conversationId,
-      userMessage,
-    );
+    this.deps.conversations.append(conversationId, userMessage);
     const sessionUser = this.deps.users.sessionUser(input.userId);
     const openListConfig = this.deps.configs.service("openlist");
     const storageId = Number(openListConfig?.options.authStorageId);
@@ -176,17 +169,6 @@ export class AgentService {
       input.userId,
       notificationTarget,
       storageAuth,
-      {
-        activate: (topic) =>
-          this.activateMediaTopic({
-            conversationId,
-            currentTurnMessageId: currentTurn.id,
-            topic,
-            client,
-            model: model.model,
-            maxOutputTokens: model.maxOutputTokens,
-          }),
-      },
     );
     const catalogItems = new Map<number, CatalogItem>();
     let observedInputTokens = 0;
@@ -394,13 +376,10 @@ export class AgentService {
           role: "system" as const,
           content: runtimeSystemPrompt(
             this.deps.prompts.get("agent.main"),
-            combinedMemory(
-              this.deps.userMemories.prompt(input.userId),
-              context.memory,
-            ),
+            this.deps.userMemories.prompt(input.userId),
           ),
         },
-        ...context.messages,
+        ...context,
       ];
     };
     let messages = build();
@@ -490,9 +469,6 @@ export class AgentService {
       targetId: string;
     },
     storageAuth?: { start(): Promise<unknown> },
-    mediaTopic?: {
-      activate(topic: MediaTopic): Promise<unknown>;
-    },
   ) {
     return createAgentTools({
       userId,
@@ -509,99 +485,12 @@ export class AgentService {
       watchlists: this.deps.watchlists,
       subtitleWorkspaces: this.deps.subtitleWorkspaces,
       subtitleDownloads: this.deps.subtitleDownloads,
-      subtitleCleaner: this.deps.subtitleCleaner,
+      subtitleProcessor: this.deps.subtitleProcessor,
       outbox: this.deps.outbox,
       media: this.deps.media,
       mediaBaseUrl: this.deps.mediaBaseUrl,
       storageAuth,
-      mediaTopic,
     });
-  }
-
-  private async activateMediaTopic(input: {
-    conversationId: string;
-    currentTurnMessageId: string;
-    topic: MediaTopic;
-    client: AiClient;
-    model: string;
-    maxOutputTokens: number | null;
-  }): Promise<Record<string, unknown>> {
-    const plan = this.deps.conversations.planTopicSwitch(
-      input.conversationId,
-      input.topic,
-      input.currentTurnMessageId,
-    );
-    if (!plan.changed) {
-      return {
-        changed: false,
-        activeTopic: input.topic,
-        message: "当前已经是该影视主题",
-      };
-    }
-
-    let previous = plan.previous;
-    if (previous && plan.messages.length > 0) {
-      previous = {
-        ...previous,
-        summary: await this.summarizeTopic(
-          input,
-          previous,
-          plan.messages,
-        ),
-      };
-    }
-    this.deps.conversations.commitTopicSwitch(
-      input.conversationId,
-      input.topic,
-      input.currentTurnMessageId,
-      previous,
-    );
-    return {
-      changed: true,
-      activeTopic: input.topic,
-      archivedTopic: previous
-        ? {
-            mediaType: previous.mediaType,
-            tmdbId: previous.tmdbId,
-            title: previous.title,
-          }
-        : undefined,
-    };
-  }
-
-  private async summarizeTopic(
-    input: {
-      client: AiClient;
-      model: string;
-      maxOutputTokens: number | null;
-    },
-    previous: TopicSummary,
-    messages: CanonicalMessage[],
-  ): Promise<string> {
-    const transcript = formatConversationTranscript(messages);
-    const result = await input.client.generate({
-      model: input.model,
-      messages: [
-        {
-          role: "system",
-          content: this.deps.prompts.get("conversation.summarizer"),
-        },
-        {
-          role: "user",
-          content:
-            `作品：${previous.title}\n` +
-            `媒体类型：${previous.mediaType}\n` +
-            `TMDB ID：${previous.tmdbId}\n\n` +
-            `此前摘要：\n${previous.summary || "无"}\n\n` +
-            `本次归档对话：\n${transcript}`,
-        },
-      ],
-      temperature: 0,
-      maxOutputTokens: Math.min(input.maxOutputTokens ?? 2_000, 2_000),
-    });
-    const summary = result.content.trim();
-    if (!summary) throw new Error("影视主题摘要模型没有返回内容");
-    return summary;
   }
 }
 
@@ -617,25 +506,4 @@ function conversationKey(input: {
     input.providerInstanceId,
     input.externalConversationId,
   ]);
-}
-
-function runtimeSystemPrompt(base: string, memory = ""): string {
-  const now = new Date();
-  const local = now.toLocaleString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    hour12: false,
-  });
-  return [
-    base,
-    "## 当前运行时间",
-    `服务器时间：${local}（Asia/Shanghai）`,
-    `ISO 时间：${now.toISOString()}`,
-    memory,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-function combinedMemory(...values: string[]): string {
-  return values.filter(Boolean).join("\n\n");
 }

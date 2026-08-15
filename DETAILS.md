@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-08-09
+Updated: 2026-08-15
 
 ## 根目录
 
@@ -14,7 +14,7 @@ Updated: 2026-08-09
   可接管现有 OpenList/Jellyfin 持久化目录。备份系统由独立仓库部署。
 - `compose.homeassistant.yaml`：以原容器名、host 网络和独立数据根目录重建
   Home Assistant。
-- `compose.build.yaml`：仅在开发时加入相邻 fork 的本地构建上下文。
+- `compose.build.yaml`：历史调试参考；当前项目禁止使用它生成本地部署镜像。
 - `.github/workflows/build-images.yml`：在 GitHub Actions 构建并发布五类 GHCR
   镜像，Jellyfin 同时提供公共版和个人版标签。
 - `.env.example`、`.env.full.example`：单服务和完整编排参数模板。
@@ -29,7 +29,8 @@ Updated: 2026-08-09
 
 ## `apps/server/src`
 
-- `index.ts`：进程入口，启动任务进度、OpenList 鉴权、追更、Outbox 和清理定时器。
+- `index.ts`：进程入口，启动 Native 请求、任务进度、OpenList 鉴权、追更、Outbox
+  和清理定时器。
 - `app.ts`：组装数据库、服务、路由和静态前端。
 - `config.ts`：环境变量校验和数据目录。
 - `bootstrap.ts`：可选环境变量所有者与首个 AI 供应方初始化。
@@ -38,21 +39,24 @@ Updated: 2026-08-09
 ### `ai`
 
 - `types.ts`：渠道和供应方无关的消息、图片、工具与响应类型。
-- `client.ts`：按协议选择 Adapter。
+- `client.ts`：按协议选择 Adapter，并组合历史协议恢复与统一自动重试包装。
 - `openai-responses.ts`：Responses 请求与函数调用映射。
 - `openai-chat.ts`：Chat Completions 兼容映射。
 - `anthropic.ts`：Anthropic Messages 映射。
 - `gemini.ts`：Gemini GenerateContent 映射。
-- `http.ts`：AI HTTP 错误和超时处理。
+- `http.ts`：AI HTTP 错误、`Retry-After` 和可重试状态分类。
+- `retry.ts`：临时供应方错误最多重试 3 次，使用响应头或带抖动的指数退避。
 - `token-budget.ts`：跨协议 Token 保守估算、模型上下文策略和工具结果视图限制。
 
 ### `agent`
 
-- `service.ts`：持久化会话、按会话顺序执行顶层请求、并行工具迭代、运行时间注入、
-  Token 阈值检查、影视主题摘要、TMDB 封面媒体生成、只读追更检查和管理员扫码工具。
-- `context-compactor.ts`：使用当前模型执行无工具本地分块压缩，保留近期用户原话并
-  写入持久化替代视图。
-- `conversation-transcript.ts`：为影视主题摘要和通用上下文压缩统一生成受限会话片段。
+- `service.ts`：持久化会话、按会话顺序执行顶层请求、并行工具迭代、Token 阈值检查、
+  TMDB 封面媒体生成、只读追更检查和管理员扫码工具。
+- `runtime-context.ts`：每次主模型调用重新组合数据库系统提示词、当前时间和成员长期
+  记忆。
+- `context-compactor.ts`：单分块直接将旧检查点与移出近期 Token 尾部的消息合并；
+  超大前缀使用最多 3 个并发的可恢复临时分块摘要，最后生成唯一正式检查点。
+- `conversation-transcript.ts`：为分块上下文压缩生成受限会话片段。
 - `conversation-queue.ts`：同一会话按提交顺序执行，不同会话互不等待。
 - `catalog-poster.ts`：从本次 TMDB 搜索结果和最终回复中确定唯一条目，不猜测
   存在歧义的封面。
@@ -74,6 +78,9 @@ Updated: 2026-08-09
   重复使用和 Jellyfin 目标，并处理部分失败重试。
 - `toolsets/subtitle-placement-executor.ts`：以最多 8 个工作协程并发执行字幕清理、
   流式上传和可选旧字幕删除；每个映射独立记录完成或失败状态。
+- `toolsets/subtitle-processing.ts`：把用户观看后选中的一条或多条 OpenList 外挂字幕
+  导入同一个工作区，批量执行大陆用词转换，按项重试并新增 `chs` 字幕；不返回字幕
+  正文，也不删除源字幕。
 - `prompt.ts`：可迁移的旧版 Agent 行为、当前远端媒体规则，以及各独立 AI
   上下文的默认提示词和版本。
 
@@ -81,17 +88,18 @@ Updated: 2026-08-09
 
 - `auth.ts`、`auth-routes.ts`：Cookie 会话、首次初始化和登录。
 - `admin-routes.ts`：管理界面 API、服务测试和 OpenList 扫码代理。
-- `native-routes.ts`：WeClaw 事件认证、去重、身份审批和 Agent 回复。
+- `native-routes.ts`：WeClaw 事件认证、去重和身份审批；有主动回传配置的成员请求写入
+  后台队列并立即返回 `202`，缺少回传配置时保留同步兼容行为。
 
 ### `db`
 
 - `database.ts`：SQLite WAL 和顺序迁移。
 - `user-store.ts`：成员、会话和外部身份。
 - `config-store.ts`：AI、模型、渠道和媒体服务配置。
-- `conversation-store.ts`：会话消息、Native 事件去重、当前影视主题、历史主题摘要和
-  压缩后的模型视图。
-- `conversation-compaction.ts`：压缩快照数据类型、近期用户原话解析和替代消息格式。
-- `conversation-topic.ts`：较早影视主题摘要的模型上下文格式和长度限制。
+- `conversation-store.ts`：保留全部原始消息，计算近期 Token 边界，并读取或写入唯一
+  滚动压缩检查点；缓存不进入主模型视图的临时分块草稿，并在正式检查点保存或会话
+  重置时删除；同时处理 Native 事件去重。
+- `conversation-compaction.ts`：压缩检查点数据类型和替代消息格式。
 - `task-store.ts`：任务生命周期。
 - `media-upgrade-store.ts`：升级批次、逐条状态、候选、下载任务、替换路径、备份和
   恢复信息；对 Agent 返回的升级选择 ID 由工具层绑定升级项，内部候选 ID 不与普通
@@ -103,19 +111,24 @@ Updated: 2026-08-09
 - `user-memory-store.ts`：按成员隔离的长期偏好、限制、资料和备注；生成受长度限制的
   系统上下文，不属于会话重置范围。
 - `outbox-store.ts`：主动聊天通知和指数退避。
+- `native-request-store.ts`：按 Native `event_id` 持久化待执行的消息与会话重置请求，
+  原子领取任务，记录完成、失败和服务重启中断状态。
 - `media-store.ts`：短期、限次读取的二维码和影片封面媒体。
 - `watchlist-store.ts`：按成员隔离的追更和分集状态。
 - `prompt-store.ts`：提示词初始化、读取、自定义和恢复默认值；系统升级只替换
   未自定义的旧版本。
-- `conversation-store.ts` 保留全部原始聊天消息；首次模型视图使用最近 80 条消息记录，
-  并向前扩展到完整用户回合。达到模型 Token 阈值后读取
-  `conversation_compactions` 替代历史并追加新消息。
-  当前影视主题和较早主题摘要继续独立管理，不改写工具调用历史。
+- `conversation_compactions` 每个会话只保存一个滚动检查点。未压缩时模型读取全部
+  原始消息；压缩后读取检查点与截止序号之后的近期原始消息。数据库迁移会删除旧主题
+  表和额外用户原话字段。`conversation_compaction_chunks` 只保存未完成压缩的可恢复
+  临时草稿，不进入主模型历史；正式检查点保存、会话重置或过期清理时删除。
 
 ### `integrations`、`tasks`、`channels`
 
 - `integrations/openlist.ts`：通过受限 `/api/autofilm` API 处理离线下载、
-  内存任务状态、精确对象移动、调度器和扫码会话，并读取电影/电视剧媒体库根目录配置。
+  内存任务状态、受大小限制的字幕对象读取、精确对象移动、调度器和扫码会话，并读取
+  电影/电视剧媒体库根目录配置。
+- `integrations/openlist-path.ts`：在 `openlist:///` Jellyfin URI 与 OpenList 绝对路径
+  之间进行严格转换。
 - `integrations/jellyfin.ts`：使用 Jellyfin 12 标准鉴权处理媒体搜索、
   Movie/MediaSource 分页清单、BoxSet 成员媒体详情、`RemoteRefresh`、Movie/Episode
   精确删除、字幕读取
@@ -142,7 +155,8 @@ Updated: 2026-08-09
   分别映射为取消和失败。超时后只发送
   备用资源选择提示，不自动提交。
   完成后优先使用云端最终结果路径精确刷新 Jellyfin，且该路径必须位于任务目标
-  目录内；旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
+  目录内；同时把任务媒体类型映射为 Jellyfin 的 Movie 或 Series 目标并携带 TMDB
+  ID。旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
 - `tasks/openlist-provider-submission.ts`：下载工具等待 OpenList 返回 provider task ID；
   60 秒内未提交或出现明确失败时取消 OpenList 任务，并向 Agent 返回提交失败。
 - `tasks/download-candidates.ts`：读取新旧任务的下载候选；新任务使用结构化
@@ -156,8 +170,8 @@ Updated: 2026-08-09
   拒绝分辨率下降、更新原 Jellyfin Item ID、自动检查条目路径和视频流，再移动旧文件
   并写入终态。带有会话续接信息的新任务由下载完成 Worker 调用 Agent；历史任务仍使用
   独立结果通知。
-- `tasks/media-upgrade-files.ts`：OpenList URI 转换、视频流检查和可恢复的精确移动
-  公共函数；能继续旧版改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
+- `tasks/media-upgrade-files.ts`：视频流检查和可恢复的精确移动公共函数；能继续旧版
+  改名后未移动的唯一中间文件，并复用相同发布判断；历史路径
   不存在时执行一层、唯一且受大小限制的分隔符差异匹配。
 - `tasks/media-upgrade-check-worker.ts`：每批领取 8 个待检查电影，以标题和年份查询
   Jackett；只保存目标分辨率命中结果，完成后恢复原聊天并发送分页结果通知。
@@ -166,6 +180,9 @@ Updated: 2026-08-09
   渠道中的 owner/admin 身份发送，并在有效期内读取扫码状态以完成 Cookie 更新；
   同一次鉴权状态不重复发送。
 - `tasks/watchlist-worker.ts`：按间隔读取 TMDB 并调用只读 Agent 检查追更条件。
+- `tasks/native-request-worker.ts`：有限并发执行已接收的 Native 请求；同一会话由 Agent
+  现有队列保持顺序，最终回复和状态更新在同一数据库事务中写入 Outbox。重启中断的
+  请求只通知失败，不自动重放可能产生副作用的工具操作。
 - `channels/outbound.ts`：向 Native Adapter 发送主动消息；Adapter 因缺少当前会话
   令牌返回 409 时延后投递，不消耗失败次数。
 - `channels/agent-messages.ts`：把 Agent 最终文本中的 Core 临时媒体 URL 提取为
@@ -188,15 +205,24 @@ Updated: 2026-08-09
   全局等待状态。
 - `extract.ts`：7z/unzip/unrar 多级解压、UTF-8/UTF-16/GB18030 编码归一化和
   字幕格式限制。
-- `cleaner.ts`：每个文本字幕使用独立 AI 请求分析全部事件，不做正则预筛选。
+- `subtitle-document.ts`：ASS/SSA/SRT/VTT 的共享事件模型与序列化器；广告操作可删除
+  完整事件，大陆用词操作只能替换解析出的中文汉字段，英文、标签、时间轴、标点、
+  空格和换行不在可写范围内。
+- `processor.ts`：顺序执行 `remove_ads`、`mainland_wording` 和 `ass_style` 的统一字幕
+  操作入口，供下载放置、现有字幕处理和样式工具复用。
+- `cleaner.ts`：通过共享字幕文档，对每个下载文本字幕使用独立 AI 请求分析全部事件；
+  不做正则预筛选，请求失败时保留原字幕。
+- `mainland-rewriter.ts`：每个现有字幕使用一次独立的完整文件请求，使用 10 分钟专用
+  超时；只接受有变化的事件 ID、中文片段 ID 和纯汉字替换内容，不继承主对话、
+  系统提示词、成员记忆或其他文件。
 - `ass-style.ts`：旧版 ASS 样式分析、行内标签和黑边特效坐标处理。
 - `hints.ts`：从解压相对路径推断集号、语言和 Jellyfin 语言标签；短语言代码只按
   完整文件名标记识别，避免作品名称中的普通字符被误判为语言。
-- `workspace-store.ts`：一个任务累计多个字幕包、文件和验证码的成员级临时工作区；
-  文件只使用 UUID，并保存不可变放置计划和逐项执行状态；摘要按固定大小分块计算，
-  SUP/PGS 可直接打开文件读取流。
+- `workspace-store.ts`：一个任务累计多个 SubHD 字幕包、OpenList 现有字幕、验证码和
+  逐项处理状态的成员级临时工作区；文件只使用 UUID，并保存不可变放置计划和处理
+  结果；摘要按固定大小分块计算，SUP/PGS 可直接打开文件读取流。
 - `references.ts`：为 Jellyfin 外挂字幕生成摘要引用，并在删除或替换前解析当前流。
-- `types.ts`：字幕搜索、验证码、提取文件、放置计划和临时工作区类型。
+- `types.ts`：字幕搜索、验证码、提取文件、来源类型、放置计划、处理项和临时工作区类型。
 
 ## `apps/web/src`
 

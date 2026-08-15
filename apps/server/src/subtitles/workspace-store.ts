@@ -19,6 +19,7 @@ import type {
   WorkspaceFile,
   WorkspacePlacementMapping,
   WorkspacePlacementPlan,
+  WorkspaceProcessingEntry,
 } from "./types.js";
 
 const WORKSPACE_LIFETIME_MS = 24 * 60 * 60_000;
@@ -43,6 +44,7 @@ export class SubtitleWorkspaceStore {
       captchas: [],
       files: [],
       placementPlans: [],
+      processingEntries: [],
       expiresAt: expiresAt(WORKSPACE_LIFETIME_MS),
       createdAt: now,
       updatedAt: now,
@@ -74,9 +76,6 @@ export class SubtitleWorkspaceStore {
       });
       const metadata: WorkspaceFile = {
         id: fileId,
-        archiveId,
-        subtitleId: input.subtitleId,
-        archiveName: input.filename,
         filename: file.filename,
         relativePath: file.relativePath,
         format: file.format,
@@ -84,6 +83,12 @@ export class SubtitleWorkspaceStore {
         episodeHint: episodeHint(file.relativePath || file.filename),
         languageHint: languageHint(file.filename, file.relativePath),
         storageName,
+        source: {
+          type: "subhd",
+          archiveId,
+          subtitleId: input.subtitleId,
+          archiveName: input.filename,
+        },
       };
       workspace.files.push(metadata);
       fileIds.push(fileId);
@@ -99,6 +104,66 @@ export class SubtitleWorkspaceStore {
     workspace.archives.push(archive);
     this.touch(workspace);
     return { workspace, archive };
+  }
+
+  appendOpenListSubtitle(input: {
+    userId: string;
+    workspaceId: string;
+    jellyfinItemId: string;
+    jellyfinItemName: string;
+    subtitleRef: string;
+    openListPath: string;
+    format: string;
+    language: string;
+    isForced: boolean;
+    isHearingImpaired: boolean;
+    season?: number;
+    episode?: number;
+    data: Buffer;
+  }): { workspace: SubtitleWorkspace; file: WorkspaceFile; existed: boolean } {
+    const workspace = this.require(input.userId, input.workspaceId);
+    const existing = workspace.files.find(
+      (file) =>
+        file.source.type === "jellyfin_openlist" &&
+        file.source.jellyfinItemId === input.jellyfinItemId &&
+        file.source.subtitleRef === input.subtitleRef,
+    );
+    if (existing) return { workspace, file: existing, existed: true };
+
+    const fileId = randomUUID();
+    const extension = `.${input.format.replace(/^\./, "").toLowerCase()}`;
+    const storageDirectory = path.join(this.directory(workspace.id), "openlist");
+    mkdirSync(storageDirectory, { recursive: true, mode: 0o700 });
+    const storageName = path.posix.join("openlist", `${fileId}${extension}`);
+    writeFileSync(
+      path.join(this.directory(workspace.id), storageName),
+      input.data,
+      { mode: 0o600 },
+    );
+    const filename = path.posix.basename(input.openListPath);
+    const file: WorkspaceFile = {
+      id: fileId,
+      filename,
+      relativePath: filename,
+      format: input.format.replace(/^\./, "").toLowerCase(),
+      sizeBytes: input.data.byteLength,
+      episodeHint: input.episode,
+      languageHint: input.language || languageHint(filename),
+      storageName,
+      source: {
+        type: "jellyfin_openlist",
+        jellyfinItemId: input.jellyfinItemId,
+        jellyfinItemName: input.jellyfinItemName,
+        subtitleRef: input.subtitleRef,
+        openListPath: input.openListPath,
+        language: input.language,
+        isForced: input.isForced,
+        isHearingImpaired: input.isHearingImpaired,
+      },
+    };
+    workspace.files.push(file);
+    this.touch(workspace);
+    return { workspace, file, existed: false };
   }
 
   addCaptcha(input: {
@@ -329,6 +394,108 @@ export class SubtitleWorkspaceStore {
     const plan = this.placementPlan(userId, workspaceId, planId);
     plan.executing = false;
     this.touch(this.require(userId, workspaceId));
+  }
+
+  processingEntry(
+    userId: string,
+    workspaceId: string,
+    fileId: string,
+  ): WorkspaceProcessingEntry {
+    const workspace = this.require(userId, workspaceId);
+    const file = this.fileById(userId, workspaceId, fileId);
+    if (file.source.type !== "jellyfin_openlist") {
+      throw new Error("大陆用词转换只处理从 OpenList 导入的已有字幕");
+    }
+    let entry = workspace.processingEntries.find(
+      (candidate) =>
+        candidate.fileId === fileId &&
+        candidate.operation === "mainland_wording" &&
+        candidate.outputLanguage === "chs",
+    );
+    if (!entry) {
+      const now = new Date().toISOString();
+      entry = {
+        id: randomUUID(),
+        fileId,
+        operation: "mainland_wording",
+        outputLanguage: "chs",
+        state: "pending",
+        beforeSubtitleRefs: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      workspace.processingEntries.push(entry);
+      this.touch(workspace);
+    }
+    return entry;
+  }
+
+  beginProcessing(
+    userId: string,
+    workspaceId: string,
+    fileId: string,
+  ): WorkspaceProcessingEntry {
+    const entry = this.processingEntry(userId, workspaceId, fileId);
+    if (entry.state === "processing") throw new Error("字幕文件正在处理");
+    if (entry.state !== "completed") entry.state = "processing";
+    entry.lastError = undefined;
+    entry.updatedAt = new Date().toISOString();
+    this.touch(this.require(userId, workspaceId));
+    return entry;
+  }
+
+  markProcessingUploaded(
+    userId: string,
+    workspaceId: string,
+    fileId: string,
+    input: {
+      beforeSubtitleRefs: string[];
+      eligibleEvents: number;
+      rewrittenEvents: number;
+      rewrittenSegments: number;
+    },
+  ): WorkspaceProcessingEntry {
+    const entry = this.processingEntry(userId, workspaceId, fileId);
+    entry.state = "uploaded";
+    entry.beforeSubtitleRefs = [...input.beforeSubtitleRefs];
+    entry.eligibleEvents = input.eligibleEvents;
+    entry.rewrittenEvents = input.rewrittenEvents;
+    entry.rewrittenSegments = input.rewrittenSegments;
+    entry.uploadedAt ??= new Date().toISOString();
+    entry.updatedAt = new Date().toISOString();
+    entry.lastError = undefined;
+    this.touch(this.require(userId, workspaceId));
+    return entry;
+  }
+
+  completeProcessing(
+    userId: string,
+    workspaceId: string,
+    fileId: string,
+    outputSubtitleRef?: string,
+  ): WorkspaceProcessingEntry {
+    const entry = this.processingEntry(userId, workspaceId, fileId);
+    entry.state = "completed";
+    entry.outputSubtitleRef = outputSubtitleRef;
+    entry.completedAt ??= new Date().toISOString();
+    entry.updatedAt = new Date().toISOString();
+    entry.lastError = undefined;
+    this.touch(this.require(userId, workspaceId));
+    return entry;
+  }
+
+  failProcessing(
+    userId: string,
+    workspaceId: string,
+    fileId: string,
+    error: string,
+  ): WorkspaceProcessingEntry {
+    const entry = this.processingEntry(userId, workspaceId, fileId);
+    entry.state = "failed";
+    entry.lastError = error;
+    entry.updatedAt = new Date().toISOString();
+    this.touch(this.require(userId, workspaceId));
+    return entry;
   }
 
   remove(id: string): void {

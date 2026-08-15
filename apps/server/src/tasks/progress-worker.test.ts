@@ -380,6 +380,7 @@ describe("OpenList task progress worker", () => {
       destination,
       jellyfinRefreshPath: refreshPath,
       jellyfinProviderIds: { Tmdb: "123" },
+      media: { type: "tv", tmdbId: 123 },
     };
     const first = tasks.create({
       type: "offline-download",
@@ -431,6 +432,7 @@ describe("OpenList task progress worker", () => {
         refresh: true,
         forceProbe: false,
         providerIds: { Tmdb: "123" },
+        providerTarget: "series",
       },
     ]);
     expect(

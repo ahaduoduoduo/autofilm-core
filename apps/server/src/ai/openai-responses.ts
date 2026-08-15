@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { bearerHeaders, postServerEvents } from "./http.js";
+import {
+  AiProviderError,
+  bearerHeaders,
+  isTransientProviderMessage,
+  postServerEvents,
+} from "./http.js";
 import type {
   AiClient,
   AiTransportConfig,
@@ -114,8 +119,10 @@ function combineStreamEvents(events: ResponsesStreamEvent[]): ResponsesPayload {
     (event) => event.type === "error" || event.type === "response.failed",
   );
   if (failed) {
-    throw new Error(
-      `AI provider stream failed: ${failed.error?.message ?? "unknown error"}`,
+    const message = failed.error?.message ?? "unknown error";
+    throw new AiProviderError(
+      `AI provider stream failed: ${message}`,
+      { retryable: isTransientProviderMessage(message) },
     );
   }
 

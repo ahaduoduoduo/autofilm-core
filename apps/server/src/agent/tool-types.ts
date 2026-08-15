@@ -10,7 +10,7 @@ import type { OpenListClient } from "../integrations/openlist.js";
 import type { SubHDClient } from "../integrations/subhd.js";
 import type { TmdbClient } from "../integrations/tmdb.js";
 import type { SubtitleDownloadService } from "../subtitles/download-service.js";
-import type { SubtitleCleaner } from "../subtitles/cleaner.js";
+import type { SubtitleProcessor } from "../subtitles/processor.js";
 import type { MediaUpgradeStore } from "../db/media-upgrade-store.js";
 import type { MediaUpgradeCheckStore } from "../db/media-upgrade-check-store.js";
 import type { UserMemoryStore } from "../db/user-memory-store.js";
@@ -39,7 +39,7 @@ export interface ToolDependencies {
   jellyfin: JellyfinClient;
   subhd: SubHDClient;
   subtitleDownloads: SubtitleDownloadService;
-  subtitleCleaner: SubtitleCleaner;
+  subtitleProcessor: SubtitleProcessor;
   subtitleWorkspaces: SubtitleWorkspaceStore;
   watchlists: WatchlistStore;
   outbox: OutboxStore;
@@ -47,13 +47,5 @@ export interface ToolDependencies {
   mediaBaseUrl: string;
   storageAuth?: {
     start(): Promise<unknown>;
-  };
-  mediaTopic?: {
-    activate(input: {
-      mediaType: "movie" | "tv";
-      tmdbId: number;
-      title: string;
-      productionYear?: number;
-    }): Promise<unknown>;
   };
 }

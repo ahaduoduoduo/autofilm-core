@@ -6,12 +6,15 @@ import type {
 
 export const DEFAULT_CONTEXT_WINDOW_TOKENS = 128_000;
 export const DEFAULT_TOOL_OUTPUT_TOKENS = 12_000;
-const DEFAULT_AUTO_COMPACT_RATIO = 0.8;
-const MAX_AUTO_COMPACT_RATIO = 0.9;
+export const DEFAULT_COMPACTION_RESERVE_TOKENS = 16_384;
+export const DEFAULT_COMPACTION_KEEP_RECENT_TOKENS = 20_000;
+const MINIMUM_COMPACTION_RESERVE_TOKENS = 4_096;
 
 export interface ContextBudgetPolicy {
   contextWindowTokens: number;
   autoCompactTokenLimit: number;
+  compactionReserveTokens: number;
+  compactKeepRecentTokens: number;
   toolOutputTokenLimit: number;
 }
 
@@ -20,6 +23,7 @@ export function contextBudgetPolicy(
     ModelProfile,
     | "contextWindowTokens"
     | "autoCompactTokenLimit"
+    | "compactKeepRecentTokens"
     | "toolOutputTokenLimit"
   >,
 ): ContextBudgetPolicy {
@@ -27,18 +31,36 @@ export function contextBudgetPolicy(
     model.contextWindowTokens,
     DEFAULT_CONTEXT_WINDOW_TOKENS,
   );
+  const minimumReserveTokens = Math.min(
+    MINIMUM_COMPACTION_RESERVE_TOKENS,
+    Math.max(1, Math.floor(contextWindowTokens * 0.5)),
+  );
+  const defaultReserveTokens = Math.min(
+    DEFAULT_COMPACTION_RESERVE_TOKENS,
+    Math.max(minimumReserveTokens, Math.floor(contextWindowTokens * 0.5)),
+  );
   const maximumAutoCompact = Math.max(
     1,
-    Math.floor(contextWindowTokens * MAX_AUTO_COMPACT_RATIO),
+    contextWindowTokens - minimumReserveTokens,
   );
   const configuredAutoCompact = model.autoCompactTokenLimit ??
-    Math.floor(contextWindowTokens * DEFAULT_AUTO_COMPACT_RATIO);
+    contextWindowTokens - defaultReserveTokens;
+  const autoCompactTokenLimit = Math.min(
+    positiveInteger(configuredAutoCompact, maximumAutoCompact),
+    maximumAutoCompact,
+  );
+  const compactKeepRecentTokens = Math.min(
+    positiveInteger(
+      model.compactKeepRecentTokens,
+      DEFAULT_COMPACTION_KEEP_RECENT_TOKENS,
+    ),
+    Math.max(1_000, autoCompactTokenLimit - 1_000),
+  );
   return {
     contextWindowTokens,
-    autoCompactTokenLimit: Math.min(
-      positiveInteger(configuredAutoCompact, maximumAutoCompact),
-      maximumAutoCompact,
-    ),
+    autoCompactTokenLimit,
+    compactionReserveTokens: contextWindowTokens - autoCompactTokenLimit,
+    compactKeepRecentTokens,
     toolOutputTokenLimit: positiveInteger(
       model.toolOutputTokenLimit,
       DEFAULT_TOOL_OUTPUT_TOKENS,
