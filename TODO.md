@@ -1,8 +1,11 @@
 # AutoFilm Core development status
 
-Updated: 2026-08-15
+Updated: 2026-08-16
 
 ## 已完成
+
+- [x] 2026-08-16：普通下载完成通知同时携带 Movie/Series 类型与 TMDB ID；Jellyfin
+  在元数据获取前验证目标类型，避免把影视身份写给错误条目。
 
 - [x] 2026-08-15：完整字幕大陆用词转换使用 10 分钟专用 AI 请求超时，不再被通用
   120 秒时限中止；其他主 Agent、会话压缩和 AI 请求继续使用 120 秒默认值。

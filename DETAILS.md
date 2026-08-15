@@ -155,7 +155,8 @@ Updated: 2026-08-15
   分别映射为取消和失败。超时后只发送
   备用资源选择提示，不自动提交。
   完成后优先使用云端最终结果路径精确刷新 Jellyfin，且该路径必须位于任务目标
-  目录内；旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
+  目录内；同时把任务媒体类型映射为 Jellyfin 的 Movie 或 Series 目标并携带 TMDB
+  ID。旧接口没有结果路径时才使用原有刷新目标，并保存重试状态。
 - `tasks/openlist-provider-submission.ts`：下载工具等待 OpenList 返回 provider task ID；
   60 秒内未提交或出现明确失败时取消 OpenList 任务，并向 Agent 返回提交失败。
 - `tasks/download-candidates.ts`：读取新旧任务的下载候选；新任务使用结构化

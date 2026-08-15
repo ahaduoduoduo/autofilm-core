@@ -75,12 +75,13 @@ provider task ID 和 provider 接受时间。进度 Worker 每 2 秒读取受限
 和原始标题。Core 选中候选后在内网读取 `.torrent` 并转换为 v1 magnet，OpenList
 不接收 Jackett 内网 URL。
 任务真实结束后，OpenList 同一快照返回 115 最终生成的 `result_path`；Core 只将
-这个精确路径交给 Jellyfin。电影任务同时提供 TMDB ID 和
-`provider_target=movie`，使 Jellyfin 将身份绑定到结果目录中的单个视频。旧版
+这个精确路径交给 Jellyfin。电影和电视剧任务同时提供 TMDB ID 以及
+`provider_target=movie|series`。Jellyfin 先核对通知类型与媒体库类型，再将身份
+绑定到 Movie 或 Series；类型冲突时拒绝导入，不把 ID 写给错误条目。旧版
 OpenList 未提供结果路径时才使用原有刷新目标。
 
 任务完成后，Core 按 Jellyfin 刷新目录合并同一批次的请求，调用
-`RemoteRefresh`。电视剧统一刷新剧集根目录并携带 TMDB ID；失败状态保存在
+`RemoteRefresh`。电视剧统一刷新剧集根目录并携带 TMDB ID 与 Series 类型；失败状态保存在
 任务元数据中，并按退避间隔重试。Jellyfin 导入完成后，Core 向原会话写入后台
 事件，Agent 继续此前已经约定的字幕操作；没有字幕计划时只报告视频入库。
 OpenList 普通文件变更不会自动修改 Jellyfin。
