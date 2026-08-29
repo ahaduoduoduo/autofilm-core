@@ -68,13 +68,13 @@ describe("OpenList authentication worker", () => {
     const startAuth = vi.fn(async () => ({
       session_id: "auth-session",
       state: "pending",
-      expires_at: "2026-08-09T04:00:00.000Z",
+      expires_at: "2099-08-09T04:00:00.000Z",
     }));
     const authQrCode = vi.fn(async () => Buffer.from("png"));
     const authStatus = vi.fn(async () => ({
       session_id: "auth-session",
       state: "pending",
-      expires_at: "2026-08-09T04:00:00.000Z",
+      expires_at: "2099-08-09T04:00:00.000Z",
     }));
     const create = vi.fn(() => "media-token");
     const worker = new OpenListAuthWorker(
@@ -170,7 +170,7 @@ describe("OpenList authentication worker", () => {
         startAuth: vi.fn(async () => ({
           session_id: "auth-session",
           state: "pending",
-          expires_at: "2026-08-09T04:00:00.000Z",
+          expires_at: "2099-08-09T04:00:00.000Z",
         })),
         authStatus: vi.fn(),
         authQrCode: vi.fn(async () => Buffer.from("png")),
@@ -197,7 +197,7 @@ describe("OpenList authentication worker", () => {
     const authStatus = vi.fn(async () => ({
       session_id: "auth-session",
       state: "confirmed",
-      expires_at: "2026-08-09T04:00:00.000Z",
+      expires_at: "2099-08-09T04:00:00.000Z",
     }));
     const worker = new OpenListAuthWorker(
       {
@@ -213,7 +213,7 @@ describe("OpenList authentication worker", () => {
         startAuth: vi.fn(async () => ({
           session_id: "auth-session",
           state: "pending",
-          expires_at: "2026-08-09T04:00:00.000Z",
+          expires_at: "2099-08-09T04:00:00.000Z",
         })),
         authStatus,
         authQrCode: vi.fn(async () => Buffer.from("png")),

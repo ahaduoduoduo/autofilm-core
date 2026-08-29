@@ -109,6 +109,36 @@ export class OpenListClient {
     return result.objects ?? [];
   }
 
+  async downloadObject(path: string, maxBytes = 20 * 1024 * 1024): Promise<{
+    object: OpenListObject;
+    data: Buffer;
+  }> {
+    const object = await this.getObject(path);
+    if (object.is_dir || !object.download_path) {
+      throw new Error("OpenList 字幕路径没有可下载文件");
+    }
+    if (object.size > maxBytes) {
+      throw new Error(`OpenList 字幕文件超过 ${maxBytes} 字节限制`);
+    }
+    const config = this.requireConfig();
+    const response = await fetch(new URL(object.download_path, config.baseUrl), {
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) {
+      throw new Error(`OpenList 字幕下载返回 HTTP ${response.status}`);
+    }
+    const declaredLength = Number(response.headers.get("content-length") ?? 0);
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      await response.body?.cancel();
+      throw new Error(`OpenList 字幕下载超过 ${maxBytes} 字节限制`);
+    }
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.byteLength > maxBytes) {
+      throw new Error(`OpenList 字幕下载超过 ${maxBytes} 字节限制`);
+    }
+    return { object, data };
+  }
+
   async moveObject(input: {
     sourcePath: string;
     destinationDirectory: string;

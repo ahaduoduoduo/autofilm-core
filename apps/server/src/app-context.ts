@@ -15,12 +15,13 @@ import type { SubHDClient } from "./integrations/subhd.js";
 import type { WatchlistStore } from "./db/watchlist-store.js";
 import type { SubtitleWorkspaceStore } from "./subtitles/workspace-store.js";
 import type { SubtitleDownloadService } from "./subtitles/download-service.js";
-import type { SubtitleCleaner } from "./subtitles/cleaner.js";
+import type { SubtitleProcessor } from "./subtitles/processor.js";
 import type { WeClawRegistration } from "./integrations/weclaw-registration.js";
 import type { PromptStore } from "./db/prompt-store.js";
 import type { MediaUpgradeStore } from "./db/media-upgrade-store.js";
 import type { MediaUpgradeCheckStore } from "./db/media-upgrade-check-store.js";
 import type { UserMemoryStore } from "./db/user-memory-store.js";
+import type { NativeRequestStore } from "./db/native-request-store.js";
 
 export interface AppContext {
   config: AppConfig;
@@ -34,11 +35,12 @@ export interface AppContext {
   mediaUpgradeChecks: MediaUpgradeCheckStore;
   userMemories: UserMemoryStore;
   outbox: OutboxStore;
+  nativeRequests: NativeRequestStore;
   media: EphemeralMediaStore;
   watchlists: WatchlistStore;
   subtitleWorkspaces: SubtitleWorkspaceStore;
   subtitleDownloads: SubtitleDownloadService;
-  subtitleCleaner: SubtitleCleaner;
+  subtitleProcessor: SubtitleProcessor;
   weClawRegistration: WeClawRegistration;
   agent: AgentService;
   tmdb: TmdbClient;

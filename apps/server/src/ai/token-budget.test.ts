@@ -14,25 +14,33 @@ describe("AI context token budgets", () => {
     expect(estimateTextTokens("abc字幕")).toBe(3);
   });
 
-  it("derives an 80 percent default and clamps overrides to 90 percent", () => {
+  it("reserves output space and keeps a separate recent raw token tail", () => {
     expect(
       contextBudgetPolicy({
         contextWindowTokens: 100_000,
         autoCompactTokenLimit: null,
+        compactKeepRecentTokens: 20_000,
         toolOutputTokenLimit: 5_000,
       }),
     ).toEqual({
       contextWindowTokens: 100_000,
-      autoCompactTokenLimit: 80_000,
+      autoCompactTokenLimit: 83_616,
+      compactionReserveTokens: 16_384,
+      compactKeepRecentTokens: 20_000,
       toolOutputTokenLimit: 5_000,
     });
     expect(
       contextBudgetPolicy({
         contextWindowTokens: 100_000,
         autoCompactTokenLimit: 99_000,
+        compactKeepRecentTokens: 20_000,
         toolOutputTokenLimit: 5_000,
-      }).autoCompactTokenLimit,
-    ).toBe(90_000);
+      }),
+    ).toMatchObject({
+      autoCompactTokenLimit: 95_904,
+      compactionReserveTokens: 4_096,
+      compactKeepRecentTokens: 20_000,
+    });
   });
 
   it("keeps the beginning and end when a tool result is limited", () => {

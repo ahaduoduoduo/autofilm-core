@@ -17,9 +17,10 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   - Anthropic Messages。
   - Gemini GenerateContent。
 - New API 可作为任意供应方配置，不是特殊代码路径。
-- 主 Agent、会话压缩、影视主题摘要、验证码 OCR、字幕广告清理和追更判断提示词保存在 SQLite 中，可从
-  管理界面修改并恢复当前版本的系统默认内容；修改在下一次模型请求时生效。
-- 39 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
+- 主 Agent、会话压缩、验证码 OCR、字幕广告清理、字幕大陆用词转换和追更判断提示词
+  保存在 SQLite 中，可从管理界面修改并恢复当前版本的系统默认内容；修改在下一次
+  模型请求时生效。
+- 49 个常规 Agent 工具，覆盖 TMDB、Jackett、OpenList、Jellyfin、SubHD、
   ASS 样式和按成员追更；管理员聊天另有 OpenList 扫码工具。
 - Jellyfin 电影按实际视频流分辨率分页查询，不访问 OpenList；重复电影分为
   Provider ID 确定重复和标题年份疑似重复，并返回每个实际版本的画质、音轨与路径。
@@ -29,13 +30,19 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
   直接核对作品。
 - 同一成员会话的顶层请求按顺序执行，避免工具调用历史交叉；不同会话和同一轮工具
   仍可并行。
-- 完整会话和工具原始结果保存在 SQLite；模型视图按 Token 预算限制单项工具输出，
-  默认在上下文窗口 80% 使用当前模型执行本地分块压缩，并可在同一任务的工具调用
-  过程中压缩后继续。首次压缩以最近 80 条消息记录为初始边界，并向前扩展到完整
-  用户回合，不拆分工具调用与结果；
-  历史中存在孤立结果或进程中断时会在发送模型前自动恢复。
-- 每次模型请求都包含服务器当前时间；精确的播出、上映和相对日期判断仍要求 Agent
-  调用时间工具。作品焦点切换时，上一作品的完整历史转换为可恢复摘要，原始消息保留。
+- 完整会话和工具原始结果保存在 SQLite；主 Agent 只使用 Pi 式滚动上下文，较早
+  前缀由一个检查点替代，近期约 20,000 Token 保留原文。默认在距离模型窗口
+  16,384 Token 时压缩，不使用固定消息条数、影视主题摘要或额外用户原话副本。
+- 超大历史前缀按最高 48,000 Token 生成临时分块草稿，最多 3 个并发；成功草稿可在
+  供应方失败或 Core 重启后复用，最后统一合并为一个正式检查点并删除草稿。主 Agent
+  只读取正式检查点和近期原文，不读取临时分块。
+- 每次主模型调用都重新注入数据库系统提示词、服务器当前时间和当前成员长期记忆；
+  精确的播出、上映和相对日期判断仍要求 Agent 调用时间工具。
+- AI 供应方临时处理失败、服务过载、超时、网络错误、普通限流和可恢复 5xx 最多
+  自动重试 3 次；遵循 `Retry-After`，其他情况使用带随机抖动的指数退避。
+- 已绑定成员的 Native 请求在认证和去重后立即返回 `202`，由 SQLite 持久化后台队列
+  执行 Agent，再经 Outbox 主动发送最终结果；长时间模型重试、字幕处理和媒体工具不再
+  占用 Adapter 的单次 HTTP 超时时间。Core 重启不会盲目重放可能已经产生副作用的请求。
 - Jackett 完整结果按文件大小降序分页，同一搜索词复用短期缓存；同轮只读工具
   并行执行。
 - Jackett 搜索只向 Agent 返回候选 ID 和原始资源标题，不返回下载 URL；Core 在成员
@@ -48,8 +55,13 @@ AutoFilm Core 是多人观影请求系统的业务服务和管理界面。聊天
 - 字幕与 Jellyfin Movie/Episode ID 配对；新增、替换和删除统一使用 Jellyfin
   字幕接口和摘要字幕引用，不向 Agent 暴露可变化的流序号。本地媒体由 Jellyfin
   写入本地目录，远端媒体由 Jellyfin 上传 OpenList。
-- 文本字幕逐文件使用独立 AI 请求分析全部事件并清理广告；SUP/PGS 原样上传。
-  同一放置计划最多并发处理 8 个映射，清理、流式上传和单项状态互相隔离。
+- 下载得到的文本字幕仍在放置前逐文件使用独立 AI 请求分析全部事件并清理广告；
+  清理完成后才上传，SUP/PGS 原样上传。同一放置计划最多并发处理 8 个映射，清理、
+  流式上传和单项状态互相隔离。
+- 成员观看后可明确要求处理一条或多条现有 OpenList 外挂字幕：字幕导入同一个临时
+  工作区，每个文件以完整双语内容发起一次独立 AI 请求，只允许替换中文汉字段，
+  最终新增 `chs` 字幕并保留原字幕。广告清理、大陆用词转换和 ASS 样式共用字幕
+  处理器与文档解析组件。
 - Jellyfin 当前图片、远程图片、图片设置、条目刷新、分集和媒体流查询。
 - Jellyfin Movie/Episode 精确版本删除；Core 先核对条目、路径和媒体流，再通过
   Jellyfin 删除本地或 OpenList 实际文件。字幕删除继续使用不可变摘要引用。
@@ -119,7 +131,7 @@ Core 每 2 秒读取一次 OpenList 的**内存任务管理器**，用于显示�
 大规模画质检查使用持久化后台任务：Agent 一次提交 Jellyfin 电影版本清单，Core
 按标题和年份构造 Jackett 查询并以 8 项并发检查目标分辨率。未命中条目只保留统计，
 不会进入模型上下文；命中条目通过稳定任务 ID 分页读取。成员明确要求保存的长期偏好
-按用户写入 SQLite，不受 `/new`、`/clear` 或影视主题摘要影响。详细说明见
+按用户写入 SQLite，不受 `/new`、`/clear` 或会话压缩影响。详细说明见
 [docs/bulk-upgrade-checks-and-user-memory.md](docs/bulk-upgrade-checks-and-user-memory.md)。
 
 完整说明见 [docs/architecture.md](docs/architecture.md)。
@@ -187,11 +199,13 @@ Actions 页面按组件和分支手动构建。当前 Jellyfin 开发和正式�
 npm install
 npm run dev
 npm run typecheck
-npm test
-npm run build
+npm run test -w @autofilm/server
 ```
 
 后端默认监听 `3100`，Vite 开发服务器监听 `5173` 并代理 API。
+本机不执行发布构建或 Docker 镜像构建；所有可部署产物统一由 GitHub Actions 生成。
+固定发布、数据库备份迁移和生产替换流程见
+[docs/deployment.md](docs/deployment.md#强制发布流程)。
 
 ## 项目文档
 
@@ -200,12 +214,12 @@ npm run build
 - [docs/system-repositories.md](docs/system-repositories.md)：六个仓库、上游和修改边界。
 - [docs/communication.md](docs/communication.md)：服务通信矩阵与用户交互流程。
 - [docs/ai-providers.md](docs/ai-providers.md)：供应方与协议模型。
-- [docs/conversation-recovery.md](docs/conversation-recovery.md)：会话截断、工具配对和
+- [docs/conversation-recovery.md](docs/conversation-recovery.md)：滚动检查点、工具配对和
   供应方错误恢复。
 - [docs/context-management.md](docs/context-management.md)：模型 Token 配置、工具输出
   预算、本地分块压缩和活动历史替换。
 - [docs/media-inventory-and-memory.md](docs/media-inventory-and-memory.md)：
-  分辨率、重复电影、TMDB 分层详情、运行时间和影视主题摘要。
+  分辨率、重复电影、TMDB 分层详情、运行时间和成员长期记忆。
 - [docs/media-upgrades.md](docs/media-upgrades.md)：现有条目资源查询、并发下载、
   原 Item ID 替换、备份与恢复。
 - [docs/bulk-upgrade-checks-and-user-memory.md](docs/bulk-upgrade-checks-and-user-memory.md)：

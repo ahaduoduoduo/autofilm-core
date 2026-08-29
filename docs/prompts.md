@@ -1,6 +1,6 @@
 # 数据库提示词
 
-Updated: 2026-08-05
+Updated: 2026-08-15
 
 AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。代码内仍保留
 每类提示词的系统默认模板，作用仅限首次初始化、默认版本升级和“恢复默认值”。
@@ -11,11 +11,11 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 | Key | 使用位置 | 上下文 |
 | --- | --- | --- |
 | `agent.main` | 成员日常聊天、媒体搜索与操作 | Token 预算管理的活动会话 |
-| `conversation.compactor` | 接近模型窗口时生成替代历史 | 独立无工具分块请求 |
-| `conversation.summarizer` | 切换作品时整理上一影视主题 | 独立无工具请求 |
+| `conversation.compactor` | 接近模型窗口时生成替代历史 | 独立无工具分块请求和最终合并请求 |
 | `subtitle.captcha.system` | SubHD 验证码识别系统指令 | 独立单次视觉请求 |
 | `subtitle.captcha.user` | 随验证码图片发送的识别要求 | 独立单次视觉请求 |
 | `subtitle.cleaner` | 字幕广告判断 | 独立单次请求 |
+| `subtitle.mainland_rewriter` | 现有字幕大陆用词转换 | 每个字幕一次独立完整文件请求，重点识别粤语口语直写、半文半白翻译腔及港台非大陆用词、名词和句式 |
 | `watchlist.evaluator` | 定时追更条件判断 | 独立只读工具会话 |
 
 管理界面的“提示词”页面显示当前内容、是否自定义、默认版本和更新时间。保存后，
@@ -40,7 +40,7 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 - 单任务、分集批量任务、Jackett 候选 ID、备用候选和 115 短时失败规则；
 - OpenList 绝对路径、Jellyfin 远端刷新、媒体流和图片管理；
 - SubHD 影片页完整列表、成员级多包 workspace、Jellyfin 字幕管理、独立验证码
-  上下文、逐文件全量广告清理和 ASS 样式；
+  上下文、逐文件全量广告清理、观看后主动执行的大陆用词转换和 ASS 样式；
 - 主动只读查询、多人权限、凭据安全和追更。
 
 以下旧规则没有迁移，因为对应能力已经删除或转移到其他组件：
@@ -56,7 +56,9 @@ AutoFilm Core 的 AI 行为提示词保存在 SQLite `prompt_configs` 表中。�
 
 ## 运行时附加信息
 
-Core 在数据库主提示词之外动态加入当前服务器时间和已保存的较早影视主题摘要。
-服务器时间每次请求重新生成，不属于可编辑行为规则。主题摘要本身由
-`conversation.summarizer` 生成。通用上下文达到阈值时由 `conversation.compactor`
-生成替代历史。两类提示词都在数据库和管理页面中维护。
+Core 在每次主模型调用时，在数据库主提示词之外重新加入当前服务器时间和当前成员
+长期记忆。这些固定上下文不进入会话压缩检查点，不会因长对话或多次滚动压缩丢失。
+
+会话接近 Token 阈值时，`conversation.compactor` 将旧检查点与刚移出近期原始窗口的
+消息前缀合并为新检查点。近期消息仍保留原文。项目不再使用按影视主题生成的第二层
+摘要提示词。详细规则见 `context-management.md`。

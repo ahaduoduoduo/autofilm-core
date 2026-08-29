@@ -16,7 +16,7 @@ function dependencies(admin = false): ToolDependencies {
     jellyfin: placeholder,
     subhd: placeholder,
     subtitleDownloads: placeholder,
-    subtitleCleaner: placeholder,
+    subtitleProcessor: placeholder,
     subtitleWorkspaces: placeholder,
     watchlists: placeholder,
     outbox: placeholder,
@@ -54,6 +54,7 @@ describe("agent tool registry", () => {
         "get_subtitle_detail",
         "get_subtitle_workspace",
         "get_tmdb_metadata",
+        "import_openlist_subtitles",
         "list_download_tasks",
         "list_jellyfin_episodes",
         "list_jellyfin_subtitle_targets",
@@ -62,6 +63,7 @@ describe("agent tool registry", () => {
         "list_watchlist",
         "place_subtitles",
         "prepare_subtitle_placements",
+        "process_subtitle_workspace",
         "query_jellyfin_movies",
         "refresh_jellyfin_item",
         "refresh_jellyfin_remote_path",
@@ -94,21 +96,6 @@ describe("agent tool registry", () => {
     expect(
       createAgentTools(dependencies(true)).some(
         (tool) => tool.definition.name === "start_openlist_storage_auth",
-      ),
-    ).toBe(true);
-  });
-
-  it("exposes topic switching only inside a persistent conversation", () => {
-    expect(
-      createAgentTools(dependencies()).some(
-        (tool) => tool.definition.name === "set_active_media_topic",
-      ),
-    ).toBe(false);
-    const deps = dependencies();
-    deps.mediaTopic = { activate: async () => ({ changed: true }) };
-    expect(
-      createAgentTools(deps).some(
-        (tool) => tool.definition.name === "set_active_media_topic",
       ),
     ).toBe(true);
   });

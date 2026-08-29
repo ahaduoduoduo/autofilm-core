@@ -35,6 +35,7 @@ interface ModelRow {
   max_output_tokens: number | null;
   context_window_tokens: number;
   auto_compact_token_limit: number | null;
+  compact_keep_recent_tokens: number;
   tool_output_token_limit: number;
   created_at: string;
   updated_at: string;
@@ -181,6 +182,7 @@ export class ConfigStore {
     maxOutputTokens?: number | null;
     contextWindowTokens?: number;
     autoCompactTokenLimit?: number | null;
+    compactKeepRecentTokens?: number;
     toolOutputTokenLimit?: number;
   }): ModelProfile {
     const existing = input.id ? this.model(input.id) : undefined;
@@ -195,15 +197,17 @@ export class ConfigStore {
           `INSERT INTO model_profiles
             (id, provider_id, name, model, is_default, enabled, temperature,
              max_output_tokens, context_window_tokens,
-             auto_compact_token_limit, tool_output_token_limit,
+             auto_compact_token_limit, compact_keep_recent_tokens,
+             tool_output_token_limit,
              created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              provider_id=excluded.provider_id, name=excluded.name, model=excluded.model,
              is_default=excluded.is_default, enabled=excluded.enabled,
              temperature=excluded.temperature, max_output_tokens=excluded.max_output_tokens,
              context_window_tokens=excluded.context_window_tokens,
              auto_compact_token_limit=excluded.auto_compact_token_limit,
+             compact_keep_recent_tokens=excluded.compact_keep_recent_tokens,
              tool_output_token_limit=excluded.tool_output_token_limit,
              updated_at=excluded.updated_at`,
         )
@@ -220,6 +224,9 @@ export class ConfigStore {
           input.autoCompactTokenLimit === undefined
             ? existing?.autoCompactTokenLimit ?? null
             : input.autoCompactTokenLimit,
+          input.compactKeepRecentTokens ??
+            existing?.compactKeepRecentTokens ??
+            20_000,
           input.toolOutputTokenLimit ?? existing?.toolOutputTokenLimit ?? 12_000,
           existing?.createdAt ?? now,
           now,
@@ -429,6 +436,7 @@ function toModel(row: ModelRow): ModelProfile {
     maxOutputTokens: row.max_output_tokens,
     contextWindowTokens: row.context_window_tokens,
     autoCompactTokenLimit: row.auto_compact_token_limit,
+    compactKeepRecentTokens: row.compact_keep_recent_tokens,
     toolOutputTokenLimit: row.tool_output_token_limit,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

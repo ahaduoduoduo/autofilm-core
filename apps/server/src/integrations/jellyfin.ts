@@ -181,7 +181,7 @@ export class JellyfinClient {
     refresh?: boolean;
     forceProbe?: boolean;
     providerIds?: Record<string, string>;
-    providerTarget?: "movie";
+    providerTarget?: "movie" | "series";
   }): Promise<void> {
     const config = this.requireConfig();
     await requestOk(

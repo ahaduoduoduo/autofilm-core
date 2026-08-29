@@ -25,7 +25,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-      fontconfig fonts-dejavu-core p7zip-full unzip unrar-free \
+      fontconfig fonts-dejavu-core p7zip-full unzip unar \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --create-home autofilm \
     && mkdir -p /data \

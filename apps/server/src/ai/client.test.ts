@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { withRecoverableHistory } from "./client.js";
+import { AiProviderError } from "./http.js";
+import { withAutomaticRetry } from "./retry.js";
 import type {
   AiClient,
   GenerateRequest,
@@ -55,6 +57,90 @@ describe("recoverable AI client", () => {
         messages: [{ role: "user", content: "hello" }],
       }),
     ).rejects.toThrow("HTTP 401");
+  });
+});
+
+describe("automatic AI request retries", () => {
+  it("retries transient processing and overload failures", async () => {
+    let attempts = 0;
+    const waits: number[] = [];
+    const inner: AiClient = {
+      async generate() {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error(
+            "AI provider stream failed: An error occurred while processing your request.",
+          );
+        }
+        if (attempts === 2) {
+          throw new Error(
+            "AI provider stream failed: Our servers are currently overloaded. Please try again later.",
+          );
+        }
+        return response("recovered");
+      },
+    };
+    const client = withAutomaticRetry(inner, {
+      sleep: async (milliseconds) => {
+        waits.push(milliseconds);
+      },
+      random: () => 0,
+    });
+
+    await expect(
+      client.generate({
+        model: "example",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    ).resolves.toMatchObject({ content: "recovered" });
+    expect(attempts).toBe(3);
+    expect(waits).toEqual([500, 1_000]);
+  });
+
+  it("respects Retry-After and does not retry permanent failures", async () => {
+    const waits: number[] = [];
+    let retryAfterAttempts = 0;
+    const retryAfterClient = withAutomaticRetry(
+      {
+        async generate() {
+          retryAfterAttempts += 1;
+          if (retryAfterAttempts === 1) {
+            throw new AiProviderError("HTTP 429 rate limited", {
+              retryable: true,
+              retryAfterMs: 2_500,
+            });
+          }
+          return response("ok");
+        },
+      },
+      {
+        sleep: async (milliseconds) => {
+          waits.push(milliseconds);
+        },
+      },
+    );
+    await retryAfterClient.generate({
+      model: "example",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    expect(waits).toEqual([2_500]);
+
+    let permanentAttempts = 0;
+    const permanentClient = withAutomaticRetry({
+      async generate() {
+        permanentAttempts += 1;
+        throw new AiProviderError("HTTP 429 insufficient_quota", {
+          retryable: false,
+        });
+      },
+    });
+    await expect(
+      permanentClient.generate({
+        model: "example",
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    ).rejects.toThrow("insufficient_quota");
+    expect(permanentAttempts).toBe(1);
   });
 });
 

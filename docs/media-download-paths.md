@@ -49,7 +49,8 @@ Core 使用 TMDB 英文标题生成稳定目录名。模型不能传入最终目
 
 ## Jellyfin 刷新
 
-电视剧无论下载单季还是多季合集，都刷新剧集根目录并携带 TMDB ID。这样
+电视剧无论下载单季还是多季合集，都刷新剧集根目录并携带 TMDB ID 及
+`provider_target=series`。这样
 `RemoteRefresh` 将 Provider ID 应用于 Series，而不是 Season。
 
 电影下载目标是月份目录，实际资源文件名或种子根目录只有下载完成后才确定，
@@ -61,7 +62,8 @@ Core 使用 TMDB 英文标题生成稳定目录名。模型不能传入最终目
 - 实际下载目录 `destination`。
 - Jellyfin 刷新目录 `jellyfinRefreshPath`。
 - 可安全应用的 `jellyfinProviderIds`。
-- 媒体类型、TMDB ID、标题、季号和是否为多季合集。
+- 媒体类型、TMDB ID、标题、季号和是否为多季合集；Worker 根据媒体类型发送
+  Jellyfin 的 Movie 或 Series 目标。
 
 ## 失败条件
 

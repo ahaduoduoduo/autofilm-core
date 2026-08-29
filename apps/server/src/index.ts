@@ -8,6 +8,7 @@ import { OpenListAuthWorker } from "./tasks/openlist-auth-worker.js";
 import { DownloadCompletionWorker } from "./tasks/download-completion-worker.js";
 import { MediaUpgradeWorker } from "./tasks/media-upgrade-worker.js";
 import { MediaUpgradeCheckWorker } from "./tasks/media-upgrade-check-worker.js";
+import { NativeRequestWorker } from "./tasks/native-request-worker.js";
 
 const config = loadConfig();
 const { app, context } = await buildApp(config);
@@ -24,6 +25,13 @@ const outboundWorker = new OutboundMessageWorker(
   context.configs,
   context.users,
   context.outbox,
+);
+const nativeRequestWorker = new NativeRequestWorker(
+  context.db,
+  context.nativeRequests,
+  context.agent,
+  context.outbox,
+  config.mediaBaseUrl,
 );
 const watchlistWorker = new WatchlistWorker(
   context.watchlists,
@@ -63,6 +71,7 @@ const mediaUpgradeCheckWorker = new MediaUpgradeCheckWorker(
 );
 progressWorker.start();
 outboundWorker.start();
+nativeRequestWorker.start();
 watchlistWorker.start();
 openListAuthWorker.start();
 downloadCompletionWorker.start();
@@ -79,6 +88,12 @@ const mediaCleanupTimer = setInterval(
     context.outbox.deleteDeliveredBefore(
       new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString(),
     );
+    context.nativeRequests.deleteFinishedBefore(
+      new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString(),
+    );
+    context.conversations.deleteCompactionChunksBefore(
+      new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString(),
+    );
   },
   60 * 60_000,
 );
@@ -86,6 +101,7 @@ mediaCleanupTimer.unref();
 app.addHook("onClose", async () => {
   progressWorker.stop();
   outboundWorker.stop();
+  nativeRequestWorker.stop();
   watchlistWorker.stop();
   openListAuthWorker.stop();
   downloadCompletionWorker.stop();

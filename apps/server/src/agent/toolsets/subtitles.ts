@@ -1,11 +1,12 @@
 import { Readable } from "node:stream";
 import type { SubtitleComment, SubtitleDetail, SubtitleWorkspace } from "../../subtitles/types.js";
-import { analyzeAss, modifyAss } from "../../subtitles/ass-style.js";
+import { analyzeAss } from "../../subtitles/ass-style.js";
 import { extractSubtitles } from "../../subtitles/extract.js";
 import { svgToPng } from "../../subtitles/captcha-recognizer.js";
 import { resolveSubtitleReference } from "../../subtitles/references.js";
 import type { AgentTool, ToolDependencies } from "../tool-types.js";
 import { createSubtitlePlacementTools } from "./subtitle-placement.js";
+import { createSubtitleProcessingTools } from "./subtitle-processing.js";
 import {
   objectSchema,
   requireArray,
@@ -46,7 +47,7 @@ export function createSubtitleTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "create_subtitle_workspace",
         description:
-          "为当前字幕任务创建一个临时工作区。一个工作区可累计下载、解压多个字幕包，任务结束或 24 小时后删除。",
+          "为当前成员创建一个通用临时字幕工作区。可累计 SubHD 下载文件或从 OpenList 导入的现有字幕，任务结束或 24 小时后删除。",
         parameters: objectSchema({}),
       },
       execute: async () => workspaceView(deps.subtitleWorkspaces.create(deps.userId)),
@@ -55,7 +56,7 @@ export function createSubtitleTools(deps: ToolDependencies): AgentTool[] {
       definition: {
         name: "get_subtitle_workspace",
         description:
-          "读取字幕工作区的全部压缩包、解压目录结构、不可变文件 UUID、集号、语言和格式。",
+          "读取字幕工作区的压缩包、OpenList 导入文件、不可变文件 UUID、处理状态、集号、语言和格式；不返回字幕正文。",
         parameters: objectSchema(
           { workspace_id: stringProperty("临时字幕工作区 ID") },
           ["workspace_id"],
@@ -111,6 +112,7 @@ export function createSubtitleTools(deps: ToolDependencies): AgentTool[] {
           requireString(args, "captcha_text"),
         ),
     },
+    ...createSubtitleProcessingTools(deps),
     ...createSubtitlePlacementTools(deps),
     {
       definition: {
@@ -336,32 +338,42 @@ async function adjustSubtitleStyle(
   const content = (
     await deps.jellyfin.subtitle(itemId, resolved.index, "ass")
   ).toString("utf8");
-  const modified = modifyAss(content, {
-    styleNames,
-    changes: {
-      fontSize:
-        typeof args.font_size === "number" ? args.font_size : undefined,
-      primaryColour:
-        typeof args.primary_color === "string"
-          ? args.primary_color
-          : undefined,
-      outlineColour:
-        typeof args.outline_color === "string"
-          ? args.outline_color
-          : undefined,
-      alignment:
-        typeof args.alignment === "number" ? args.alignment : undefined,
-      marginV: typeof args.margin_v === "number" ? args.margin_v : undefined,
-    },
-    moveToBottom: args.move_to_bottom === true,
-    moveToBlackBar: args.move_to_black_bar === true,
-    inlineMode:
-      args.inline_mode === "scale" || args.inline_mode === "remove"
-        ? args.inline_mode
-        : "keep",
-    blackBarMarginV: 30,
-  });
-  const data = Buffer.from(modified, "utf8");
+  const processed = await deps.subtitleProcessor.process(
+    "source.ass",
+    Buffer.from(content, "utf8"),
+    [
+      {
+        type: "ass_style",
+        options: {
+          styleNames,
+          changes: {
+            fontSize:
+              typeof args.font_size === "number" ? args.font_size : undefined,
+            primaryColour:
+              typeof args.primary_color === "string"
+                ? args.primary_color
+                : undefined,
+            outlineColour:
+              typeof args.outline_color === "string"
+                ? args.outline_color
+                : undefined,
+            alignment:
+              typeof args.alignment === "number" ? args.alignment : undefined,
+            marginV:
+              typeof args.margin_v === "number" ? args.margin_v : undefined,
+          },
+          moveToBottom: args.move_to_bottom === true,
+          moveToBlackBar: args.move_to_black_bar === true,
+          inlineMode:
+            args.inline_mode === "scale" || args.inline_mode === "remove"
+              ? args.inline_mode
+              : "keep",
+          blackBarMarginV: 30,
+        },
+      },
+    ],
+  );
+  const data = processed.data;
   await deps.jellyfin.uploadSubtitle({
     itemId,
     format: "ass",
@@ -406,6 +418,34 @@ function workspaceView(workspace: SubtitleWorkspace): Record<string, unknown> {
           languageHint: file.languageHint,
         };
       }),
+    })),
+    importedFiles: workspace.files
+      .filter((file) => file.source.type === "jellyfin_openlist")
+      .map((file) => {
+        if (file.source.type !== "jellyfin_openlist") return undefined;
+        return {
+          workspaceFileId: file.id,
+          jellyfinItemId: file.source.jellyfinItemId,
+          jellyfinName: file.source.jellyfinItemName,
+          filename: file.filename,
+          format: file.format,
+          language: file.source.language,
+          sizeBytes: file.sizeBytes,
+          episodeHint: file.episodeHint,
+        };
+      }),
+    processing: workspace.processingEntries.map((entry) => ({
+      processingId: entry.id,
+      workspaceFileId: entry.fileId,
+      operation: entry.operation,
+      outputLanguage: entry.outputLanguage,
+      state: entry.state,
+      eligibleEvents: entry.eligibleEvents,
+      rewrittenEvents: entry.rewrittenEvents,
+      rewrittenSegments: entry.rewrittenSegments,
+      newSubtitleRef: entry.outputSubtitleRef,
+      error: entry.lastError,
+      updatedAt: entry.updatedAt,
     })),
   };
 }

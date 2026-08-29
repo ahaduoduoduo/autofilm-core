@@ -103,6 +103,11 @@ function extractCommands(type: ArchiveType): ExtractCommand[] {
   }
   if (type === "rar") {
     return [
+      {
+        name: "unar",
+        command: "unar",
+        args: (archive, output) => ["-f", "-o", output, archive],
+      },
       sevenZip,
       {
         name: "unrar",

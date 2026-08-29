@@ -349,4 +349,76 @@ describe("native message service route", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().messages[0].text).toContain("已清除");
   });
+
+  it("accepts active native requests immediately and deduplicates background work", async () => {
+    const { app, context } = await testApp();
+    context.configs.saveChannel({
+      name: "WeClaw",
+      type: "native",
+      providerInstanceId: "wechat-main",
+      baseUrl: "http://weclaw:18011",
+      inboundToken: "adapter-to-core-token-with-length",
+      outboundToken: "core-to-adapter-token",
+      enabled: true,
+    });
+    const member = context.users.create({
+      username: "async-friend",
+      displayName: "Async Friend",
+      role: "member",
+    });
+    const identity = context.users.ensurePendingIdentity({
+      channel: "wechat",
+      providerInstanceId: "wechat-main",
+      externalUserId: "async@im.wechat",
+      displayName: "Async Friend",
+    });
+    context.users.bindIdentity(identity.id, member.id, "active");
+    const respond = vi.spyOn(context.agent, "respond");
+    const event = {
+      version: "2026-07-01",
+      event_id: "async:wechat-main:1",
+      event_type: "message.created",
+      provider: "wechat",
+      provider_instance_id: "wechat-main",
+      conversation_id: "async@im.wechat",
+      sender_id: "async@im.wechat",
+      message_id: "1",
+      message_type: "text",
+      text: "转换第一集字幕",
+      timestamp: new Date().toISOString(),
+    };
+
+    const accepted = await app.inject({
+      method: "POST",
+      url: "/v1/conversation/events",
+      headers: {
+        authorization: "Bearer adapter-to-core-token-with-length",
+      },
+      payload: event,
+    });
+    const repeated = await app.inject({
+      method: "POST",
+      url: "/v1/conversation/events",
+      headers: {
+        authorization: "Bearer adapter-to-core-token-with-length",
+      },
+      payload: event,
+    });
+
+    expect(accepted.statusCode).toBe(202);
+    expect(accepted.json()).toEqual({ messages: [] });
+    expect(repeated.statusCode).toBe(202);
+    expect(context.nativeRequests.get(event.event_id)).toMatchObject({
+      state: "pending",
+      text: "转换第一集字幕",
+    });
+    expect(
+      (
+        context.db
+          .prepare("SELECT COUNT(*) AS total FROM native_request_jobs")
+          .get() as { total: number }
+      ).total,
+    ).toBe(1);
+    expect(respond).not.toHaveBeenCalled();
+  });
 });

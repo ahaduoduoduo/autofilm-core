@@ -10,49 +10,6 @@ import {
 
 export function createBaseTools(deps: ToolDependencies): AgentTool[] {
   const tools: AgentTool[] = [
-    ...(deps.mediaTopic
-      ? [{
-          definition: {
-            name: "set_active_media_topic",
-            description:
-              "在当前讨论焦点已经唯一确定为一部电影或电视剧后登记主题。切换到另一作品时，Core 会把上一作品的完整历史压缩为摘要；只是举例或同时比较多部作品时不要调用。",
-            parameters: objectSchema(
-              {
-                media_type: {
-                  type: "string",
-                  enum: ["movie", "tv"],
-                },
-                tmdb_id: {
-                  type: "integer",
-                  minimum: 1,
-                },
-                title: stringProperty("已确认的规范标题"),
-                production_year: {
-                  type: "integer",
-                  minimum: 1800,
-                  maximum: 3000,
-                },
-              },
-              ["media_type", "tmdb_id", "title"],
-            ),
-          },
-          execute: async (args: Record<string, unknown>) => {
-            const mediaType = requireString(args, "media_type");
-            if (mediaType !== "movie" && mediaType !== "tv") {
-              throw new Error("media_type must be movie or tv");
-            }
-            return deps.mediaTopic!.activate({
-              mediaType,
-              tmdbId: positiveInteger(args, "tmdb_id", 1),
-              title: requireString(args, "title"),
-              productionYear:
-                args.production_year === undefined
-                  ? undefined
-                  : positiveInteger(args, "production_year", 1800),
-            });
-          },
-        } satisfies AgentTool]
-      : []),
     {
       definition: {
         name: "search_catalog",
