@@ -1,11 +1,11 @@
 # Deployment
 
-Updated: 2026-08-14
+Updated: 2026-08-29
 
 ## 目录和权限
 
 Core 容器以 UID `10001` 运行，`/data` 必须可写。数据目录包含 SQLite
-数据库、WAL 文件和字幕临时目录。镜像包含 `p7zip-full`，用于解压
+数据库、WAL 文件和字幕临时目录。镜像包含 `p7zip-full`、`unzip` 和 `unar`，用于解压
 ZIP、RAR 和 7z 字幕包。
 
 生成主密钥：

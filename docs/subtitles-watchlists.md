@@ -1,6 +1,6 @@
 # 字幕、验证码与追更
 
-Updated: 2026-08-14
+Updated: 2026-08-29
 
 ## 字幕搜索与评价
 
@@ -45,7 +45,8 @@ SHA-256；部分失败后用同一计划重试，已经成功的项不会再次�
 
 ## 解压与编码
 
-ZIP 依次尝试 7z 和 unzip；RAR 依次尝试 7z 和 unrar；7z 使用 7z。无法从扩展名识别
+ZIP 依次尝试 7z 和 unzip；RAR 优先使用支持 RAR 压缩方法与 Unicode 文件名的 `unar`，
+再回退到 7z 和 unrar；7z 使用 7z。无法从扩展名识别
 但内容符合 ASS、SRT、VTT、MicroDVD SUB 或 VobSub IDX 的文件按直接字幕处理。
 
 文本先处理 UTF-8、UTF-16 LE/BE BOM；严格 UTF-8 失败后使用 `iconv-lite` 的 GB18030

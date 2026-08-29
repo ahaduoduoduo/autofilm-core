@@ -1,8 +1,11 @@
 # AutoFilm Core development status
 
-Updated: 2026-08-16
+Updated: 2026-08-29
 
 ## 已完成
+
+- [x] 2026-08-29：RAR 字幕包改用 `unar` 优先解压，避免 `unrar-free` 对 RAR 压缩方法和
+  UTF-16BE 中文文件名的兼容问题；保留 7z/unrar 作为回退。
 
 - [x] 2026-08-16：普通下载完成通知同时携带 Movie/Series 类型与 TMDB ID；Jellyfin
   在元数据获取前验证目标类型，避免把影视身份写给错误条目。

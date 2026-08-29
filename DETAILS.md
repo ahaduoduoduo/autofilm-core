@@ -1,6 +1,6 @@
 # Repository details
 
-Updated: 2026-08-15
+Updated: 2026-08-29
 
 ## 根目录
 
@@ -203,7 +203,8 @@ Updated: 2026-08-15
 - `captcha-recognizer.ts`：独立视觉模型上下文和固定 OCR 提示词。
 - `download-service.ts`：每个下载独立执行最多五次自动验证码处理；人工验证码不占用
   全局等待状态。
-- `extract.ts`：7z/unzip/unrar 多级解压、UTF-8/UTF-16/GB18030 编码归一化和
+- `extract.ts`：RAR 优先使用 unar，并以 7z/unrar 回退；ZIP 使用 7z/unzip，另含
+  UTF-8/UTF-16/GB18030 编码归一化和
   字幕格式限制。
 - `subtitle-document.ts`：ASS/SSA/SRT/VTT 的共享事件模型与序列化器；广告操作可删除
   完整事件，大陆用词操作只能替换解析出的中文汉字段，英文、标签、时间轴、标点、
